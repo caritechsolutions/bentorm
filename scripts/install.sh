@@ -29,6 +29,7 @@ log()  { echo -e "\e[1;32m==>\e[0m $*"; }
 warn() { echo -e "\e[1;33m!!\e[0m $*"; }
 die()  { echo -e "\e[1;31mERROR:\e[0m $*" >&2; exit 1; }
 
+main() {
 trap 'die "Installer failed at line $LINENO (see output above)"' ERR
 
 [[ $EUID -eq 0 ]] || die "Run as root (curl ... | sudo bash)"
@@ -68,11 +69,11 @@ fi
 git config --global --add safe.directory "$INSTALL_DIR" >/dev/null 2>&1 || true
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   log "Updating checkout in $INSTALL_DIR ($BRANCH)"
-  git -C "$INSTALL_DIR" fetch origin "$BRANCH"
-  git -C "$INSTALL_DIR" reset --hard "origin/$BRANCH"
+  git -C "$INSTALL_DIR" fetch origin "$BRANCH" </dev/null
+  git -C "$INSTALL_DIR" reset --hard "origin/$BRANCH" </dev/null
 else
   log "Cloning $REPO_URL to $INSTALL_DIR"
-  git clone -b "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
+  git clone -b "$BRANCH" "$REPO_URL" "$INSTALL_DIR" </dev/null
 fi
 BACKEND="$INSTALL_DIR/backend"
 ENV_FILE="$BACKEND/.env"
@@ -126,7 +127,7 @@ fi
 # ---------------------------------------------------------------- app
 log "Installing PHP dependencies"
 cd "$BACKEND"
-COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --no-dev --optimize-autoloader --quiet
+COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --no-dev --optimize-autoloader --quiet </dev/null
 
 if ! grep -q '^APP_KEY=base64:' "$ENV_FILE"; then
   log "Generating application key"
@@ -183,3 +184,6 @@ echo "  Config      : $ENV_FILE"
 echo
 echo "  Next: point Nginx Proxy Manager at :$API_PORT (API) and :$WS_PORT (WebSockets, enable 'Websockets Support'),"
 echo "        then set APP_URL and REVERB_HOST/REVERB_SCHEME in .env and re-run this script."
+}
+
+main "$@" </dev/null
