@@ -2,6 +2,4 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', fn () => response()->json(['service' => 'bentorm-api', 'docs' => '/api/v1/health']));

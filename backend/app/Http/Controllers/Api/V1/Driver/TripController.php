@@ -1,0 +1,81 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1\Driver;
+
+use App\Http\Controllers\Controller;
+use App\Http\Resources\TripResource;
+use App\Models\Trip;
+use App\Services\DispatchService;
+use App\Services\TripService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+
+class TripController extends Controller
+{
+    public function __construct(private readonly TripService $trips, private readonly DispatchService $dispatch) {}
+
+    /** GET /driver/trips — driver history. */
+    public function index(Request $request): AnonymousResourceCollection
+    {
+        return TripResource::collection(
+            Trip::query()->where('driver_id', $request->user()->id)->with(['rider', 'vehicle'])->latest('id')->paginate(20)
+        );
+    }
+
+    /** GET /driver/trips/active */
+    public function active(Request $request): JsonResponse
+    {
+        $trip = $request->user()->activeTrip();
+
+        return response()->json(['trip' => $trip ? (new TripResource($trip->load(['rider', 'vehicle'])))->resolve($request) : null]);
+    }
+
+    /** POST /driver/trips/{trip}/accept */
+    public function accept(Request $request, Trip $trip): TripResource
+    {
+        return new TripResource($this->dispatch->accept($trip, $request->user())->load(['rider', 'driver.driverProfile', 'vehicle']));
+    }
+
+    /** POST /driver/trips/{trip}/decline */
+    public function decline(Request $request, Trip $trip): JsonResponse
+    {
+        $this->dispatch->decline($trip, $request->user());
+
+        return response()->json(['message' => 'Offer declined.']);
+    }
+
+    /** POST /driver/trips/{trip}/arrive */
+    public function arrive(Request $request, Trip $trip): TripResource
+    {
+        return new TripResource($this->trips->arrive($trip, $request->user())->load(['rider', 'vehicle']));
+    }
+
+    /** POST /driver/trips/{trip}/start */
+    public function start(Request $request, Trip $trip): TripResource
+    {
+        return new TripResource($this->trips->start($trip, $request->user())->load(['rider', 'vehicle']));
+    }
+
+    /** POST /driver/trips/{trip}/complete */
+    public function complete(Request $request, Trip $trip): TripResource
+    {
+        $data = $request->validate([
+            'lat' => ['nullable', 'numeric', 'between:-90,90'],
+            'lng' => ['nullable', 'numeric', 'between:-180,180'],
+        ]);
+
+        return new TripResource(
+            $this->trips->complete($trip, $request->user(), $data['lat'] ?? null, $data['lng'] ?? null)->load(['rider', 'vehicle'])
+        );
+    }
+
+    /** POST /driver/trips/{trip}/cancel */
+    public function cancel(Request $request, Trip $trip): TripResource
+    {
+        abort_unless($trip->driver_id === $request->user()->id, 403, 'This is not your trip.');
+        $data = $request->validate(['reason' => ['required', 'string', 'max:255']]);
+
+        return new TripResource($this->trips->cancel($trip, $request->user(), $data['reason'])->load(['rider', 'vehicle']));
+    }
+}

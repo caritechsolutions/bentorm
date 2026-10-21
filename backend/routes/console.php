@@ -1,8 +1,9 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use App\Models\OtpCode;
+use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+// Housekeeping
+Schedule::call(fn () => OtpCode::query()->where('expires_at', '<', now()->subDay())->delete())->daily()->name('otp:prune');
+Schedule::command('sanctum:prune-expired --hours=720')->daily();
+Schedule::command('trips:expire-stale')->everyMinute();

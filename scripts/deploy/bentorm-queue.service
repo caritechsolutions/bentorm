@@ -1,0 +1,14 @@
+[Unit]
+Description=Bentorm queue worker
+After=network.target mysql.service redis-server.service
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/bentorm/backend
+ExecStart=/usr/bin/php artisan queue:work redis --sleep=1 --tries=3 --max-time=3600 --queue=default
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
