@@ -1,0 +1,37 @@
+# Secrets / local config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# PHP
+backend/vendor/
+backend/composer.lock
+backend/storage/logs/
+backend/storage/cache/
+
+# Flutter / Dart
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/build/
+**/.pub-cache/
+**/.pub/
+**/ios/Pods/
+**/ios/.symlinks/
+**/android/.gradle/
+**/android/local.properties
+**/*.g.dart
+**/*.freezed.dart
+**/android/app/google-services.json
+**/ios/Runner/GoogleService-Info.plist
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+*.log
