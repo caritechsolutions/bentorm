@@ -22,7 +22,7 @@ docs/         Architecture, API contract, decisions
 ## Install / update the backend (Ubuntu 22.04 / 24.04)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/caritechsolutions/bentorm/main/scripts/install.sh | sudo ADMIN_PHONE=2461234567 bash
+curl -fsSL "https://raw.githubusercontent.com/caritechsolutions/bentorm/main/scripts/bootstrap.sh?$(date +%s)" | sudo ADMIN_PHONE=12461234567 API_HOST=api.example.com WS_HOST=ws.example.com bash
 ```
 
 Brings up the API on `:8080` and WebSockets on `:8081`, plus queue worker and scheduler as systemd services. Re-run to deploy the latest `main`.

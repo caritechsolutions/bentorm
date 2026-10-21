@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Bentorm backend installer / updater — Ubuntu 22.04 / 24.04
 #
-#   curl -fsSL https://raw.githubusercontent.com/caritechsolutions/bentorm/main/scripts/install.sh | sudo bash
+#   Run via scripts/bootstrap.sh (see README) — it updates the checkout then execs this file from /opt/bentorm.
 #
 # Optional environment variables (first run only):
 #   ADMIN_PHONE=2461234567   first admin account (can also be set later in /opt/bentorm/backend/.env)
