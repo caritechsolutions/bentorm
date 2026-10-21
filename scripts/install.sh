@@ -29,6 +29,8 @@ log()  { echo -e "\e[1;32m==>\e[0m $*"; }
 warn() { echo -e "\e[1;33m!!\e[0m $*"; }
 die()  { echo -e "\e[1;31mERROR:\e[0m $*" >&2; exit 1; }
 
+trap 'die "Installer failed at line $LINENO (see output above)"' ERR
+
 [[ $EUID -eq 0 ]] || die "Run as root (curl ... | sudo bash)"
 command -v apt-get >/dev/null || die "This installer supports Ubuntu/Debian only"
 export DEBIAN_FRONTEND=noninteractive
@@ -63,15 +65,15 @@ if ! command -v composer >/dev/null; then
 fi
 
 # ---------------------------------------------------------------- repo
+git config --global --add safe.directory "$INSTALL_DIR" >/dev/null 2>&1 || true
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   log "Updating checkout in $INSTALL_DIR ($BRANCH)"
-  git -C "$INSTALL_DIR" fetch -q origin "$BRANCH"
-  git -C "$INSTALL_DIR" reset -q --hard "origin/$BRANCH"
+  git -C "$INSTALL_DIR" fetch origin "$BRANCH"
+  git -C "$INSTALL_DIR" reset --hard "origin/$BRANCH"
 else
   log "Cloning $REPO_URL to $INSTALL_DIR"
-  git clone -q -b "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
+  git clone -b "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
 fi
-git config --global --add safe.directory "$INSTALL_DIR" >/dev/null 2>&1 || true
 BACKEND="$INSTALL_DIR/backend"
 ENV_FILE="$BACKEND/.env"
 
