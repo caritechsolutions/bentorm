@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\UserRole;
 use App\Models\User;
+use App\Support\Phone;
 use Illuminate\Database\Seeder;
 
 /**
@@ -13,12 +14,17 @@ class AdminUserSeeder extends Seeder
 {
     public function run(): void
     {
-        $phone = config('bentorm.admin_phone');
-        if (! $phone) {
+        $raw = config('bentorm.admin_phone');
+        if (! $raw) {
             $this->command?->warn('ADMIN_PHONE not set in .env — skipping admin user.');
 
             return;
         }
+
+        $phone = Phone::normalise((string) $raw);
+
+        // Repair any earlier record stored un-normalised.
+        User::query()->where('phone', $raw)->where('phone', '!=', $phone)->update(['phone' => $phone]);
 
         $user = User::query()->firstOrCreate(
             ['phone' => $phone],
