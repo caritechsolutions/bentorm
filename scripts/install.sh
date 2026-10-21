@@ -185,8 +185,6 @@ echo "  Queue       : $(systemctl is-active bentorm-queue)"
 echo "  Scheduler   : $(systemctl is-active bentorm-scheduler)"
 echo "  Config      : $ENV_FILE"
 echo
-echo "  Next: point Nginx Proxy Manager at :$API_PORT (API) and :$WS_PORT (WebSockets, enable 'Websockets Support'),"
-echo "        then set APP_URL and REVERB_HOST/REVERB_SCHEME in .env and re-run this script."
 }
 
 main "$@" </dev/null
