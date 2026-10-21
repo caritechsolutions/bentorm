@@ -20,6 +20,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ['prefix' => 'api', 'middleware' => ['api', 'auth:sanctum']],
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Behind Nginx Proxy Manager: trust X-Forwarded-* so URLs and client IPs are correct.
+        $middleware->trustProxies(at: '*');
         $middleware->alias([
             'role' => EnsureRole::class,
             'last-seen' => TouchLastSeen::class,

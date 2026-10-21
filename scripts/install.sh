@@ -6,6 +6,8 @@
 # Optional environment variables (first run only):
 #   ADMIN_PHONE=2461234567   first admin account (can also be set later in /opt/bentorm/backend/.env)
 #   ADMIN_NAME="Richard"
+#   API_HOST=api.ridecoop.net   public hostname NPM uses for the API  (sets APP_URL)
+#   WS_HOST=ws.ridecoop.net     public hostname NPM uses for WebSockets (sets REVERB_HOST)
 #   BRANCH=main
 #
 # Installs PHP 8.3 + extensions, Composer, MySQL 8, Redis, nginx; clones/updates the repo to
@@ -110,6 +112,14 @@ if [[ ! -f "$ENV_FILE" ]]; then
   [[ -n "${ADMIN_NAME:-}" ]] && set_env ADMIN_NAME "\"$ADMIN_NAME\""
 fi
 set_env DB_PASSWORD "$DB_PASS"
+if [[ -n "${API_HOST:-}" ]]; then
+  set_env APP_URL "https://$API_HOST"
+fi
+if [[ -n "${WS_HOST:-}" ]]; then
+  set_env REVERB_HOST "$WS_HOST"
+  set_env REVERB_PORT 443
+  set_env REVERB_SCHEME https
+fi
 
 # ---------------------------------------------------------------- app
 log "Installing PHP dependencies"
