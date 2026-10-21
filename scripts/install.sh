@@ -33,7 +33,7 @@ rand() { # rand <chars> <length> — pipe-safe random string
 }
 
 main() {
-trap 'die "Installer failed at line $LINENO (see output above)"' ERR
+trap 'die "Installer failed at line $LINENO: $BASH_COMMAND (exit $?)"' ERR
 
 [[ $EUID -eq 0 ]] || die "Run as root (curl ... | sudo bash)"
 command -v apt-get >/dev/null || die "This installer supports Ubuntu/Debian only"
