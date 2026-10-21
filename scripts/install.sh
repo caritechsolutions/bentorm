@@ -28,6 +28,9 @@ WS_PORT=8081
 log()  { echo -e "\e[1;32m==>\e[0m $*"; }
 warn() { echo -e "\e[1;33m!!\e[0m $*"; }
 die()  { echo -e "\e[1;31mERROR:\e[0m $*" >&2; exit 1; }
+rand() { # rand <chars> <length> — pipe-safe random string
+  head -c 512 /dev/urandom | tr -dc "$1" | cut -c1-"$2"
+}
 
 main() {
 trap 'die "Installer failed at line $LINENO (see output above)"' ERR
@@ -82,7 +85,7 @@ ENV_FILE="$BACKEND/.env"
 if [[ -f "$ENV_FILE" ]] && grep -q '^DB_PASSWORD=.\+' "$ENV_FILE"; then
   DB_PASS=$(grep '^DB_PASSWORD=' "$ENV_FILE" | cut -d= -f2-)
 else
-  DB_PASS=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)
+  DB_PASS=$(rand 'A-Za-z0-9' 32)
 fi
 
 log "Ensuring database '$DB_NAME' and user '$DB_USER'"
@@ -109,8 +112,8 @@ if [[ ! -f "$ENV_FILE" ]]; then
   set_env APP_ENV production
   set_env APP_DEBUG false
   set_env LOG_LEVEL info
-  set_env REVERB_APP_KEY "$(tr -dc 'a-z0-9' </dev/urandom | head -c 24)"
-  set_env REVERB_APP_SECRET "$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40)"
+  set_env REVERB_APP_KEY "$(rand 'a-z0-9' 24)"
+  set_env REVERB_APP_SECRET "$(rand 'A-Za-z0-9' 40)"
   [[ -n "${ADMIN_PHONE:-}" ]] && set_env ADMIN_PHONE "$ADMIN_PHONE"
   [[ -n "${ADMIN_NAME:-}" ]] && set_env ADMIN_NAME "\"$ADMIN_NAME\""
 fi
