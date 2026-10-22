@@ -64,7 +64,7 @@ class AdminPanelTest extends TestCase
             '/admin/documents', '/admin/vehicles', "/admin/vehicles/{$vehicle->id}", "/admin/vehicles/{$vehicle->id}/edit",
             '/admin/trips', "/admin/trips/{$trip->public_id}", '/admin/payments', '/admin/users', "/admin/users/{$admin->id}/edit",
             '/admin/service-areas', "/admin/service-areas/{$bb->id}/edit", '/admin/service-areas/create',
-            '/admin/vehicle-types', '/admin/document-types', '/admin/gateways', '/admin/gateways/create', '/admin/gateways/1/edit',
+            '/admin/vehicle-types', '/admin/document-types', '/admin/gateways', '/admin/gateways/create', '/admin/gateways/'.\App\Models\Gateway::query()->value('id').'/edit',
         ] as $url) {
             $this->get($url)->assertOk();
         }

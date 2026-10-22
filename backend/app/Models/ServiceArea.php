@@ -39,7 +39,7 @@ class ServiceArea extends Model
             $area->polygon = GeoJson::normalise($area->polygon);
             [$area->min_lat, $area->max_lat, $area->min_lng, $area->max_lng] = GeoJson::bbox($area->polygon);
         });
-        $flush = fn () => Cache::forget(self::CACHE_KEY);
+        $flush = fn () => Cache::deleteMultiple([self::CACHE_KEY, self::CACHE_KEY.':box']);
         static::saved($flush);
         static::deleted($flush);
     }

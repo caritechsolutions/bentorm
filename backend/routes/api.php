@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\FileController;
 use App\Http\Controllers\Api\V1\GeoController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\PaymentMethodController;
+use App\Http\Controllers\Api\V1\PlaceController;
 use App\Http\Controllers\Api\V1\Rider\TripController as RiderTripController;
 use Illuminate\Support\Facades\Route;
 
@@ -28,6 +29,19 @@ Route::prefix('v1')->group(function () {
 
     // ---------------------------------------------------------------- public
     Route::get('health', fn () => ['ok' => true, 'time' => now()->toIso8601String()]);
+    // Runtime settings for the apps (nothing secret: the Reverb app key is public by design).
+    Route::get('config', fn () => [
+        'realtime' => [
+            'key' => config('reverb.apps.apps.0.key'),
+            'host' => config('reverb.apps.apps.0.options.host'),
+            'port' => (int) config('reverb.apps.apps.0.options.port'),
+            'scheme' => config('reverb.apps.apps.0.options.scheme'),
+            'auth_endpoint' => url('/api/broadcasting/auth'),
+        ],
+        'address_search' => \App\Services\Google\PlacesService::configured(),
+        'app_scheme' => config('bentorm.app_scheme'),
+        'otp_length' => 6,
+    ]);
     Route::get('service-areas', [GeoController::class, 'serviceAreas']);
     Route::get('geo/check', [GeoController::class, 'check']);
     Route::get('vehicle-types', [GeoController::class, 'vehicleTypes']);
@@ -70,6 +84,13 @@ Route::prefix('v1')->group(function () {
         Route::get('files/documents/{document}', [FileController::class, 'document'])->name('files.document');
 
         Route::get('payments/{payment}', [PaymentController::class, 'show']);
+
+        // Address search (Google Places, proxied)
+        Route::prefix('places')->middleware('throttle:places')->group(function () {
+            Route::get('autocomplete', [PlaceController::class, 'autocomplete']);
+            Route::get('reverse', [PlaceController::class, 'reverse']);
+            Route::get('{placeId}', [PlaceController::class, 'show']);
+        });
 
         // Rider
         Route::prefix('trips')->group(function () {

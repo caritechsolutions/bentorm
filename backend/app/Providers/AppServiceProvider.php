@@ -23,6 +23,7 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->bind(DistanceProvider::class, fn ($app) => match (config('pricing.distance_provider')) {
             'osrm' => new OsrmDistanceProvider($app->make(HaversineDistanceProvider::class)),
+            'google' => new \App\Services\Routing\GoogleRoutesDistanceProvider($app->make(HaversineDistanceProvider::class)),
             default => $app->make(HaversineDistanceProvider::class),
         });
     }
@@ -32,6 +33,7 @@ class AppServiceProvider extends ServiceProvider
         // Single resources are returned bare; paginated lists keep {data, links, meta}.
         JsonResource::withoutWrapping();
 
+        RateLimiter::for('places', fn (Request $r) => Limit::perMinute(90)->by('places:'.($r->user()?->id ?: $r->ip())));
         RateLimiter::for('api', fn (Request $r) => Limit::perMinute(120)->by($r->user()?->id ?: $r->ip()));
         // Per phone number (the real abuse target) plus a looser per-IP cap — many users can share one IP.
         RateLimiter::for('otp', fn (Request $r) => [

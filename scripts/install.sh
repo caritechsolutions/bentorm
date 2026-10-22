@@ -10,6 +10,7 @@
 #   API_HOST=api.ridecoop.net   public hostname NPM uses for the API  (sets APP_URL)
 #   WS_HOST=ws.ridecoop.net     public hostname NPM uses for WebSockets (sets REVERB_HOST)
 #   ADMIN_HOST=newadmin.ridecoop.net  public hostname NPM uses for the admin panel (nginx :8082)
+#   GOOGLE_MAPS_KEY=AIza...      Google Maps Platform key: road distances (Routes API) + address search (Places)
 #   BRANCH=main
 #
 # Installs PHP 8.3 + extensions, Composer, MySQL 8, Redis, nginx; clones/updates the repo to
@@ -126,6 +127,11 @@ fi
 if [[ -n "${ADMIN_HOST:-}" ]]; then
   set_env ADMIN_HOST "$ADMIN_HOST"
 fi
+if [[ -n "${GOOGLE_MAPS_KEY:-}" ]]; then
+  set_env GOOGLE_MAPS_SERVER_KEY "$GOOGLE_MAPS_KEY"
+  set_env GOOGLE_MAPS_CLIENT_KEY "$GOOGLE_MAPS_KEY"
+  set_env DISTANCE_PROVIDER google
+fi
 if [[ -n "${WS_HOST:-}" ]]; then
   set_env REVERB_HOST "$WS_HOST"
   set_env REVERB_PORT 443
@@ -218,6 +224,7 @@ echo "  WebSockets  : ws://$IP:$WS_PORT  ($(systemctl is-active bentorm-reverb))
 echo "  Queue       : $(systemctl is-active bentorm-queue)"
 echo "  Scheduler   : $(systemctl is-active bentorm-scheduler)"
 echo "  Admin panel : http://$IP:8082/admin  ($(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8082/admin/login"))${ADMIN_HOST:+  ->  https://$ADMIN_HOST}"
+echo "  Google Maps : $(grep -q '^GOOGLE_MAPS_SERVER_KEY=.\+' "$ENV_FILE" && echo "configured (distance: $(grep '^DISTANCE_PROVIDER=' "$ENV_FILE" | cut -d= -f2))" || echo "not set — pass GOOGLE_MAPS_KEY=... (address search off, straight-line distances)")"
 echo "  Config      : $ENV_FILE"
 echo
 echo "$ADMIN_LOGIN" | sed 's/^/  /'

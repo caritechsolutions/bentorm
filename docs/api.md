@@ -23,12 +23,13 @@ Response shapes: single objects are returned bare; paginated lists are `{data, l
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/health` | |
+| GET | `/config` | Runtime settings for the apps: `realtime {key, host, port, scheme, auth_endpoint}`, `address_search` (bool), `app_scheme`, `otp_length` |
 | GET | `/service-areas` | Operating regions with GeoJSON polygons (coverage map, driver sign-up) |
 | GET | `/geo/check?lat=&lng=` | `{served, service_area, zones[], blocked}` |
 | GET | `/vehicle-types?service_area_id=` | Types offered in an area, with `max_passengers`, `max_luggage` |
 | GET | `/vehicle-features` | `[{key, label}]` — wheelchair_accessible, child_seat, pet_friendly, extra_luggage |
 | GET | `/fares?service_area_id=` | Rate cards (amounts exclude tax) |
-| POST | `/fares/estimate` | `pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, vehicle_type?, passengers?, luggage?` → `quotes[]` with `fare, hold_amount, subtotal, tax, currency, surge_multiplier, breakdown.lines[]`. Only types that fit the party are quoted. 422 `pickup`/`dropoff` when outside service or blocked. |
+| POST | `/fares/estimate` | `pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, vehicle_type?, passengers?, luggage?` → `quotes[]` with `fare, hold_amount, subtotal, tax, currency, surge_multiplier, breakdown.lines[]`. Only types that fit the party are quoted. Also returns `route {distance_m, duration_s, polyline: [[lat, lng], …] \| null}` for drawing. 422 `pickup`/`dropoff` when outside service or blocked. |
 
 ## Rider
 
@@ -45,6 +46,16 @@ Response shapes: single objects are returned bare; paginated lists are `{data, l
 | POST | `/me/payment-methods` | `service_area_id?` or `lat, lng` | Start adding a card → `redirect_url` (hosted card page). Returns to `ridecoop://card?id=&status=`; then poll `GET /me/payment-methods/{id}` |
 | POST | `/me/payment-methods/{id}/default` · DELETE `/me/payment-methods/{id}` | | Delete is refused while the card is on an active ride |
 | GET | `/payments/{pid}` | | Poll payment status |
+
+## Address search (any signed-in user)
+
+Google Places, called from the server so the key never ships for search and web clients avoid CORS. 503 when `GOOGLE_MAPS_SERVER_KEY` is not set or Google refuses. Throttled to 90/min per user.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/places/autocomplete?q=&lat=&lng=&session=` | Suggestions inside the active service areas: `[{place_id, main_text, secondary_text, distance_m}]`. Pass the rider's position for distances, and one `session` token per search (until a place is picked) for Google's session pricing |
+| GET | `/places/{place_id}?session=` | `{place_id, name, address, lat, lng}` (cached a day) |
+| GET | `/places/reverse?lat=&lng=` | Address for a point (current location, dragged pin); 404 if none |
 
 ## Driver (`role=driver`)
 
@@ -158,7 +169,7 @@ platform = subtotal × commission_rate                               driver   = 
 ```
 
 The multiplier (or fixed route) is locked when the trip is requested and reused for the final fare; distance, time and waiting use actuals. Cancellation fee (rider cancels after acceptance) gets VAT and commission the same way.
-Distance: haversine × 1.3 road factor by default; set `DISTANCE_PROVIDER=osrm` for real routing.
+Distance: haversine × 1.3 road factor by default; `DISTANCE_PROVIDER=google` (set by the installer when `GOOGLE_MAPS_KEY` is given) uses the Google Routes API — cached 10 min, falls back to haversine on error; `osrm` is also supported.
 
 ## Card payments: holds (Uber-style)
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Contracts\DistanceProvider;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\FareConfigResource;
 use App\Models\FareConfig;
@@ -24,7 +25,7 @@ class FareController extends Controller
     }
 
     /** POST /fares/estimate — quotes for every vehicle type offered at the pickup (or one type). */
-    public function estimate(Request $request, PricingService $pricing): JsonResponse
+    public function estimate(Request $request, PricingService $pricing, DistanceProvider $distance): JsonResponse
     {
         $data = $request->validate([
             'pickup_lat' => ['required', 'numeric', 'between:-90,90'],
@@ -56,6 +57,16 @@ class FareController extends Controller
             return $q;
         }, $quotes);
 
-        return response()->json(['quotes' => $quotes]);
+        // Same lookup the quotes used (cached for Google), returned so apps can draw the route.
+        $route = $distance->estimate($pLat, $pLng, $dLat, $dLng);
+
+        return response()->json([
+            'quotes' => $quotes,
+            'route' => [
+                'distance_m' => $route->distanceM,
+                'duration_s' => $route->durationS,
+                'polyline' => $route->polyline ? array_map(fn ($p) => [(float) $p[1], (float) $p[0]], $route->polyline) : null, // [[lat, lng], ...]
+            ],
+        ]);
     }
 }

@@ -14,6 +14,13 @@ return [
     |
     */
 
+    // Google Maps Platform. server_key: Routes, Places (New), Geocoding — called from this server only.
+    // client_key: Maps SDK / Maps JavaScript key handed to the web app for map tiles.
+    'google_maps' => [
+        'server_key' => env('GOOGLE_MAPS_SERVER_KEY'),
+        'client_key' => env('GOOGLE_MAPS_CLIENT_KEY'),
+    ],
+
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],

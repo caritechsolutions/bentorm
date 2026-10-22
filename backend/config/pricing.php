@@ -1,7 +1,7 @@
 <?php
 
 return [
-    // 'haversine' or 'osrm'
+    // 'haversine', 'osrm' or 'google' (Routes API; needs GOOGLE_MAPS_SERVER_KEY)
     'distance_provider' => env('DISTANCE_PROVIDER', 'haversine'),
     'osrm_url' => env('OSRM_URL', 'https://router.project-osrm.org'),
 
