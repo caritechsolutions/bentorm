@@ -130,4 +130,20 @@ class Trip extends Model
     {
         return $this->rider_id === $user->id || $this->driver_id === $user->id;
     }
+
+    /**
+     * What the driver would take home from the estimate (ex VAT, after commission) — shown on offers,
+     * before driver_earnings exists. Mirrors PricingService: subtotal = fare / (1 + tax), driver = subtotal × (1 − commission).
+     */
+    public function estimatedDriverEarnings(): ?float
+    {
+        if ($this->estimated_fare === null) {
+            return null;
+        }
+        $area = $this->relationLoaded('serviceArea') ? $this->serviceArea : $this->serviceArea()->first();
+        $tax = (float) ($area?->tax_rate ?? 0);
+        $commission = (float) ($area?->commission_rate ?? 0);
+
+        return round(((float) $this->estimated_fare / (1 + $tax)) * (1 - $commission), 2);
+    }
 }

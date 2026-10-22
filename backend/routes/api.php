@@ -129,6 +129,7 @@ Route::prefix('v1')->group(function () {
 
             Route::get('trips', [DriverTripController::class, 'index']);
             Route::get('trips/active', [DriverTripController::class, 'active']);
+            Route::get('trips/{trip}', [DriverTripController::class, 'show']);
             Route::post('trips/{trip}/accept', [DriverTripController::class, 'accept']);
             Route::post('trips/{trip}/decline', [DriverTripController::class, 'decline']);
             Route::post('trips/{trip}/arrive', [DriverTripController::class, 'arrive']);

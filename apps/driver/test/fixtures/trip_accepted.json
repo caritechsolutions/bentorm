@@ -1,0 +1,138 @@
+{
+  "id": "01m5k07wzjwxdzcwt4m85kkcq0",
+  "status": "accepted",
+  "vehicle_type": "standard",
+  "service_area_id": 1,
+  "rider": {
+    "id": 14,
+    "name": "Rita Rider",
+    "role": "rider",
+    "avatar_url": null
+  },
+  "driver": {
+    "id": 13,
+    "name": "Dave Driver",
+    "phone": "+12465554250",
+    "email": "dave12465554250@example.com",
+    "role": "driver",
+    "country_code": null,
+    "avatar_url": null,
+    "is_active": true,
+    "driver_profile": {
+      "status": "approved",
+      "status_note": "fixtures",
+      "service_area_id": 1,
+      "is_online": true,
+      "rating_avg": 5.0,
+      "rating_count": 0,
+      "completed_trips": 0,
+      "licence_number": "L123456",
+      "licence_expiry": "2030-06-30",
+      "psv_permit_number": "PSV-889",
+      "current_vehicle_id": 7,
+      "approved_at": "2026-10-22T23:48:15+00:00"
+    },
+    "created_at": "2026-10-22T23:48:14+00:00"
+  },
+  "vehicle": {
+    "id": 7,
+    "driver_id": 13,
+    "make": "Toyota",
+    "model": "Axio",
+    "year": 2019,
+    "colour": "Silver",
+    "plate": "Z20331",
+    "seats": 4,
+    "luggage_capacity": 2,
+    "features": [
+      "child_seat"
+    ],
+    "vehicle_type": "standard",
+    "status": "approved",
+    "status_note": null,
+    "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/35"
+  },
+  "pickup": {
+    "lat": 13.0969,
+    "lng": -59.6145,
+    "address": "Bay Street, Bridgetown",
+    "zone_id": null
+  },
+  "dropoff": {
+    "lat": 13.0667,
+    "lng": -59.5333,
+    "address": "Oistins Fish Fry",
+    "zone_id": null
+  },
+  "estimate": {
+    "distance_m": 12238,
+    "duration_s": 1469,
+    "fare": 57.5
+  },
+  "actual": {
+    "distance_m": null,
+    "duration_s": null,
+    "wait_s": null,
+    "fare": null,
+    "subtotal": null,
+    "tax": null
+  },
+  "driver_earnings": null,
+  "currency": "BBD",
+  "fare_breakdown": {
+    "lines": [
+      {
+        "code": "base",
+        "label": "Base fare",
+        "amount": 5
+      },
+      {
+        "code": "distance",
+        "label": "Distance (12.2 km)",
+        "amount": 30.6
+      },
+      {
+        "code": "time",
+        "label": "Time (24 min)",
+        "amount": 12.24
+      },
+      {
+        "code": "booking_fee",
+        "label": "Booking fee",
+        "amount": 1
+      },
+      {
+        "code": "rounding",
+        "label": "Rounding",
+        "amount": 0.1
+      },
+      {
+        "code": "tax",
+        "label": "VAT 17.5%",
+        "amount": 8.56
+      }
+    ],
+    "total": 57.5
+  },
+  "surge_multiplier": 1.0,
+  "payment_method": "cash",
+  "payment_status": "pending",
+  "amount_due": 0.0,
+  "passengers": 2,
+  "luggage": 1,
+  "required_features": [],
+  "hold_amount": null,
+  "payment_action": null,
+  "rider_note": "By the blue gate",
+  "cancelled_by": null,
+  "cancellation_reason": null,
+  "cancellation_fee": 0.0,
+  "timestamps": {
+    "requested_at": "2026-10-22T23:48:17+00:00",
+    "accepted_at": "2026-10-22T23:48:18+00:00",
+    "arrived_at": null,
+    "started_at": null,
+    "completed_at": null,
+    "cancelled_at": null
+  }
+}

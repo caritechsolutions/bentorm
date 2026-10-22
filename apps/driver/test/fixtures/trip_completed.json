@@ -1,0 +1,113 @@
+{
+  "id": "01m5k07wzjwxdzcwt4m85kkcq0",
+  "status": "completed",
+  "vehicle_type": "standard",
+  "service_area_id": 1,
+  "rider": {
+    "id": 14,
+    "name": "Rita Rider",
+    "role": "rider",
+    "avatar_url": null
+  },
+  "vehicle": {
+    "id": 7,
+    "driver_id": 13,
+    "make": "Toyota",
+    "model": "Axio",
+    "year": 2019,
+    "colour": "Silver",
+    "plate": "Z20331",
+    "seats": 4,
+    "luggage_capacity": 2,
+    "features": [
+      "child_seat"
+    ],
+    "vehicle_type": "standard",
+    "status": "approved",
+    "status_note": null,
+    "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/35"
+  },
+  "pickup": {
+    "lat": 13.0969,
+    "lng": -59.6145,
+    "address": "Bay Street, Bridgetown",
+    "zone_id": null
+  },
+  "dropoff": {
+    "lat": 13.0667,
+    "lng": -59.5333,
+    "address": "Oistins Fish Fry",
+    "zone_id": null
+  },
+  "estimate": {
+    "distance_m": 12238,
+    "duration_s": 1469,
+    "fare": 57.5
+  },
+  "actual": {
+    "distance_m": 12238,
+    "duration_s": 0,
+    "wait_s": 0,
+    "fare": 43.5,
+    "subtotal": 37.02,
+    "tax": 6.48
+  },
+  "driver_earnings": 29.62,
+  "currency": "BBD",
+  "fare_breakdown": {
+    "lines": [
+      {
+        "code": "base",
+        "label": "Base fare",
+        "amount": 5
+      },
+      {
+        "code": "distance",
+        "label": "Distance (12.2 km)",
+        "amount": 30.6
+      },
+      {
+        "code": "time",
+        "label": "Time (0 min)",
+        "amount": 0
+      },
+      {
+        "code": "booking_fee",
+        "label": "Booking fee",
+        "amount": 1
+      },
+      {
+        "code": "rounding",
+        "label": "Rounding",
+        "amount": 0.42
+      },
+      {
+        "code": "tax",
+        "label": "VAT 17.5%",
+        "amount": 6.48
+      }
+    ],
+    "total": 43.5
+  },
+  "surge_multiplier": 1.0,
+  "payment_method": "cash",
+  "payment_status": "paid",
+  "amount_due": 0.0,
+  "passengers": 2,
+  "luggage": 1,
+  "required_features": [],
+  "hold_amount": null,
+  "payment_action": null,
+  "rider_note": "By the blue gate",
+  "cancelled_by": null,
+  "cancellation_reason": null,
+  "cancellation_fee": 0.0,
+  "timestamps": {
+    "requested_at": "2026-10-22T23:48:17+00:00",
+    "accepted_at": "2026-10-22T23:48:18+00:00",
+    "arrived_at": "2026-10-22T23:48:18+00:00",
+    "started_at": "2026-10-22T23:48:18+00:00",
+    "completed_at": "2026-10-22T23:48:18+00:00",
+    "cancelled_at": null
+  }
+}

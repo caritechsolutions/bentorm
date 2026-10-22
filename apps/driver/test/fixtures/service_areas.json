@@ -1,0 +1,75 @@
+[
+  {
+    "id": 1,
+    "parent_id": null,
+    "type": "service",
+    "code": "BB",
+    "name": "Barbados",
+    "country_code": "BB",
+    "currency": "BBD",
+    "timezone": "America/Barbados",
+    "tax_rate": 0.175,
+    "tax_label": "VAT",
+    "rounding_increment": 0.5,
+    "hold_buffer_rate": 0.2,
+    "message": null,
+    "is_active": true,
+    "bbox": {
+      "min_lat": 13.025,
+      "max_lat": 13.345,
+      "min_lng": -59.67,
+      "max_lng": -59.405
+    },
+    "polygon": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            -59.66,
+            13.345
+          ],
+          [
+            -59.6,
+            13.345
+          ],
+          [
+            -59.5,
+            13.24
+          ],
+          [
+            -59.405,
+            13.17
+          ],
+          [
+            -59.42,
+            13.1
+          ],
+          [
+            -59.52,
+            13.025
+          ],
+          [
+            -59.58,
+            13.05
+          ],
+          [
+            -59.625,
+            13.075
+          ],
+          [
+            -59.665,
+            13.16
+          ],
+          [
+            -59.67,
+            13.28
+          ],
+          [
+            -59.66,
+            13.345
+          ]
+        ]
+      ]
+    }
+  }
+]

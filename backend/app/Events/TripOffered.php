@@ -34,6 +34,7 @@ class TripOffered implements ShouldBroadcast
                 'id' => $this->offer->id,
                 'distance_m' => $this->offer->distance_m,
                 'expires_at' => $this->offer->expires_at->toIso8601String(),
+                'estimated_earnings' => $this->offer->trip->estimatedDriverEarnings(),
             ],
             'trip' => (new TripResource($this->offer->trip->loadMissing('rider')))->resolve(),
         ];

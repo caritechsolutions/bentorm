@@ -1,0 +1,15 @@
+{
+  "status": "pending",
+  "status_note": null,
+  "service_area_id": 1,
+  "is_online": false,
+  "rating_avg": 5.0,
+  "rating_count": 0,
+  "completed_trips": 0,
+  "licence_number": "L123456",
+  "licence_expiry": "2030-06-30",
+  "psv_permit_number": "PSV-889",
+  "current_vehicle_id": null,
+  "current_vehicle": null,
+  "approved_at": null
+}

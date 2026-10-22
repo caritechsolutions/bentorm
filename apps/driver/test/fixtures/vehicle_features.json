@@ -1,0 +1,18 @@
+[
+  {
+    "key": "wheelchair_accessible",
+    "label": "Wheelchair accessible"
+  },
+  {
+    "key": "child_seat",
+    "label": "Child seat"
+  },
+  {
+    "key": "pet_friendly",
+    "label": "Pet friendly"
+  },
+  {
+    "key": "extra_luggage",
+    "label": "Extra luggage space"
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "message": "Verification code sent.",
+  "phone": "+12465554250",
+  "registered": false,
+  "channels": [
+    "sms",
+    "email"
+  ],
+  "email_hint": "d•••@example.com",
+  "ttl_minutes": 5
+}

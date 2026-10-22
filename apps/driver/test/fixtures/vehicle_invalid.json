@@ -1,0 +1,8 @@
+{
+  "message": "The make field is required.",
+  "errors": {
+    "make": [
+      "The make field is required."
+    ]
+  }
+}

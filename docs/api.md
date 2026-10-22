@@ -74,8 +74,8 @@ Google Places, called from the server so the key never ships for search and web 
 | POST | `/driver/vehicles/{id}/select` | | Set current vehicle (must be offline) |
 | POST | `/driver/online` · `/driver/offline` | | Requires approved profile + approved current vehicle |
 | POST | `/driver/location` | `lat, lng, heading?, speed?` | Send every 3–5 s while online. Doubles as heartbeat (90 s TTL). Returns `active_trip` for resync. |
-| GET | `/driver/offers` | | Pending offers (resync after reconnect) |
-| GET | `/driver/trips` · `/driver/trips/active` | | |
+| GET | `/driver/offers` | | Pending offers (resync after reconnect), each with `estimated_earnings` (ex VAT, after commission) |
+| GET | `/driver/trips` · `/driver/trips/active` · `/driver/trips/{id}` | | `{id}`: a trip this driver was assigned — e.g. to show that the rider cancelled |
 | POST | `/driver/trips/{id}/accept` | | 409 if taken/expired |
 | POST | `/driver/trips/{id}/decline` | | |
 | POST | `/driver/trips/{id}/arrive` → `/start` → `/complete` | `complete: lat?, lng?` | |

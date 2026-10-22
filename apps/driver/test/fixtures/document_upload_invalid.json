@@ -1,0 +1,8 @@
+{
+  "message": "The file field must be a file of type: jpg, jpeg, png, webp, heic, pdf.",
+  "errors": {
+    "file": [
+      "The file field must be a file of type: jpg, jpeg, png, webp, heic, pdf."
+    ]
+  }
+}

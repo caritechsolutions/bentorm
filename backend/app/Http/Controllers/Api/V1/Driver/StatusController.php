@@ -53,13 +53,14 @@ class StatusController extends Controller
     {
         $offers = TripOffer::query()->where('driver_id', $request->user()->id)
             ->where('response', OfferResponse::Pending->value)->where('expires_at', '>', now())
-            ->with('trip.rider')->get();
+            ->with(['trip.rider', 'trip.serviceArea'])->get();
 
         return response()->json([
             'offers' => $offers->map(fn (TripOffer $o) => [
                 'id' => $o->id,
                 'distance_m' => $o->distance_m,
                 'expires_at' => $o->expires_at->toIso8601String(),
+                'estimated_earnings' => $o->trip->estimatedDriverEarnings(),
                 'trip' => (new TripResource($o->trip))->resolve($request),
             ])->values(),
         ]);

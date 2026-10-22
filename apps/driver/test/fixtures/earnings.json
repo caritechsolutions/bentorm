@@ -1,0 +1,20 @@
+{
+  "currency": "BBD",
+  "periods": {
+    "today": {
+      "trips": 1,
+      "earnings": 29.62,
+      "cash_collected": 43.5
+    },
+    "week": {
+      "trips": 1,
+      "earnings": 29.62,
+      "cash_collected": 43.5
+    },
+    "month": {
+      "trips": 1,
+      "earnings": 29.62,
+      "cash_collected": 43.5
+    }
+  }
+}

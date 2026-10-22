@@ -1,0 +1,26 @@
+{
+  "profile": {
+    "status": "pending",
+    "status_note": null,
+    "service_area_id": null,
+    "is_online": false,
+    "rating_avg": 5.0,
+    "rating_count": 0,
+    "completed_trips": 0,
+    "licence_number": null,
+    "licence_expiry": null,
+    "psv_permit_number": null,
+    "current_vehicle_id": null,
+    "current_vehicle": null,
+    "approved_at": null
+  },
+  "can_go_online": false,
+  "issues": [
+    "Your account is awaiting approval.",
+    "Select the area you will drive in.",
+    "Upload your Profile photo.",
+    "Upload your Driver's licence.",
+    "Upload your Police Certificate of Character.",
+    "Add and select a vehicle."
+  ]
+}

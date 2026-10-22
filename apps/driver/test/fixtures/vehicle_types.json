@@ -1,0 +1,32 @@
+[
+  {
+    "key": "standard",
+    "name": "Standard",
+    "description": "Everyday rides",
+    "max_passengers": 4,
+    "max_luggage": 2,
+    "icon_url": null,
+    "sort_order": 1,
+    "is_active": true
+  },
+  {
+    "key": "xl",
+    "name": "XL",
+    "description": "Larger vehicles for groups and luggage",
+    "max_passengers": 6,
+    "max_luggage": 5,
+    "icon_url": null,
+    "sort_order": 2,
+    "is_active": true
+  },
+  {
+    "key": "premium",
+    "name": "Premium",
+    "description": "Top-rated drivers, premium vehicles",
+    "max_passengers": 4,
+    "max_luggage": 3,
+    "icon_url": null,
+    "sort_order": 3,
+    "is_active": true
+  }
+]

@@ -113,6 +113,27 @@ class TripLifecycleTest extends TestCase
             ->assertStatus(422)->assertJsonValidationErrors('payment');
     }
 
+    public function test_offers_show_estimated_earnings_and_driver_can_see_a_trip_the_rider_cancelled(): void
+    {
+        $trip = $this->requestTrip();
+        $this->offerTo($trip, $this->driver);
+
+        $offer = $this->actingAs($this->driver)->getJson('/api/v1/driver/offers')->assertOk()->json('offers.0');
+        // ex VAT (17.5%), after 20% commission
+        $this->assertEqualsWithDelta(round($trip->estimated_fare / 1.175 * 0.8, 2), $offer['estimated_earnings'], 0.001);
+        $this->assertLessThan($trip->estimated_fare, $offer['estimated_earnings']);
+
+        $this->actingAs($this->driver)->postJson("/api/v1/driver/trips/{$trip->public_id}/accept")->assertOk();
+        $this->actingAs($this->rider)->postJson("/api/v1/trips/{$trip->public_id}/cancel")->assertOk();
+
+        $this->actingAs($this->driver)->getJson('/api/v1/driver/trips/active')->assertOk()->assertJsonPath('trip', null);
+        $this->actingAs($this->driver)->getJson("/api/v1/driver/trips/{$trip->public_id}")
+            ->assertOk()->assertJsonPath('status', 'cancelled')->assertJsonPath('cancelled_by', 'rider')
+            ->assertJsonPath('rider.name', $this->rider->name);
+
+        $this->actingAs($this->makeApprovedDriver())->getJson("/api/v1/driver/trips/{$trip->public_id}")->assertNotFound();
+    }
+
     public function test_rider_cancel_before_accept_is_free(): void
     {
         $trip = $this->requestTrip();

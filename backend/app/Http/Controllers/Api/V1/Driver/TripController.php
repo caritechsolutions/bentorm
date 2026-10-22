@@ -31,6 +31,14 @@ class TripController extends Controller
         return response()->json(['trip' => $trip ? (new TripResource($trip->load(['rider', 'vehicle'])))->resolve($request) : null]);
     }
 
+    /** GET /driver/trips/{trip} — a trip this driver drove (or was assigned), e.g. after the rider cancelled. */
+    public function show(Request $request, Trip $trip): TripResource
+    {
+        abort_unless($trip->driver_id === $request->user()->id, 404);
+
+        return new TripResource($trip->load(['rider', 'vehicle']));
+    }
+
     /** POST /driver/trips/{trip}/accept */
     public function accept(Request $request, Trip $trip): TripResource
     {

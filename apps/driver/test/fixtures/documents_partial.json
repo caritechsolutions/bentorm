@@ -1,0 +1,118 @@
+{
+  "checklist": [
+    {
+      "type": {
+        "id": 1,
+        "key": "driver_photo",
+        "name": "Profile photo",
+        "description": "A clear, recent photo of your face. Riders see this.",
+        "applies_to": "driver",
+        "service_area_id": null,
+        "is_required": true,
+        "requires_expiry": false,
+        "requires_number": false,
+        "is_image_only": true,
+        "visible_to_riders": true,
+        "sort_order": 1,
+        "is_active": true
+      },
+      "state": "pending",
+      "document": {
+        "id": 33,
+        "type": {
+          "key": "driver_photo",
+          "name": "Profile photo"
+        },
+        "document_type_id": 1,
+        "number": null,
+        "expires_at": null,
+        "status": "pending",
+        "review_note": null,
+        "reviewed_at": null,
+        "mime": "image/jpeg",
+        "size": 2591,
+        "original_name": "tmp.0QDP6KCMv9.jpg",
+        "url": "http://127.0.0.1:8099/api/v1/files/documents/33",
+        "uploaded_at": "2026-10-22T23:48:15+00:00"
+      },
+      "pending_replacement": null
+    },
+    {
+      "type": {
+        "id": 2,
+        "key": "drivers_licence",
+        "name": "Driver's licence",
+        "description": null,
+        "applies_to": "driver",
+        "service_area_id": null,
+        "is_required": true,
+        "requires_expiry": true,
+        "requires_number": true,
+        "is_image_only": false,
+        "visible_to_riders": false,
+        "sort_order": 2,
+        "is_active": true
+      },
+      "state": "pending",
+      "document": {
+        "id": 34,
+        "type": {
+          "key": "drivers_licence",
+          "name": "Driver's licence"
+        },
+        "document_type_id": 2,
+        "number": "L123456",
+        "expires_at": "2030-06-30",
+        "status": "pending",
+        "review_note": null,
+        "reviewed_at": null,
+        "mime": "image/jpeg",
+        "size": 2591,
+        "original_name": "tmp.0QDP6KCMv9.jpg",
+        "url": "http://127.0.0.1:8099/api/v1/files/documents/34",
+        "uploaded_at": "2026-10-22T23:48:15+00:00"
+      },
+      "pending_replacement": null
+    },
+    {
+      "type": {
+        "id": 3,
+        "key": "police_certificate",
+        "name": "Police Certificate of Character",
+        "description": "Issued within the last 6 months.",
+        "applies_to": "driver",
+        "service_area_id": null,
+        "is_required": true,
+        "requires_expiry": false,
+        "requires_number": false,
+        "is_image_only": false,
+        "visible_to_riders": false,
+        "sort_order": 3,
+        "is_active": true
+      },
+      "state": "missing",
+      "document": null,
+      "pending_replacement": null
+    },
+    {
+      "type": {
+        "id": 4,
+        "key": "psv_permit",
+        "name": "PSV / taxi permit",
+        "description": null,
+        "applies_to": "driver",
+        "service_area_id": 1,
+        "is_required": true,
+        "requires_expiry": true,
+        "requires_number": true,
+        "is_image_only": false,
+        "visible_to_riders": false,
+        "sort_order": 4,
+        "is_active": true
+      },
+      "state": "missing",
+      "document": null,
+      "pending_replacement": null
+    }
+  ]
+}

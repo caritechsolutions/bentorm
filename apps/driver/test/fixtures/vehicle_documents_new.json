@@ -1,0 +1,144 @@
+{
+  "checklist": [
+    {
+      "type": {
+        "id": 5,
+        "key": "vehicle_registration",
+        "name": "Vehicle registration",
+        "description": null,
+        "applies_to": "vehicle",
+        "service_area_id": null,
+        "is_required": true,
+        "requires_expiry": false,
+        "requires_number": true,
+        "is_image_only": false,
+        "visible_to_riders": false,
+        "sort_order": 10,
+        "is_active": true
+      },
+      "state": "missing",
+      "document": null,
+      "pending_replacement": null
+    },
+    {
+      "type": {
+        "id": 6,
+        "key": "vehicle_insurance",
+        "name": "Insurance certificate",
+        "description": "Must cover hire and reward.",
+        "applies_to": "vehicle",
+        "service_area_id": null,
+        "is_required": true,
+        "requires_expiry": true,
+        "requires_number": false,
+        "is_image_only": false,
+        "visible_to_riders": false,
+        "sort_order": 11,
+        "is_active": true
+      },
+      "state": "missing",
+      "document": null,
+      "pending_replacement": null
+    },
+    {
+      "type": {
+        "id": 7,
+        "key": "vehicle_photo_front",
+        "name": "Vehicle photo — front (plate visible)",
+        "description": null,
+        "applies_to": "vehicle",
+        "service_area_id": null,
+        "is_required": true,
+        "requires_expiry": false,
+        "requires_number": false,
+        "is_image_only": true,
+        "visible_to_riders": true,
+        "sort_order": 12,
+        "is_active": true
+      },
+      "state": "missing",
+      "document": null,
+      "pending_replacement": null
+    },
+    {
+      "type": {
+        "id": 8,
+        "key": "vehicle_photo_rear",
+        "name": "Vehicle photo — rear",
+        "description": null,
+        "applies_to": "vehicle",
+        "service_area_id": null,
+        "is_required": true,
+        "requires_expiry": false,
+        "requires_number": false,
+        "is_image_only": true,
+        "visible_to_riders": false,
+        "sort_order": 13,
+        "is_active": true
+      },
+      "state": "missing",
+      "document": null,
+      "pending_replacement": null
+    },
+    {
+      "type": {
+        "id": 9,
+        "key": "vehicle_photo_side",
+        "name": "Vehicle photo — side",
+        "description": null,
+        "applies_to": "vehicle",
+        "service_area_id": null,
+        "is_required": true,
+        "requires_expiry": false,
+        "requires_number": false,
+        "is_image_only": true,
+        "visible_to_riders": false,
+        "sort_order": 14,
+        "is_active": true
+      },
+      "state": "missing",
+      "document": null,
+      "pending_replacement": null
+    },
+    {
+      "type": {
+        "id": 10,
+        "key": "vehicle_photo_interior",
+        "name": "Vehicle photo — interior",
+        "description": null,
+        "applies_to": "vehicle",
+        "service_area_id": null,
+        "is_required": true,
+        "requires_expiry": false,
+        "requires_number": false,
+        "is_image_only": true,
+        "visible_to_riders": false,
+        "sort_order": 15,
+        "is_active": true
+      },
+      "state": "missing",
+      "document": null,
+      "pending_replacement": null
+    },
+    {
+      "type": {
+        "id": 11,
+        "key": "vehicle_inspection",
+        "name": "Inspection / fitness certificate",
+        "description": null,
+        "applies_to": "vehicle",
+        "service_area_id": null,
+        "is_required": false,
+        "requires_expiry": true,
+        "requires_number": false,
+        "is_image_only": false,
+        "visible_to_riders": false,
+        "sort_order": 16,
+        "is_active": true
+      },
+      "state": "missing",
+      "document": null,
+      "pending_replacement": null
+    }
+  ]
+}
