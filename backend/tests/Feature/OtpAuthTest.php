@@ -26,11 +26,14 @@ class OtpAuthTest extends TestCase
 
         $this->postJson('/api/v1/auth/otp/request', ['phone' => '2465551234'])->assertStatus(422); // cooldown
 
-        $this->travel(31)->seconds();
-        $this->postJson('/api/v1/auth/otp/request', ['phone' => '2465551234'])->assertOk();
+        // Same code, now with a name: asking for the name must not have used the code up.
         $res = $this->postJson('/api/v1/auth/otp/verify', ['phone' => '2465551234', 'code' => '123456', 'name' => 'Test Rider']);
         $res->assertCreated()->assertJsonPath('is_new', true)->assertJsonPath('user.role', 'rider')
             ->assertJsonPath('user.phone', '+12465551234');
+
+        // ...but a successful login does use it up.
+        $this->postJson('/api/v1/auth/otp/verify', ['phone' => '2465551234', 'code' => '123456'])
+            ->assertStatus(422)->assertJsonPath('errors.code.0', 'Code expired. Please request a new one.');
 
         $this->withToken($res->json('token'))->getJson('/api/v1/me')->assertOk()->assertJsonPath('name', 'Test Rider');
     }

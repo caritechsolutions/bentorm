@@ -39,7 +39,11 @@ class OtpService
     }
 
     /** Verify a code; throws a validation error on failure. */
-    public function verify(string $phone, string $code): void
+    /**
+     * Check a code. With $consume = false the code stays usable (e.g. while a first-time user is
+     * asked for their name) — call consume() once the login actually happens.
+     */
+    public function verify(string $phone, string $code, bool $consume = true): OtpCode
     {
         $otp = OtpCode::query()
             ->where('phone', $phone)
@@ -60,6 +64,15 @@ class OtpService
             throw ValidationException::withMessages(['code' => ['Incorrect code.']]);
         }
 
+        if ($consume) {
+            $this->consume($otp);
+        }
+
+        return $otp;
+    }
+
+    public function consume(OtpCode $otp): void
+    {
         $otp->forceFill(['consumed_at' => now()])->save();
     }
 

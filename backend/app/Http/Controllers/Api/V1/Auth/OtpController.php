@@ -43,7 +43,8 @@ class OtpController extends Controller
         ]);
         $phone = Phone::normalise($data['phone']);
 
-        $this->otp->verify($phone, $data['code']);
+        // Not consumed yet: a first-time user who still has to give their name keeps the same code.
+        $otp = $this->otp->verify($phone, $data['code'], consume: false);
 
         $user = User::query()->where('phone', $phone)->first();
         $isNew = false;
@@ -68,6 +69,7 @@ class OtpController extends Controller
             $user->forceFill(['phone_verified_at' => now()])->save();
         }
 
+        $this->otp->consume($otp);
         $token = $user->createToken($data['device_name'] ?? 'app')->plainTextToken;
 
         return response()->json([
