@@ -29,7 +29,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login(Login::class)
-            ->brandName('RideCoop Admin')
+            ->brandName('Ride Coop Admin')
             ->colors(['primary' => Color::Teal])
             ->defaultAvatarProvider(\App\Filament\Support\InitialsAvatarProvider::class)
             ->navigationGroups([

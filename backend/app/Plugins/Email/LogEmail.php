@@ -26,7 +26,7 @@ class LogEmail extends AbstractPlugin implements EmailPlugin
 
     public function test(array $context = []): array
     {
-        $this->send($context['to'] ?? 'test@example.com', 'RideCoop test email', '<p>Test</p>');
+        $this->send($context['to'] ?? 'test@example.com', 'Ride Coop test email', '<p>Test</p>');
 
         return ['ok' => true, 'message' => 'Written to storage/logs/laravel.log'];
     }

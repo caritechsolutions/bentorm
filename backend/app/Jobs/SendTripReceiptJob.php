@@ -26,6 +26,6 @@ class SendTripReceiptJob implements ShouldQueue
             return;
         }
         $html = view('emails.receipt', ['trip' => $trip, 'tz' => $trip->serviceArea?->timezone ?: config('app.timezone')])->render();
-        $email->send($trip->rider->email, 'Your RideCoop receipt', $html);
+        $email->send($trip->rider->email, 'Your '.config('bentorm.brand_name', 'Ride Coop').' receipt', $html);
     }
 }

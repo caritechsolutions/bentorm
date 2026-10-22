@@ -33,6 +33,10 @@ class AppServiceProvider extends ServiceProvider
         // Single resources are returned bare; paginated lists keep {data, links, meta}.
         JsonResource::withoutWrapping();
 
+        RateLimiter::for('otp-lookup', fn (Request $r) => [
+            Limit::perMinute(10)->by('otp-lookup-phone:'.preg_replace('/\D+/', '', (string) $r->input('phone'))),
+            Limit::perMinute(60)->by('otp-lookup-ip:'.$r->ip()),
+        ]);
         RateLimiter::for('places', fn (Request $r) => Limit::perMinute(90)->by('places:'.($r->user()?->id ?: $r->ip())));
         RateLimiter::for('api', fn (Request $r) => Limit::perMinute(120)->by($r->user()?->id ?: $r->ip()));
         // Per phone number (the real abuse target) plus a looser per-IP cap — many users can share one IP.

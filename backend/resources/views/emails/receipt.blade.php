@@ -1,6 +1,6 @@
 <!doctype html>
 <html><body style="font-family:system-ui,Segoe UI,Roboto,sans-serif;color:#111;max-width:520px;margin:0 auto;padding:16px">
-  <h2 style="margin:0 0 4px">Thanks for riding with RideCoop</h2>
+  <h2 style="margin:0 0 4px">Thanks for riding with Ride Coop</h2>
   <p style="color:#555;margin:0 0 16px">{{ $trip->completed_at?->setTimezone($tz)->format('D j M Y, g:i a') }}</p>
   <p style="margin:0 0 4px"><strong>From:</strong> {{ $trip->pickup_address ?? 'Pickup' }}</p>
   <p style="margin:0 0 16px"><strong>To:</strong> {{ $trip->dropoff_address ?? 'Drop-off' }}</p>

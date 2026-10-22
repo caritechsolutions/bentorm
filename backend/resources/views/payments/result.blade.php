@@ -12,5 +12,5 @@
     <h1>Payment processing</h1>
     <p>We're waiting for confirmation from the bank. You can return to the app.</p>
   @endif
-  <a class="btn primary" href="{{ $deepLink }}">Return to RideCoop</a>
+  <a class="btn primary" href="{{ $deepLink }}">Return to Ride Coop</a>
 @endsection

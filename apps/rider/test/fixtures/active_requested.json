@@ -1,6 +1,6 @@
 {
   "trip": {
-    "id": "01m5j2vtdmrjbb3gx3xst365f7",
+    "id": "01m5jvzr845a1zt9g59vvn5w7t",
     "status": "requested",
     "vehicle_type": "standard",
     "service_area_id": 1,
@@ -81,7 +81,7 @@
     "cancellation_reason": null,
     "cancellation_fee": 0.0,
     "timestamps": {
-      "requested_at": "2026-10-22T15:14:52+00:00",
+      "requested_at": "2026-10-22T22:33:56+00:00",
       "accepted_at": null,
       "arrived_at": null,
       "started_at": null,

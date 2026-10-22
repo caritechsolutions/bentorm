@@ -29,7 +29,7 @@ class SmtpEmail extends AbstractPlugin implements EmailPlugin
             ['key' => 'username', 'label' => 'Username', 'type' => 'string'],
             ['key' => 'password', 'label' => 'Password', 'type' => 'secret'],
             ['key' => 'from_address', 'label' => 'From address', 'type' => 'email', 'required' => true],
-            ['key' => 'from_name', 'label' => 'From name', 'type' => 'string', 'default' => 'RideCoop'],
+            ['key' => 'from_name', 'label' => 'From name', 'type' => 'string', 'default' => 'Ride Coop'],
         ];
     }
 
@@ -49,7 +49,7 @@ class SmtpEmail extends AbstractPlugin implements EmailPlugin
     {
         try {
             if (! empty($context['to'])) {
-                $this->send($context['to'], 'RideCoop test email', '<p>Your SMTP gateway is working.</p>');
+                $this->send($context['to'], config('bentorm.brand_name', 'Ride Coop').' test email', '<p>Your SMTP gateway is working.</p>');
 
                 return ['ok' => true, 'message' => "Sent to {$context['to']}"];
             }

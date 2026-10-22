@@ -29,7 +29,7 @@ class HttpSms extends AbstractPlugin implements SmsPlugin
             ['key' => 'to_field', 'label' => 'Recipient field', 'type' => 'string', 'default' => 'to'],
             ['key' => 'message_field', 'label' => 'Message field', 'type' => 'string', 'default' => 'message'],
             ['key' => 'sender_field', 'label' => 'Sender field', 'type' => 'string', 'default' => 'from'],
-            ['key' => 'sender_id', 'label' => 'Sender ID', 'type' => 'string', 'default' => 'RideCoop'],
+            ['key' => 'sender_id', 'label' => 'Sender ID', 'type' => 'string', 'default' => 'Ride Coop'],
             ['key' => 'strip_plus', 'label' => 'Send number without "+"', 'type' => 'bool', 'default' => false],
             ['key' => 'extra_fields', 'label' => 'Extra fields (JSON object)', 'type' => 'text', 'help' => '{"api_key":"..."}'],
         ];

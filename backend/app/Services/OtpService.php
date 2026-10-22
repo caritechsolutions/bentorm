@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\SmsSender;
+use App\Jobs\SendOtpEmailJob;
 use App\Models\OtpCode;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -14,9 +15,12 @@ class OtpService
     public function __construct(private readonly SmsSender $sms) {}
 
     /**
-     * Generate and send a code. Returns the code only when config('otp.expose_code') is on.
+     * Generate a code and send it by SMS and, when there is one, to the email address too.
+     * $email: the account's email (existing users) or the one a new user is signing up with.
+     *
+     * @return array{code: ?string, channels: list<string>} code only when config('otp.expose_code') is on
      */
-    public function request(string $phone): ?string
+    public function request(string $phone, ?string $email = null): array
     {
         $cooldown = (int) config('otp.resend_cooldown_seconds');
         $recent = OtpCode::query()->where('phone', $phone)->latest('id')->first();
@@ -27,25 +31,48 @@ class OtpService
         }
 
         $code = config('otp.static_code') ?: $this->generate();
+        $minutes = (int) config('otp.ttl_minutes');
 
         OtpCode::query()->where('phone', $phone)->whereNull('consumed_at')->delete();
         $otp = OtpCode::query()->create([
             'phone' => $phone,
+            'email' => $email,
             'code_hash' => Hash::make($code),
-            'expires_at' => now()->addMinutes((int) config('otp.ttl_minutes')),
+            'expires_at' => now()->addMinutes($minutes),
         ]);
 
+        $channels = [];
         $brand = config('bentorm.brand_name', 'Ride Coop');
         try {
-            $this->sms->send($phone, "Your {$brand} code is {$code}. It expires in ".config('otp.ttl_minutes').' minutes.');
+            $this->sms->send($phone, "Your {$brand} code is {$code}. It expires in {$minutes} minutes.");
+            $channels[] = 'sms';
         } catch (\Throwable $e) {
+            Log::error('OTP SMS failed: '.$e->getMessage(), ['phone' => $phone]);
+        }
+
+        if ($email) {
+            SendOtpEmailJob::dispatch($email, $code, $minutes);
+            $channels[] = 'email';
+        }
+
+        if (! $channels) {
             // Don't leave a code nobody received (it would also block a retry for the cooldown).
             $otp->delete();
-            Log::error('OTP SMS failed: '.$e->getMessage(), ['phone' => $phone]);
             throw new ServiceUnavailableHttpException(null, 'We couldn\'t send the text message right now. Please try again in a minute.');
         }
 
-        return config('otp.expose_code') ? $code : null;
+        return ['code' => config('otp.expose_code') ? $code : null, 'channels' => $channels];
+    }
+
+    /** "r•••@gmail.com" — enough for the rider to recognise their address. */
+    public static function maskEmail(?string $email): ?string
+    {
+        if (! $email || ! str_contains($email, '@')) {
+            return null;
+        }
+        [$local, $domain] = explode('@', $email, 2);
+
+        return mb_substr($local, 0, 1).'•••@'.$domain;
     }
 
     /** Verify a code; throws a validation error on failure. */

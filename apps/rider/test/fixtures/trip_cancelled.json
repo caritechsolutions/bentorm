@@ -1,18 +1,18 @@
 {
-  "id": "01m5j2vw00rrgr1f880jk4mqy2",
+  "id": "01m5jvzsse1gz6pf2n9yej006r",
   "status": "cancelled",
   "vehicle_type": "standard",
   "service_area_id": 1,
   "rider": {
-    "id": 7,
+    "id": 8,
     "name": "Rita Rider",
-    "phone": "+12465552447",
-    "email": null,
+    "phone": "+12465552901",
+    "email": "rita12465552901@example.com",
     "role": "rider",
     "country_code": null,
     "avatar_url": null,
     "is_active": true,
-    "created_at": "2026-10-22T15:14:52+00:00"
+    "created_at": "2026-10-22T22:33:55+00:00"
   },
   "driver": null,
   "vehicle": null,
@@ -91,11 +91,11 @@
   "cancellation_reason": "Changed my mind",
   "cancellation_fee": 0.0,
   "timestamps": {
-    "requested_at": "2026-10-22T15:14:54+00:00",
+    "requested_at": "2026-10-22T22:33:57+00:00",
     "accepted_at": null,
     "arrived_at": null,
     "started_at": null,
     "completed_at": null,
-    "cancelled_at": "2026-10-22T15:14:54+00:00"
+    "cancelled_at": "2026-10-22T22:33:57+00:00"
   }
 }

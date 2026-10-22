@@ -8,8 +8,9 @@ Response shapes: single objects are returned bare; paginated lists are `{data, l
 
 | Method | Path | Body | Notes |
 |---|---|---|---|
-| POST | `/auth/otp/request` | `phone` | Sends a 6-digit code. 7-digit Barbados numbers are normalised to `+1246…`. 30 s cooldown per phone. |
-| POST | `/auth/otp/verify` | `phone, code, name?, role? (rider\|driver), device_name?` | Returns `token` + `user`. First-time phones need `name` (422 with `needs_name: true` otherwise). |
+| POST | `/auth/otp/lookup` | `phone` | `{phone, registered, email_hint}` — the app asks new phones for name + email before sending a code. Own rate limit (10/min per phone) |
+| POST | `/auth/otp/request` | `phone, email?` | One 6-digit code, sent by **SMS and email**: the account's email for registered phones (an `email` sent with it is ignored), or `email` for a new sign-up (422 if another account uses it). Returns `channels` (`sms`, `email`) and `email_hint` (`r•••@gmail.com`). 7-digit Barbados numbers are normalised to `+1246…`. 30 s cooldown per phone. If the SMS fails but an email was sent, it still succeeds (`channels: ["email"]`); if nothing could be sent: 503 and no cooldown |
+| POST | `/auth/otp/verify` | `phone, code, name?, email?, role? (rider\|driver), device_name?` | Returns `token` + `user`. New accounts need `name` and an email (the one the code was sent to, or `email`); otherwise 422 with `needs_name` / `needs_email` — the code stays valid for the retry |
 | GET | `/me` | | Current user incl. `driver_profile` |
 | PATCH | `/me` | `name?, email?, avatar_url?` | |
 | POST | `/auth/logout` | | Revokes the current token |
@@ -216,7 +217,7 @@ Files live in private storage (`storage/app/private/documents/...`) and are only
 
 ## Local testing
 
-Set `OTP_STATIC_CODE=123456` and `OTP_EXPOSE_CODE=true` in `.env` to log in without an SMS gateway.
+Set `OTP_STATIC_CODE=123456` and `OTP_EXPOSE_CODE=true` in `.env` to log in without an SMS gateway. On a server, `php artisan bentorm:test-token 12465550101 --name=Test` issues a token for a +1 246 555 test number (used by `scripts/smoke.sh`, which therefore sends no SMS).
 
 Run the test suite on the server (clones `main` into a temp dir, never touches `/opt/bentorm`):
 

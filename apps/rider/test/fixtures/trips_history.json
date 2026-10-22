@@ -1,7 +1,7 @@
 {
   "data": [
     {
-      "id": "01m5j2vtdmrjbb3gx3xst365f7",
+      "id": "01m5jvzr845a1zt9g59vvn5w7t",
       "status": "completed",
       "vehicle_type": "standard",
       "service_area_id": 1,
@@ -15,27 +15,27 @@
           "service_area_id": 1,
           "is_online": true,
           "rating_avg": 5.0,
-          "rating_count": 4,
-          "completed_trips": 7,
-          "current_vehicle_id": 1,
-          "approved_at": "2026-10-22T14:59:24+00:00"
+          "rating_count": 6,
+          "completed_trips": 10,
+          "current_vehicle_id": 3,
+          "approved_at": "2026-10-22T22:32:58+00:00"
         }
       },
       "vehicle": {
-        "id": 1,
+        "id": 3,
         "driver_id": 3,
         "make": "Toyota",
         "model": "Corolla",
         "year": null,
         "colour": null,
-        "plate": "SMOKE1",
+        "plate": "ZR101",
         "seats": 4,
         "luggage_capacity": 2,
         "features": [
           "child_seat"
         ],
         "vehicle_type": "standard",
-        "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/7"
+        "photo_url": null
       },
       "pickup": {
         "lat": 13.0969,
@@ -112,11 +112,11 @@
       "cancellation_reason": null,
       "cancellation_fee": 0.0,
       "timestamps": {
-        "requested_at": "2026-10-22T15:14:52+00:00",
-        "accepted_at": "2026-10-22T15:14:54+00:00",
-        "arrived_at": "2026-10-22T15:14:54+00:00",
-        "started_at": "2026-10-22T15:14:54+00:00",
-        "completed_at": "2026-10-22T15:14:54+00:00",
+        "requested_at": "2026-10-22T22:33:56+00:00",
+        "accepted_at": "2026-10-22T22:33:57+00:00",
+        "arrived_at": "2026-10-22T22:33:57+00:00",
+        "started_at": "2026-10-22T22:33:57+00:00",
+        "completed_at": "2026-10-22T22:33:57+00:00",
         "cancelled_at": null
       }
     }

@@ -1,4 +1,5 @@
 {
-  "message": "Name is required to create an account.",
-  "needs_name": true
+  "message": "Your name and email are needed to create an account.",
+  "needs_name": true,
+  "needs_email": false
 }

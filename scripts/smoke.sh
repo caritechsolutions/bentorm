@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# Live end-to-end check of a deployed Bentorm API, run ON the API server (it reads OTP codes from the app log).
+# Live end-to-end check of a deployed Bentorm API, run ON the API server (signs test accounts in with `artisan bentorm:test-token`).
 #   curl -fsSL "https://raw.githubusercontent.com/caritechsolutions/bentorm/main/scripts/smoke.sh?$(date +%s)" | sudo API_HOST=api.ridecoop.net ADMIN_PHONE=12462530487 bash
 #
 # Creates test accounts +1246555 0101 (rider) / 0202 (driver), a test vehicle and two test rides in Barbados.
+# Sends no SMS: also safe once Twilio is configured.
 # Uses the test card gateway. Safe to re-run (accounts are reused).
 set -uo pipefail
 main() {
   command -v jq >/dev/null || { apt-get install -y -qq jq >/dev/null 2>&1 || { echo "jq required"; exit 1; }; }
   API="${API:-https://${API_HOST:?set API_HOST}/api/v1}"
   ADMIN_PHONE="${ADMIN_PHONE:?set ADMIN_PHONE}"
-  LOG="${LOG:-/opt/bentorm/backend/storage/logs/laravel.log}"
+  APP="${APP:-/opt/bentorm/backend}"
   PASS=0; FAIL=0
   ok()   { echo "  ✔ $*"; PASS=$((PASS+1)); }
   bad()  { echo "  ✘ $*"; FAIL=$((FAIL+1)); }
@@ -17,10 +18,10 @@ main() {
   req()  { curl -s -X "$1" "$API$2" -H 'Accept: application/json' -H 'Content-Type: application/json' ${3:+-H "Authorization: Bearer $3"} ${4:+-d "$4"}; }
   code() { curl -s -o /dev/null -w '%{http_code}' -X "$1" "$API$2" -H 'Accept: application/json' -H 'Content-Type: application/json' ${3:+-H "Authorization: Bearer $3"} ${4:+-d "$4"}; }
   upload(){ curl -s -X POST "$API$2" -H 'Accept: application/json' -H "Authorization: Bearer $1" "${@:3}"; }
-  login(){ local phone=$1 name=$2 role=$3 c=""
-    req POST /auth/otp/request "" "{\"phone\":\"$phone\"}" >/dev/null
-    for _ in $(seq 1 10); do c=$(grep "SMS to +$phone" "$LOG" 2>/dev/null | tail -1 | grep -oE 'code is [0-9]{6}' | grep -oE '[0-9]{6}'); [[ -n "$c" ]] && break; sleep 0.5; done
-    req POST /auth/otp/verify "" "{\"phone\":\"$phone\",\"code\":\"$c\",\"name\":\"$name\",\"role\":\"$role\",\"device_name\":\"smoke\"}" | jq -r '.token // empty'; }
+  # Test accounts (+1 246 555 xxxx) get a token straight from artisan: with a real SMS gateway the
+  # codes are texted, not logged, and we must not text made-up numbers.
+  login(){ local phone=$1 name=$2 role=$3
+    (cd "$APP" && php artisan bentorm:test-token "$phone" --name="$name" --role="$role" --email="${phone}@smoke.test" 2>/dev/null | tail -1); }
   wait_offer(){ local n=0; for _ in $(seq 1 30); do n=$(req GET /driver/offers "$1" | jq '.offers|length'); [[ "$n" -ge 1 ]] && break; sleep 1; done; echo "$n"; }
   BT='"pickup_lat":13.0969,"pickup_lng":-59.6145,"dropoff_lat":13.0667,"dropoff_lng":-59.5333'
   JPG=$(mktemp --suffix=.jpg); php -r 'imagejpeg(imagecreatetruecolor(40,30), $argv[1]);' "$JPG"

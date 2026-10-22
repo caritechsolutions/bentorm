@@ -7,19 +7,33 @@ class RiderApi {
   final ApiClient client;
 
   // ---------------------------------------------------------------- auth
-  /// Sends an SMS code. Returns the normalised phone (+1246…).
-  Future<String> requestCode(String phone) async {
-    final r = await client.post('/auth/otp/request', {'phone': phone});
-    return (r as Map)['phone']?.toString() ?? phone;
+  /// Is this phone registered? New phones give name + email before a code is sent.
+  Future<({String phone, bool registered, String? emailHint})> lookup(String phone) async {
+    final r = await client.post('/auth/otp/lookup', {'phone': phone}) as Map<String, dynamic>;
+    return (phone: r['phone']?.toString() ?? phone, registered: r['registered'] == true, emailHint: r['email_hint']?.toString());
   }
 
-  /// Logs in (or signs up when [name] is given). Throws ApiException with body['needs_name'] == true
-  /// for a new phone without a name — the same code stays valid for the retry.
-  Future<({String token, User user})> verifyCode(String phone, String code, {String? name}) async {
+  /// Sends a code by SMS, and by email (the account's, or [email] for a new sign-up).
+  Future<({String phone, List<String> channels, String? emailHint})> requestCode(String phone, {String? email}) async {
+    final r = await client.post('/auth/otp/request', {
+      'phone': phone,
+      if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+    }) as Map<String, dynamic>;
+    return (
+      phone: r['phone']?.toString() ?? phone,
+      channels: (r['channels'] as List?)?.map((e) => e.toString()).toList() ?? const ['sms'],
+      emailHint: r['email_hint']?.toString(),
+    );
+  }
+
+  /// Logs in, or signs up when [name] and [email] are given. A 422 with body['needs_name'] /
+  /// body['needs_email'] means more details are needed — the same code stays valid for the retry.
+  Future<({String token, User user})> verifyCode(String phone, String code, {String? name, String? email}) async {
     final r = await client.post('/auth/otp/verify', {
       'phone': phone,
       'code': code,
       if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+      if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
       'role': 'rider',
       'device_name': 'rider-app',
     }) as Map<String, dynamic>;

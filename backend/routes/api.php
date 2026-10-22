@@ -49,6 +49,8 @@ Route::prefix('v1')->group(function () {
     Route::get('fares', [FareController::class, 'index']);
     Route::post('fares/estimate', [FareController::class, 'estimate']);
 
+    // Own limit, so checking a number doesn't eat into the per-phone code/verify budget.
+    Route::post('auth/otp/lookup', [OtpController::class, 'lookup'])->middleware('throttle:otp-lookup');
     Route::prefix('auth/otp')->middleware('throttle:otp')->group(function () {
         Route::post('request', [OtpController::class, 'request']);
         Route::post('verify', [OtpController::class, 'verify']);

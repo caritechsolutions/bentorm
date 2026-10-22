@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>@yield('title', 'RideCoop')</title>
+<title>@yield('title', 'Ride Coop')</title>
 <style>
   :root { --bg:#f6f7f9; --card:#fff; --ink:#111827; --muted:#6b7280; --ok:#15803d; --bad:#b91c1c; --brand:#0f766e; }
   @media (prefers-color-scheme: dark) { :root { --bg:#0b0f14; --card:#141a22; --ink:#e5e7eb; --muted:#9ca3af; } }

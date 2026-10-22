@@ -11,5 +11,5 @@
     <h1>Checking your card</h1>
     <p>This can take a moment. You can return to the app.</p>
   @endif
-  <a class="btn primary" href="{{ $deepLink }}">Return to RideCoop</a>
+  <a class="btn primary" href="{{ $deepLink }}">Return to Ride Coop</a>
 @endsection

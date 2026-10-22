@@ -149,7 +149,7 @@ class PaymentService
         $result = $this->call($hold->gateway, fn (PaymentPlugin $p) => $p->authorize($hold, $pm, [
             'return_url' => route('payments.return', ['payment' => $hold->public_id]),
             'webhook_url' => route('payments.webhook', ['gateway' => $hold->gateway_id]),
-            'description' => "RideCoop ride {$trip->public_id} (hold)",
+            'description' => "Ride Coop ride {$trip->public_id} (hold)",
             'customer' => $this->customer($trip->rider),
         ]));
 
@@ -260,7 +260,7 @@ class PaymentService
         return $this->apply($payment, $this->call($gateway, fn (PaymentPlugin $p) => $p->initiate($payment, [
             'return_url' => route('payments.return', ['payment' => $payment->public_id]),
             'webhook_url' => route('payments.webhook', ['gateway' => $gateway->id]),
-            'description' => "RideCoop trip {$trip->public_id}",
+            'description' => "Ride Coop trip {$trip->public_id}",
             'customer' => $this->customer($rider),
         ])));
     }
@@ -282,7 +282,7 @@ class PaymentService
         }
         $plugin = $this->plugins->payment($payment->gateway);
         if (! $plugin::supportsRefunds()) {
-            throw ValidationException::withMessages(['payment' => ['This gateway does not support refunds from RideCoop. Refund in the gateway portal.']]);
+            throw ValidationException::withMessages(['payment' => ['This gateway does not support refunds from Ride Coop. Refund in the gateway portal.']]);
         }
 
         return $this->apply($payment, $plugin->refund($payment, $amount ?? $captured));
@@ -430,7 +430,7 @@ class PaymentService
         ]);
         // Bookkeeping for direct charges is done by the caller (updateTripBalance), so apply without trip effect.
         $result = $this->call($payment->gateway, fn (PaymentPlugin $p) => $p->charge($payment, $card, [
-            'description' => "RideCoop ride {$trip->public_id}", 'customer' => $this->customer($trip->rider),
+            'description' => "Ride Coop ride {$trip->public_id}", 'customer' => $this->customer($trip->rider),
         ]));
 
         return $this->record($payment, $result);
