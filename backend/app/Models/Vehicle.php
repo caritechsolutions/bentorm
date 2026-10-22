@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 class Vehicle extends Model
 {
     protected $fillable = [
-        'driver_id', 'make', 'model', 'year', 'colour', 'plate', 'seats', 'vehicle_type', 'status', 'status_note', 'approved_at',
+        'driver_id', 'make', 'model', 'year', 'colour', 'plate', 'seats', 'luggage_capacity', 'features', 'vehicle_type', 'status', 'status_note', 'approved_at',
     ];
 
     protected function casts(): array
@@ -20,6 +20,8 @@ class Vehicle extends Model
             'approved_at' => 'datetime',
             'year' => 'integer',
             'seats' => 'integer',
+            'luggage_capacity' => 'integer',
+            'features' => 'array',
         ];
     }
 
@@ -36,6 +38,13 @@ class Vehicle extends Model
     public function type(): BelongsTo
     {
         return $this->belongsTo(VehicleType::class, 'vehicle_type', 'key');
+    }
+
+    /** Can this vehicle carry the request? */
+    public function fits(int $passengers, int $luggage, array $features): bool
+    {
+        return $this->seats >= $passengers && $this->luggage_capacity >= $luggage
+            && array_diff($features, $this->features ?? []) === [];
     }
 
     public function isApproved(): bool

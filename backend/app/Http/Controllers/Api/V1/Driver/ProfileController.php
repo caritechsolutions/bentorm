@@ -70,6 +70,9 @@ class ProfileController extends Controller
             'colour' => ['nullable', 'string', 'max:32'],
             'plate' => ['required', 'string', 'max:16'],
             'seats' => ['nullable', 'integer', 'min:1', 'max:16'],
+            'luggage_capacity' => ['nullable', 'integer', 'min:0', 'max:20'],
+            'features' => ['nullable', 'array'],
+            'features.*' => ['string', Rule::in(array_keys(config('bentorm.vehicle_features')))],
             'vehicle_type' => ['required', Rule::exists('vehicle_types', 'key')->where('is_active', true)],
         ]);
         $data['plate'] = strtoupper(preg_replace('/[\s-]+/', '', $data['plate']));
@@ -95,6 +98,9 @@ class ProfileController extends Controller
             'year' => ['nullable', 'integer', 'min:1990', 'max:'.(now()->year + 1)],
             'colour' => ['nullable', 'string', 'max:32'],
             'seats' => ['nullable', 'integer', 'min:1', 'max:16'],
+            'luggage_capacity' => ['nullable', 'integer', 'min:0', 'max:20'],
+            'features' => ['nullable', 'array'],
+            'features.*' => ['string', Rule::in(array_keys(config('bentorm.vehicle_features')))],
             'vehicle_type' => ['sometimes', Rule::exists('vehicle_types', 'key')->where('is_active', true)],
         ]);
         if ($request->user()->driverProfile?->is_online && $request->user()->driverProfile->current_vehicle_id === $vehicle->id) {

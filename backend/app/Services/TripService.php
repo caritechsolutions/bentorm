@@ -26,10 +26,16 @@ class TripService
         private readonly DriverLocationService $locations,
         private readonly ComplianceService $compliance,
         private readonly PluginManager $plugins,
+        private readonly PaymentService $payments,
     ) {}
 
     // ---------------------------------------------------------------- rider
 
+    /**
+     * Cash: the trip is created as `requested` and dispatch starts immediately.
+     * Card: the trip is created as `pending_payment`, the estimate + buffer is held on the saved card, and dispatch
+     * starts once the hold is authorised (immediately, or after 3-D Secure). A declined hold cancels the trip.
+     */
     public function request(User $rider, array $data): Trip
     {
         if ($rider->activeTrip()) {
@@ -41,15 +47,20 @@ class TripService
             ]]);
         }
 
-        // Geofences are enforced inside the estimate.
+        $passengers = (int) ($data['passengers'] ?? 1);
+        $luggage = (int) ($data['luggage'] ?? 0);
+        $features = array_values(array_unique($data['features'] ?? []));
+
+        // Geofences and capacity are enforced inside the estimate.
         $quote = $this->pricing->estimate(
-            (float) $data['pickup_lat'], (float) $data['pickup_lng'], (float) $data['dropoff_lat'], (float) $data['dropoff_lng'], $data['vehicle_type'],
+            (float) $data['pickup_lat'], (float) $data['pickup_lng'], (float) $data['dropoff_lat'], (float) $data['dropoff_lng'],
+            $data['vehicle_type'], null, $passengers, $luggage,
         );
 
         $method = PaymentMethod::from($data['payment_method'] ?? PaymentMethod::Cash->value);
-        if ($method === PaymentMethod::Card && ! $this->plugins->paymentGatewayFor($quote['service_area_id'])) {
-            throw ValidationException::withMessages(['payment_method' => ['Card payments are not available here yet. Please choose cash.']]);
-        }
+        $card = $method === PaymentMethod::Card
+            ? $this->payments->cardForRide($rider, $data['payment_method_id'] ?? null, $quote['service_area_id'])
+            : null;
 
         $trip = Trip::query()->create([
             'rider_id' => $rider->id,
@@ -57,7 +68,7 @@ class TripService
             'pickup_zone_id' => $quote['pickup_zone_id'],
             'dropoff_zone_id' => $quote['dropoff_zone_id'],
             'vehicle_type' => $data['vehicle_type'],
-            'status' => TripStatus::Requested,
+            'status' => $card ? TripStatus::PendingPayment : TripStatus::Requested,
             'pickup_lat' => $data['pickup_lat'],
             'pickup_lng' => $data['pickup_lng'],
             'pickup_address' => $data['pickup_address'] ?? null,
@@ -71,10 +82,21 @@ class TripService
             'fare_breakdown' => $quote['breakdown'],
             'surge_multiplier' => $quote['surge_multiplier'],
             'payment_method' => $method,
-            'passengers' => $data['passengers'] ?? 1,
+            'payment_method_id' => $card?->id,
+            'hold_amount' => $card ? $quote['hold_amount'] : null,
+            'passengers' => $passengers,
+            'luggage' => $luggage,
+            'required_features' => $features ?: null,
             'rider_note' => $data['rider_note'] ?? null,
             'requested_at' => now(),
         ]);
+
+        if ($card) {
+            // Authorised → requested + dispatch; 3-D Secure → stays pending_payment; declined → cancelled.
+            $this->payments->placeHold($trip, $card);
+
+            return $trip->fresh();
+        }
 
         $this->dispatch->start($trip);
         event(new TripUpdated($trip));
@@ -84,7 +106,7 @@ class TripService
 
     public function cancel(Trip $trip, User $by, ?string $reason = null): Trip
     {
-        return DB::transaction(function () use ($trip, $by, $reason) {
+        $t = DB::transaction(function () use ($trip, $by, $reason) {
             /** @var Trip $t */
             $t = Trip::query()->whereKey($trip->id)->lockForUpdate()->firstOrFail();
 
@@ -103,7 +125,7 @@ class TripService
                 $charge = $this->pricing->cancellationCharge($t);
             }
 
-            if ($t->status === TripStatus::Requested) {
+            if (in_array($t->status, [TripStatus::Requested, TripStatus::PendingPayment], true)) {
                 $this->dispatch->withdrawAll($t, 'cancelled');
             }
 
@@ -125,10 +147,21 @@ class TripService
                 $this->releaseDriver($t->driver);
             }
 
-            event(new TripUpdated($t));
-
             return $t;
         });
+
+        // Money after commit: take the fee from the hold (or the card / record it owed), otherwise release the hold.
+        if ($t->cancellation_fee > 0) {
+            $this->payments->chargeCancellationFee($t);
+            $this->payments->releaseHold($t->fresh()); // void anything left (no-op once captured)
+        } else {
+            $this->payments->releaseHold($t);
+        }
+
+        $t = $t->fresh();
+        event(new TripUpdated($t));
+
+        return $t;
     }
 
     public function rate(Trip $trip, User $rater, int $score, ?string $comment): Rating
@@ -172,7 +205,7 @@ class TripService
 
     public function complete(Trip $trip, User $driver, ?float $endLat = null, ?float $endLng = null): Trip
     {
-        return DB::transaction(function () use ($trip, $driver, $endLat, $endLng) {
+        $t = DB::transaction(function () use ($trip, $driver, $endLat, $endLng) {
             /** @var Trip $t */
             $t = Trip::query()->whereKey($trip->id)->lockForUpdate()->firstOrFail();
             $this->assertDriverCan($t, $driver, TripStatus::Completed);
@@ -200,7 +233,7 @@ class TripService
                 'platform_fee' => $quote['platform_fee'],
                 'driver_earnings' => $quote['driver_earnings'],
                 'fare_breakdown' => $quote['breakdown'],
-                // Cash is settled in the car; card is collected via the payment gateway flow.
+                // Cash is settled in the car; card is captured from the hold right after commit.
                 'payment_status' => $isCash ? PaymentStatus::Paid : PaymentStatus::Pending,
                 'amount_due' => $isCash ? 0 : $quote['fare'],
             ])->save();
@@ -215,11 +248,17 @@ class TripService
             $driver->driverProfile?->increment('completed_trips');
             $this->releaseDriver($driver);
 
-            event(new TripUpdated($t));
-            SendTripReceiptJob::dispatch($t->id)->afterCommit();
-
             return $t;
         });
+
+        if ($t->payment_method === PaymentMethod::Card) {
+            $t = $this->payments->settleTrip($t);
+        }
+
+        event(new TripUpdated($t));
+        SendTripReceiptJob::dispatch($t->id);
+
+        return $t;
     }
 
     /** Driver position ping — updates presence and, if on a trip, records and broadcasts it. */

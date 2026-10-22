@@ -20,10 +20,14 @@ class PaymentController extends Controller
 {
     public function __construct(private readonly PaymentService $payments) {}
 
-    /** POST /trips/{trip}/pay — returns a payment with redirect_url to open in a browser / webview. */
+    /**
+     * POST /trips/{trip}/pay {payment_method_id?} — settle an amount owed. With a saved card it's charged directly;
+     * otherwise a redirect_url to a hosted payment page is returned.
+     */
     public function pay(Request $request, Trip $trip): JsonResponse
     {
-        $payment = $this->payments->start($trip, $request->user());
+        $data = $request->validate(['payment_method_id' => ['nullable', 'string', 'max:40']]);
+        $payment = $this->payments->start($trip, $request->user(), $data['payment_method_id'] ?? null);
 
         return response()->json([
             'payment' => (new PaymentResource($payment->load('trip')))->resolve($request),
@@ -67,7 +71,7 @@ class PaymentController extends Controller
     public function testCheckout(Payment $payment): View
     {
         abort_unless($payment->gateway?->plugin === 'test_payment', 404);
-        abort_if($payment->isFinal(), 410, 'This payment is already complete.');
+        abort_if($payment->isFinal() || $payment->status === 'authorized', 410, 'This payment is already complete.');
 
         $sign = fn (string $name) => URL::temporarySignedRoute($name, now()->addMinutes(30), ['payment' => $payment->public_id]);
 
@@ -83,9 +87,11 @@ class PaymentController extends Controller
     {
         abort_unless($payment->gateway?->plugin === 'test_payment', 404);
         $approve = $request->route()->getName() === 'payments.test.approve';
-        $this->payments->apply($payment, $approve
-            ? PaymentResult::captured($payment->gateway_ref)
-            : PaymentResult::failed('Declined on the test page.', $payment->gateway_ref));
+        $this->payments->apply($payment, match (true) {
+            ! $approve => PaymentResult::failed('Declined on the test page.', $payment->gateway_ref),
+            $payment->isHold() => PaymentResult::authorized((float) $payment->amount, $payment->gateway_ref), // 3-D Secure passed
+            default => PaymentResult::captured($payment->gateway_ref, [], (float) $payment->amount),
+        });
 
         return redirect()->route('payments.return', ['payment' => $payment->public_id]);
     }

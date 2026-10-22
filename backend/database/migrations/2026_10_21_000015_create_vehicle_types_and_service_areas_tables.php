@@ -14,6 +14,7 @@ return new class extends Migration
             $table->string('name', 64);
             $table->string('description')->nullable();
             $table->unsignedTinyInteger('max_passengers')->default(4);
+            $table->unsignedTinyInteger('max_luggage')->default(2); // standard suitcases
             $table->string('icon_url')->nullable();
             $table->unsignedSmallInteger('sort_order')->default(0);
             $table->boolean('is_active')->default(true);
@@ -41,6 +42,7 @@ return new class extends Migration
             $table->string('tax_label', 32)->nullable();             // "VAT"
             $table->decimal('commission_rate', 6, 4)->nullable();   // 0.2000 = 20%
             $table->decimal('rounding_increment', 6, 2)->nullable(); // 0.50
+            $table->decimal('hold_buffer_rate', 5, 4)->nullable();   // 0.2000 = hold estimate + 20%
             $table->json('polygon');
             $table->decimal('min_lat', 10, 7);
             $table->decimal('max_lat', 10, 7);

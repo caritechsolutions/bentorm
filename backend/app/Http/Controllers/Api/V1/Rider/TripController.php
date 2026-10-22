@@ -53,13 +53,25 @@ class TripController extends Controller
             'dropoff_address' => ['nullable', 'string', 'max:255'],
             'vehicle_type' => ['required', 'string', 'max:32'],
             'payment_method' => ['nullable', 'in:cash,card'],
-            'passengers' => ['nullable', 'integer', 'min:1', 'max:8'],
+            'payment_method_id' => ['nullable', 'string', 'max:40'],
+            'passengers' => ['nullable', 'integer', 'min:1', 'max:16'],
+            'luggage' => ['nullable', 'integer', 'min:0', 'max:20'],
+            'features' => ['nullable', 'array'],
+            'features.*' => ['string', \Illuminate\Validation\Rule::in(array_keys(config('bentorm.vehicle_features')))],
             'rider_note' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $trip = $this->trips->request($request->user(), $data);
+        $trip = $this->trips->request($request->user(), $data)->load(['rider', 'card']);
 
-        return (new TripResource($trip->load('rider')))->response()->setStatusCode(201);
+        // 201 searching for a driver · 202 card needs the rider (open payment_action.url) · 402 card hold declined
+        return match ($trip->status->value) {
+            'cancelled' => response()->json([
+                'message' => 'Your card was declined. Please use another card or pay cash.',
+                'trip' => (new TripResource($trip))->resolve($request),
+            ], 402),
+            'pending_payment' => (new TripResource($trip))->response()->setStatusCode(202),
+            default => (new TripResource($trip))->response()->setStatusCode(201),
+        };
     }
 
     /** GET /trips/{trip} */

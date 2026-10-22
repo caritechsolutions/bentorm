@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\V1\FareController;
 use App\Http\Controllers\Api\V1\FileController;
 use App\Http\Controllers\Api\V1\GeoController;
 use App\Http\Controllers\Api\V1\PaymentController;
+use App\Http\Controllers\Api\V1\PaymentMethodController;
 use App\Http\Controllers\Api\V1\Rider\TripController as RiderTripController;
 use Illuminate\Support\Facades\Route;
 
@@ -30,6 +31,7 @@ Route::prefix('v1')->group(function () {
     Route::get('service-areas', [GeoController::class, 'serviceAreas']);
     Route::get('geo/check', [GeoController::class, 'check']);
     Route::get('vehicle-types', [GeoController::class, 'vehicleTypes']);
+    Route::get('vehicle-features', [GeoController::class, 'vehicleFeatures']);
     Route::get('fares', [FareController::class, 'index']);
     Route::post('fares/estimate', [FareController::class, 'estimate']);
 
@@ -41,10 +43,13 @@ Route::prefix('v1')->group(function () {
     // Browser- and gateway-facing payment endpoints (no bearer token).
     Route::match(['get', 'post'], 'payments/{payment}/return', [PaymentController::class, 'return'])->name('payments.return');
     Route::post('webhooks/payments/{gateway}', [PaymentController::class, 'webhook'])->name('payments.webhook');
+    Route::match(['get', 'post'], 'payment-methods/{paymentMethod}/return', [PaymentMethodController::class, 'return'])->name('payment-methods.return');
     Route::middleware('signed')->group(function () {
         Route::get('payments/test/{payment}', [PaymentController::class, 'testCheckout'])->name('payments.test.checkout');
         Route::post('payments/test/{payment}/approve', [PaymentController::class, 'testDecide'])->name('payments.test.approve');
         Route::post('payments/test/{payment}/decline', [PaymentController::class, 'testDecide'])->name('payments.test.decline');
+        Route::get('payment-methods/test/{paymentMethod}', [PaymentMethodController::class, 'testForm'])->name('payment-methods.test.form');
+        Route::post('payment-methods/test/{paymentMethod}', [PaymentMethodController::class, 'testSubmit'])->name('payment-methods.test.submit');
     });
 
     // ---------------------------------------------------------------- authenticated
@@ -53,6 +58,11 @@ Route::prefix('v1')->group(function () {
         Route::patch('me', [SessionController::class, 'update']);
         Route::post('me/avatar', [FileController::class, 'uploadAvatar']);
         Route::get('me/outstanding', [PaymentController::class, 'outstanding']);
+        Route::get('me/payment-methods', [PaymentMethodController::class, 'index']);
+        Route::post('me/payment-methods', [PaymentMethodController::class, 'store']);
+        Route::get('me/payment-methods/{paymentMethod}', [PaymentMethodController::class, 'show']);
+        Route::post('me/payment-methods/{paymentMethod}/default', [PaymentMethodController::class, 'makeDefault']);
+        Route::delete('me/payment-methods/{paymentMethod}', [PaymentMethodController::class, 'destroy']);
         Route::post('auth/logout', [SessionController::class, 'logout']);
         Route::post('devices', [SessionController::class, 'registerDevice']);
 

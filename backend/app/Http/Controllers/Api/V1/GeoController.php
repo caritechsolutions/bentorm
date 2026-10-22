@@ -32,6 +32,12 @@ class GeoController extends Controller
         return response()->json($geo->resolve((float) $data['lat'], (float) $data['lng'])->toArray());
     }
 
+    /** GET /vehicle-features — what riders can ask for. */
+    public function vehicleFeatures(): JsonResponse
+    {
+        return response()->json(collect(config('bentorm.vehicle_features'))->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values());
+    }
+
     /** GET /vehicle-types?service_area_id= — types with an active rate card in the area (or all). */
     public function vehicleTypes(Request $request): AnonymousResourceCollection
     {

@@ -24,6 +24,7 @@ class ServiceAreaResource extends JsonResource
             'tax_label' => $this->tax_label,
             'commission_rate' => $this->when($admin, $this->commission_rate),
             'rounding_increment' => $this->rounding_increment,
+            'hold_buffer_rate' => $this->hold_buffer_rate,
             'message' => $this->message,
             'priority' => $this->when($admin, $this->priority),
             'is_active' => $this->is_active,

@@ -73,6 +73,17 @@ class User extends Authenticatable
         return $this->hasMany(Trip::class, 'driver_id');
     }
 
+    public function paymentMethods(): HasMany
+    {
+        return $this->hasMany(PaymentMethod::class);
+    }
+
+    public function defaultCard(): ?PaymentMethod
+    {
+        return $this->paymentMethods()->where('status', 'active')->orderByDesc('is_default')->latest('id')->get()
+            ->first(fn (PaymentMethod $pm) => $pm->isUsable());
+    }
+
     public function deviceTokens(): HasMany
     {
         return $this->hasMany(DeviceToken::class);

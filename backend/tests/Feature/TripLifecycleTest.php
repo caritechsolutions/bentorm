@@ -117,7 +117,7 @@ class TripLifecycleTest extends TestCase
     {
         $trip = $this->requestTrip();
         $this->actingAs($this->rider)->postJson("/api/v1/trips/{$trip->public_id}/cancel")
-            ->assertOk()->assertJsonPath('cancellation_fee', 0)->assertJsonPath('payment_status', 'waived');
+            ->assertOk()->assertJsonPath('cancellation_fee', 0.0)->assertJsonPath('payment_status', 'waived');
     }
 
     public function test_rider_cannot_have_two_active_trips(): void

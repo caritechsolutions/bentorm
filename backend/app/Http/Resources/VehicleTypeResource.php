@@ -11,7 +11,7 @@ class VehicleTypeResource extends JsonResource
     {
         return [
             'key' => $this->key, 'name' => $this->name, 'description' => $this->description,
-            'max_passengers' => $this->max_passengers, 'icon_url' => $this->icon_url,
+            'max_passengers' => $this->max_passengers, 'max_luggage' => $this->max_luggage, 'icon_url' => $this->icon_url,
             'sort_order' => $this->sort_order, 'is_active' => $this->is_active,
         ];
     }

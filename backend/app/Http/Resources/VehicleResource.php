@@ -21,6 +21,8 @@ class VehicleResource extends JsonResource
             'colour' => $this->colour,
             'plate' => $this->plate,
             'seats' => $this->seats,
+            'luggage_capacity' => $this->luggage_capacity,
+            'features' => $this->features ?? [],
             'vehicle_type' => $this->vehicle_type,
             'status' => $this->when($private, $this->status),
             'status_note' => $this->when($private, $this->status_note),

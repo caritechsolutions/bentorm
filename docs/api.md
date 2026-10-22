@@ -2,6 +2,8 @@
 
 Base URL: `https://<host>/api/v1` · JSON in, JSON out · Auth: `Authorization: Bearer <token>` (Laravel Sanctum).
 
+Response shapes: single objects are returned bare; paginated lists are `{data, links, meta}`; unpaginated lists are bare arrays.
+
 ## Auth (phone + OTP)
 
 | Method | Path | Body | Notes |
@@ -23,9 +25,10 @@ Base URL: `https://<host>/api/v1` · JSON in, JSON out · Auth: `Authorization: 
 | GET | `/health` | |
 | GET | `/service-areas` | Operating regions with GeoJSON polygons (coverage map, driver sign-up) |
 | GET | `/geo/check?lat=&lng=` | `{served, service_area, zones[], blocked}` |
-| GET | `/vehicle-types?service_area_id=` | Types offered in an area |
+| GET | `/vehicle-types?service_area_id=` | Types offered in an area, with `max_passengers`, `max_luggage` |
+| GET | `/vehicle-features` | `[{key, label}]` — wheelchair_accessible, child_seat, pet_friendly, extra_luggage |
 | GET | `/fares?service_area_id=` | Rate cards (amounts exclude tax) |
-| POST | `/fares/estimate` | `pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, vehicle_type?` → `quotes[]` with `fare, subtotal, tax, currency, surge_multiplier, breakdown.lines[]`. 422 `pickup`/`dropoff` when outside service or blocked. |
+| POST | `/fares/estimate` | `pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, vehicle_type?, passengers?, luggage?` → `quotes[]` with `fare, hold_amount, subtotal, tax, currency, surge_multiplier, breakdown.lines[]`. Only types that fit the party are quoted. 422 `pickup`/`dropoff` when outside service or blocked. |
 
 ## Rider
 
@@ -33,11 +36,14 @@ Base URL: `https://<host>/api/v1` · JSON in, JSON out · Auth: `Authorization: 
 |---|---|---|---|
 | GET | `/trips` | | History, paginated |
 | GET | `/trips/active` | | Current trip + live `driver_position` |
-| POST | `/trips` | `pickup_*, dropoff_*, vehicle_type, payment_method? (cash\|card), passengers?, rider_note?` | 201; dispatch starts immediately. 422 if a trip is already active. |
+| POST | `/trips` | `pickup_*, dropoff_*, vehicle_type, payment_method? (cash\|card), payment_method_id? (saved card; default card if omitted), passengers?, luggage?, features[]?, rider_note?` | **201** `requested` — searching for a driver · **202** `pending_payment` — card needs 3-D Secure: open `payment_action.url` · **402** card hold declined (trip cancelled, nothing owed) · 422 active trip / amount owed / party too big |
 | GET | `/trips/{id}` | | `id` is the trip's public ULID |
 | POST | `/trips/{id}/cancel` | `reason?` | Free while `requested`; cancellation fee after a driver accepted |
 | POST | `/trips/{id}/rate` | `score 1–5, comment?` | Completed trips only |
-| POST | `/trips/{id}/pay` | | Card: returns `redirect_url` to open in a browser/webview. After the gateway, the browser lands on `/payments/{pid}/return`, which deep-links to `ridecoop://payment?id=&status=` |
+| POST | `/trips/{id}/pay` | `payment_method_id?` | Settle an amount owed. With a saved card it's charged directly; otherwise returns `redirect_url` for a hosted page, which deep-links back to `ridecoop://payment?id=&status=` |
+| GET | `/me/payment-methods` | | Saved cards (`brand, last4, exp_month, exp_year, is_default`) |
+| POST | `/me/payment-methods` | `service_area_id?` or `lat, lng` | Start adding a card → `redirect_url` (hosted card page). Returns to `ridecoop://card?id=&status=`; then poll `GET /me/payment-methods/{id}` |
+| POST | `/me/payment-methods/{id}/default` · DELETE `/me/payment-methods/{id}` | | Delete is refused while the card is on an active ride |
 | GET | `/payments/{pid}` | | Poll payment status |
 
 ## Driver (`role=driver`)
@@ -49,7 +55,7 @@ Base URL: `https://<host>/api/v1` · JSON in, JSON out · Auth: `Authorization: 
 | GET | `/driver/documents` | | Checklist: each document type with `state` = missing / pending / approved / expiring_soon / expired / rejected |
 | POST | `/driver/documents` | multipart `document_type, file, number?, expires_at?` | jpg/png/webp/heic/pdf ≤ 15 MB; photos downscaled to 1600 px |
 | DELETE | `/driver/documents/{id}` | | Unapproved uploads only |
-| GET/POST | `/driver/vehicles` | `make, model, plate, vehicle_type, year?, colour?, seats?` | |
+| GET/POST | `/driver/vehicles` | `make, model, plate, vehicle_type, year?, colour?, seats?, luggage_capacity?, features[]?` | Seats = passenger seats; luggage = standard suitcases |
 | PATCH | `/driver/vehicles/{id}` | | Edits send an approved vehicle back for review |
 | GET/POST | `/driver/vehicles/{id}/documents` | as above | Vehicle checklist / upload (registration, insurance, photos) |
 | GET | `/driver/earnings` | | Today / week / month: trips, earnings (after commission, ex tax), cash collected |
@@ -94,6 +100,7 @@ Base URL: `https://<host>/api/v1` · JSON in, JSON out · Auth: `Authorization: 
 ## Trip state machine
 
 ```
+pending_payment ──hold authorised──► requested     (card rides only; declined → cancelled)
 requested ──accept──► accepted ──arrive──► arrived ──start──► in_progress ──complete──► completed
     │                     │                   │                    │
     └─ cancel / no_drivers└── cancel ─────────┴── cancel ──────────┴── cancel (admin only)
@@ -153,6 +160,25 @@ platform = subtotal × commission_rate                               driver   = 
 The multiplier (or fixed route) is locked when the trip is requested and reused for the final fare; distance, time and waiting use actuals. Cancellation fee (rider cancels after acceptance) gets VAT and commission the same way.
 Distance: haversine × 1.3 road factor by default; set `DISTANCE_PROVIDER=osrm` for real routing.
 
+## Card payments: holds (Uber-style)
+
+| When | What happens to the money |
+|---|---|
+| Rider adds a card | Hosted card page at the gateway → we store only a token + brand/last4/expiry |
+| Ride requested (card) | **Hold** `hold_amount = estimate × (1 + hold_buffer_rate)` (20% default, rounded up) on the saved card. Trip is `pending_payment` until authorised; dispatch starts only after. 3-D Secure → 202 + `payment_action.url`. Declined → trip cancelled, nothing owed |
+| Trip completed | **Capture** the final fare from the hold (partial capture releases the rest). If the final fare exceeds the hold, the difference is charged to the same card (`top_up`). Anything that can't be collected becomes `amount_due` |
+| Rider cancels before a driver accepts / no drivers / driver or admin cancels | **Void** — the whole hold is released |
+| Rider cancels after a driver accepted | Cancellation fee (+VAT) **captured** from the hold; rest released |
+| Hold never confirmed (abandoned 3-D Secure) | Trip cancelled after 15 minutes |
+
+Cash rides have no hold and are paid in the car. Saved cards are tied to the gateway that created them; the gateway serving the pickup area must match.
+
+Test gateway cards: `4242 4242 4242 4242` approves · `4000 0000 0000 0002` declines holds/charges · `4000 0000 0000 3220` requires 3-D Secure.
+
+## Capacity and features
+
+Vehicle types have `max_passengers` and `max_luggage`; quotes only include types that fit. Each vehicle declares `seats`, `luggage_capacity` and `features` (checked by admin at vehicle approval — edits send it back for review). Dispatch only offers a trip to drivers whose **current vehicle** fits the party, the luggage and every requested feature.
+
 ## Plugins (payment, SMS, email)
 
 A **plugin** is a PHP class (listed in `config/plugins.php`); a **gateway** is a configured instance of one, created from the admin API. Credentials are stored encrypted; `secret` fields come back as `••••••••` and are kept if sent back unchanged.
@@ -164,13 +190,13 @@ A **plugin** is a PHP class (listed in `config/plugins.php`); a **gateway** is a
 | `twilio` | sms | account_sid, auth_token, from / messaging_service_sid |
 | `log_email` | email | — |
 | `smtp` | email | host, port, encryption, username, password, from_address, from_name |
-| `test_payment` | payment | mode: hosted_page / auto_approve / auto_decline |
+| `test_payment` | payment | mode: hosted_page / auto_approve / auto_decline. Supports saved cards, holds, 3-D Secure, refunds |
 
 Selection: the active gateway of the needed type whose `service_area_id` matches (area-specific beats global), then highest `priority`. So each island can have its own card processor and SMS sender.
 
-Adding a gateway: implement `App\Plugins\Contracts\{PaymentPlugin|SmsPlugin|EmailPlugin}` (extend `AbstractPlugin`), add the class to `config/plugins.php`. Payment plugins implement `initiate` (usually return a hosted-page redirect), `verifyReturn`, `handleWebhook` (verify signatures!) and `refund`. Webhook URL per gateway: `POST /api/v1/webhooks/payments/{gatewayId}` (shown in the gateway's admin record).
+Adding a gateway: implement `App\Plugins\Contracts\{PaymentPlugin|SmsPlugin|EmailPlugin}` (extend `AbstractPlugin`), add the class to `config/plugins.php`. A payment plugin implements: `startCardSetup` / `completeCardSetup` (tokenise a card via the gateway's hosted page), `authorize` (hold; may return a 3-D Secure redirect), `capture`, `void`, `charge` (merchant-initiated, for top-ups), `initiate` / `verifyReturn` (one-off hosted payments), `handleWebhook` (verify signatures!) and `refund`. Webhook URL per gateway: `POST /api/v1/webhooks/payments/{gatewayId}` (shown in the gateway's admin record).
 
-Card flow (sale at the end of the trip): trip completes → `amount_due` set → app calls `POST /trips/{id}/pay` → opens `redirect_url` → gateway → `/payments/{pid}/return` → trip `payment_status=paid`, `trip.updated` broadcast. Unpaid amounts block new ride requests until paid or waived.
+Unpaid amounts block new ride requests until paid (saved card or hosted page) or waived by an admin.
 
 ## Documents
 

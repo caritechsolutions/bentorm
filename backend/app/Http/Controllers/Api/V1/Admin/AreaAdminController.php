@@ -86,6 +86,7 @@ class AreaAdminController extends Controller
             'tax_label' => ['nullable', 'string', 'max:32'],
             'commission_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
             'rounding_increment' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'hold_buffer_rate' => ['nullable', 'numeric', 'min:0', 'max:2'],
             'polygon' => [$req],
             'message' => ['nullable', 'string', 'max:255'],
             'priority' => ['sometimes', 'integer'],

@@ -38,6 +38,7 @@ class FareAdminController extends Controller
             'name' => ['required', 'string', 'max:64'],
             'description' => ['nullable', 'string', 'max:255'],
             'max_passengers' => ['nullable', 'integer', 'min:1', 'max:16'],
+            'max_luggage' => ['nullable', 'integer', 'min:0', 'max:20'],
             'icon_url' => ['nullable', 'url', 'max:500'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
@@ -126,11 +127,14 @@ class FareAdminController extends Controller
             'pickup_lat' => ['required', 'numeric'], 'pickup_lng' => ['required', 'numeric'],
             'dropoff_lat' => ['required', 'numeric'], 'dropoff_lng' => ['required', 'numeric'],
             'at' => ['nullable', 'date'],
+            'passengers' => ['nullable', 'integer', 'min:1'],
+            'luggage' => ['nullable', 'integer', 'min:0'],
         ]);
         $at = isset($data['at']) ? Carbon::parse($data['at']) : now();
 
         return response()->json(['at' => $at->toIso8601String(), 'quotes' => $pricing->estimateAll(
             (float) $data['pickup_lat'], (float) $data['pickup_lng'], (float) $data['dropoff_lat'], (float) $data['dropoff_lng'], $at,
+            (int) ($data['passengers'] ?? 1), (int) ($data['luggage'] ?? 0),
         )]);
     }
 

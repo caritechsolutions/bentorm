@@ -35,31 +35,56 @@ class PricingService
         private readonly GeoService $geo,
     ) {}
 
-    /** Quotes for every vehicle type offered in the pickup's service area. */
-    public function estimateAll(float $pLat, float $pLng, float $dLat, float $dLng, ?CarbonInterface $at = null): array
+    /** Quotes for every vehicle type offered in the pickup's service area that can carry the party. */
+    public function estimateAll(float $pLat, float $pLng, float $dLat, float $dLng, ?CarbonInterface $at = null, int $passengers = 1, int $luggage = 0): array
     {
         [$pickup, $dropoff] = $this->geo->assertTripAllowed($pLat, $pLng, $dLat, $dLng);
         $route = $this->distance->estimate($pLat, $pLng, $dLat, $dLng);
 
         $configs = FareConfig::query()->where('service_area_id', $pickup->service->id)->where('is_active', true)->get()->keyBy('vehicle_type');
-        $types = VehicleType::query()->where('is_active', true)->whereIn('key', $configs->keys())->orderBy('sort_order')->get();
+        $types = VehicleType::query()->where('is_active', true)->whereIn('key', $configs->keys())
+            ->where('max_passengers', '>=', $passengers)->where('max_luggage', '>=', $luggage)
+            ->orderBy('sort_order')->get();
 
-        return $types->map(fn (VehicleType $t) => $this->calculate($pickup, $dropoff, $t->key, $route->distanceM, $route->durationS, 0, $at ?? now()) + [
-            'display_name' => $t->name,
-            'description' => $t->description,
-            'max_passengers' => $t->max_passengers,
-            'icon_url' => $t->icon_url,
-        ])->values()->all();
+        return $types->map(fn (VehicleType $t) => $this->withHold($pickup->service,
+            $this->calculate($pickup, $dropoff, $t->key, $route->distanceM, $route->durationS, 0, $at ?? now())) + [
+                'display_name' => $t->name,
+                'description' => $t->description,
+                'max_passengers' => $t->max_passengers,
+                'max_luggage' => $t->max_luggage,
+                'icon_url' => $t->icon_url,
+            ])->values()->all();
     }
 
     /** Quote for one vehicle type. Also returns the geo contexts so the caller can store them. */
-    public function estimate(float $pLat, float $pLng, float $dLat, float $dLng, string $vehicleType, ?CarbonInterface $at = null): array
+    public function estimate(float $pLat, float $pLng, float $dLat, float $dLng, string $vehicleType, ?CarbonInterface $at = null, int $passengers = 1, int $luggage = 0): array
     {
         [$pickup, $dropoff] = $this->geo->assertTripAllowed($pLat, $pLng, $dLat, $dLng);
+
+        $type = VehicleType::query()->where('key', $vehicleType)->where('is_active', true)->first();
+        if (! $type) {
+            throw ValidationException::withMessages(['vehicle_type' => ['Unknown vehicle type.']]);
+        }
+        if ($passengers > $type->max_passengers) {
+            throw ValidationException::withMessages(['passengers' => ["{$type->name} carries up to {$type->max_passengers} passengers."]]);
+        }
+        if ($luggage > $type->max_luggage) {
+            throw ValidationException::withMessages(['luggage' => ["{$type->name} takes up to {$type->max_luggage} pieces of luggage."]]);
+        }
+
         $route = $this->distance->estimate($pLat, $pLng, $dLat, $dLng);
 
-        return $this->calculate($pickup, $dropoff, $vehicleType, $route->distanceM, $route->durationS, 0, $at ?? now())
+        return $this->withHold($pickup->service, $this->calculate($pickup, $dropoff, $vehicleType, $route->distanceM, $route->durationS, 0, $at ?? now()))
             + ['pickup_context' => $pickup, 'dropoff_context' => $dropoff];
+    }
+
+    /** Amount held on a card at request: estimate × (1 + hold buffer), rounded up like fares. */
+    private function withHold(ServiceArea $area, array $quote): array
+    {
+        $buffer = (float) ($area->hold_buffer_rate ?? config('pricing.hold_buffer_rate', 0.20));
+        $quote['hold_amount'] = $this->roundUp($quote['fare'] * (1 + $buffer), (float) ($area->rounding_increment ?? 0.5));
+
+        return $quote;
     }
 
     /** Final fare from actual trip metrics, honouring the multiplier / fixed route locked at request time. */

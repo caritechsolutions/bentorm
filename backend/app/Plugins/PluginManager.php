@@ -44,6 +44,7 @@ class PluginManager
                 'description' => $class::description(),
                 'config_schema' => $class::configSchema(),
                 'supports_refunds' => is_subclass_of($class, PaymentPlugin::class) ? $class::supportsRefunds() : null,
+                'supports_saved_cards' => is_subclass_of($class, PaymentPlugin::class) ? $class::supportsSavedCards() : null,
             ];
         }
 

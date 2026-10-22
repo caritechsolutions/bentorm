@@ -15,7 +15,7 @@ class ServiceArea extends Model
 
     protected $fillable = [
         'parent_id', 'type', 'code', 'name', 'country_code', 'currency', 'timezone', 'tax_rate', 'tax_label',
-        'commission_rate', 'rounding_increment', 'polygon', 'message', 'priority', 'is_active',
+        'commission_rate', 'rounding_increment', 'hold_buffer_rate', 'polygon', 'message', 'priority', 'is_active',
     ];
 
     protected function casts(): array
@@ -26,6 +26,7 @@ class ServiceArea extends Model
             'tax_rate' => 'float',
             'commission_rate' => 'float',
             'rounding_increment' => 'float',
+            'hold_buffer_rate' => 'float',
             'min_lat' => 'float', 'max_lat' => 'float', 'min_lng' => 'float', 'max_lng' => 'float',
             'priority' => 'integer',
             'is_active' => 'boolean',

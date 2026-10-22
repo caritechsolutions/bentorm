@@ -23,9 +23,9 @@ class ReferenceDataSeeder extends Seeder
     {
         // ---------------------------------------------------------------- vehicle types
         foreach ([
-            ['key' => 'standard', 'name' => 'Standard', 'description' => 'Everyday rides', 'max_passengers' => 4, 'sort_order' => 1],
-            ['key' => 'xl', 'name' => 'XL', 'description' => 'Larger vehicles for groups', 'max_passengers' => 6, 'sort_order' => 2],
-            ['key' => 'premium', 'name' => 'Premium', 'description' => 'Top-rated drivers, premium vehicles', 'max_passengers' => 4, 'sort_order' => 3],
+            ['key' => 'standard', 'name' => 'Standard', 'description' => 'Everyday rides', 'max_passengers' => 4, 'max_luggage' => 2, 'sort_order' => 1],
+            ['key' => 'xl', 'name' => 'XL', 'description' => 'Larger vehicles for groups and luggage', 'max_passengers' => 6, 'max_luggage' => 5, 'sort_order' => 2],
+            ['key' => 'premium', 'name' => 'Premium', 'description' => 'Top-rated drivers, premium vehicles', 'max_passengers' => 4, 'max_luggage' => 3, 'sort_order' => 3],
         ] as $vt) {
             VehicleType::query()->firstOrCreate(['key' => $vt['key']], $vt);
         }
@@ -35,7 +35,7 @@ class ReferenceDataSeeder extends Seeder
         $bb = ServiceArea::query()->firstOrCreate(['code' => 'BB'], [
             'type' => AreaType::Service, 'name' => 'Barbados', 'country_code' => 'BB', 'currency' => 'BBD',
             'timezone' => 'America/Barbados', 'tax_rate' => 0.175, 'tax_label' => 'VAT', 'commission_rate' => 0.20,
-            'rounding_increment' => 0.50, 'priority' => 0,
+            'rounding_increment' => 0.50, 'hold_buffer_rate' => 0.20, 'priority' => 0,
             'polygon' => ['type' => 'Polygon', 'coordinates' => [[
                 [-59.660, 13.345], [-59.600, 13.345], [-59.500, 13.240], [-59.405, 13.170], [-59.420, 13.100],
                 [-59.520, 13.025], [-59.580, 13.050], [-59.625, 13.075], [-59.665, 13.160], [-59.670, 13.280],

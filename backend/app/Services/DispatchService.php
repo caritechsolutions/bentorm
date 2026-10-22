@@ -11,6 +11,7 @@ use App\Jobs\DispatchTripJob;
 use App\Models\Trip;
 use App\Models\TripOffer;
 use App\Models\User;
+use App\Models\Vehicle;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -61,13 +62,15 @@ class DispatchService
         }
 
         $alreadyOffered = $trip->offers()->pluck('driver_id')->all();
-        $candidates = $this->locations->nearbyIdle(
+        $batch = (int) config('dispatch.offer_batch_size');
+        // Over-fetch, then keep only drivers whose current vehicle fits the party, luggage and requested features.
+        $candidates = $this->fitting($trip, $this->locations->nearbyIdle(
             $trip->pickup_lat, $trip->pickup_lng,
             (int) config('dispatch.search_radius_m'),
             $trip->vehicle_type,
-            (int) config('dispatch.offer_batch_size'),
+            $batch * 4,
             $alreadyOffered,
-        );
+        ), $batch);
 
         if (empty($candidates)) {
             // Nobody new in range this wave — count it and try again.
@@ -176,8 +179,39 @@ class DispatchService
     {
         $this->withdrawAll($trip, 'no_drivers');
         $trip->forceFill(['status' => TripStatus::NoDrivers, 'cancelled_at' => now(), 'cancelled_by' => 'system',
-            'cancellation_reason' => 'No drivers available'])->save();
+            'cancellation_reason' => 'No drivers available', 'payment_status' => \App\Enums\PaymentStatus::Waived])->save();
+        app(PaymentService::class)->releaseHold($trip);
         event(new TripUpdated($trip));
+    }
+
+    /**
+     * @param array<int, array{driver_id: int, distance_m: int}> $candidates nearest first
+     * @return array<int, array{driver_id: int, distance_m: int}>
+     */
+    private function fitting(Trip $trip, array $candidates, int $limit): array
+    {
+        if (! $candidates) {
+            return [];
+        }
+        $vehicles = Vehicle::query()
+            ->join('driver_profiles', 'driver_profiles.current_vehicle_id', '=', 'vehicles.id')
+            ->whereIn('driver_profiles.user_id', array_column($candidates, 'driver_id'))
+            ->get(['vehicles.*', 'driver_profiles.user_id as profile_user_id'])
+            ->keyBy('profile_user_id');
+
+        $features = $trip->required_features ?? [];
+        $out = [];
+        foreach ($candidates as $c) {
+            $v = $vehicles->get($c['driver_id']);
+            if ($v && $v->fits((int) $trip->passengers, (int) $trip->luggage, $features)) {
+                $out[] = $c;
+                if (count($out) >= $limit) {
+                    break;
+                }
+            }
+        }
+
+        return $out;
     }
 
     private function scheduleNextWave(Trip $trip): void

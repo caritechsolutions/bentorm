@@ -43,6 +43,12 @@ class TripResource extends JsonResource
             'payment_status' => $this->payment_status,
             'amount_due' => (float) $this->amount_due,
             'passengers' => $this->passengers,
+            'luggage' => $this->luggage,
+            'required_features' => $this->required_features ?? [],
+            'hold_amount' => $this->hold_amount,
+            'card' => $this->whenLoaded('card', fn () => $this->card ? ['id' => $this->card->public_id, 'brand' => $this->card->brand, 'last4' => $this->card->last4] : null),
+            // When a card hold needs the rider (3-D Secure), the app opens this URL.
+            'payment_action' => $this->paymentAction(),
             'rider_note' => $this->rider_note,
             'cancelled_by' => $this->cancelled_by,
             'cancellation_reason' => $this->cancellation_reason,
@@ -57,5 +63,15 @@ class TripResource extends JsonResource
             ],
             'ratings' => RatingResource::collection($this->whenLoaded('ratings')),
         ];
+    }
+
+    private function paymentAction(): ?array
+    {
+        if ($this->status?->value !== 'pending_payment') {
+            return null;
+        }
+        $hold = $this->hold();
+
+        return $hold?->redirect_url ? ['type' => 'redirect', 'url' => $hold->redirect_url, 'payment_id' => $hold->public_id] : null;
     }
 }

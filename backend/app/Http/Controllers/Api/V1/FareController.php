@@ -32,15 +32,19 @@ class FareController extends Controller
             'dropoff_lat' => ['required', 'numeric', 'between:-90,90'],
             'dropoff_lng' => ['required', 'numeric', 'between:-180,180'],
             'vehicle_type' => ['nullable', 'string', 'max:32'],
+            'passengers' => ['nullable', 'integer', 'min:1', 'max:16'],
+            'luggage' => ['nullable', 'integer', 'min:0', 'max:20'],
         ]);
+        $pax = (int) ($data['passengers'] ?? 1);
+        $bags = (int) ($data['luggage'] ?? 0);
         [$pLat, $pLng, $dLat, $dLng] = [(float) $data['pickup_lat'], (float) $data['pickup_lng'], (float) $data['dropoff_lat'], (float) $data['dropoff_lng']];
 
         if (! empty($data['vehicle_type'])) {
-            $q = $pricing->estimate($pLat, $pLng, $dLat, $dLng, $data['vehicle_type']);
+            $q = $pricing->estimate($pLat, $pLng, $dLat, $dLng, $data['vehicle_type'], null, $pax, $bags);
             unset($q['pickup_context'], $q['dropoff_context']);
             $quotes = [$q];
         } else {
-            $quotes = $pricing->estimateAll($pLat, $pLng, $dLat, $dLng);
+            $quotes = $pricing->estimateAll($pLat, $pLng, $dLat, $dLng, null, $pax, $bags);
         }
 
         $quotes = array_map(function ($q) use ($request) {

@@ -20,7 +20,8 @@ class Trip extends Model
         'estimated_distance_m', 'estimated_duration_s', 'estimated_fare',
         'actual_distance_m', 'actual_duration_s', 'wait_duration_s', 'currency', 'subtotal', 'tax_amount', 'final_fare',
         'platform_fee', 'driver_earnings', 'fare_breakdown', 'surge_multiplier',
-        'payment_method', 'payment_status', 'amount_due', 'passengers', 'rider_note',
+        'payment_method', 'payment_status', 'amount_due', 'payment_method_id', 'hold_amount',
+        'passengers', 'luggage', 'required_features', 'rider_note',
         'requested_at', 'accepted_at', 'arrived_at', 'started_at', 'completed_at', 'cancelled_at',
         'cancelled_by', 'cancellation_reason', 'cancellation_fee',
     ];
@@ -53,6 +54,9 @@ class Trip extends Model
             'platform_fee' => 'float',
             'driver_earnings' => 'float',
             'amount_due' => 'float',
+            'hold_amount' => 'float',
+            'luggage' => 'integer',
+            'required_features' => 'array',
             'cancellation_fee' => 'float',
             'surge_multiplier' => 'float',
             'fare_breakdown' => 'array',
@@ -84,6 +88,17 @@ class Trip extends Model
     public function serviceArea(): BelongsTo
     {
         return $this->belongsTo(ServiceArea::class);
+    }
+
+    public function card(): BelongsTo
+    {
+        return $this->belongsTo(PaymentMethod::class, 'payment_method_id');
+    }
+
+    /** The authorisation placed when the trip was requested, if any. */
+    public function hold(): ?Payment
+    {
+        return $this->payments()->where('purpose', 'hold')->latest('id')->first();
     }
 
     public function offers(): HasMany

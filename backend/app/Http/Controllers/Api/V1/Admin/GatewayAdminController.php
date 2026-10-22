@@ -30,7 +30,7 @@ class GatewayAdminController extends Controller
             $q->where('type', $t);
         }
 
-        return response()->json(['data' => $q->get()->map(fn (Gateway $g) => $this->present($g))]);
+        return response()->json($q->get()->map(fn (Gateway $g) => $this->present($g))->values());
     }
 
     /** POST /admin/gateways {plugin, name, config, service_area_id?, priority?, is_active?} */
@@ -56,7 +56,7 @@ class GatewayAdminController extends Controller
             'is_active' => $data['is_active'] ?? false,
         ]);
 
-        return response()->json(['data' => $this->present($g)], 201);
+        return response()->json($this->present($g), 201);
     }
 
     /** PATCH /admin/gateways/{gateway} — secrets sent back masked or empty are kept unchanged. */
@@ -74,7 +74,7 @@ class GatewayAdminController extends Controller
         }
         $gateway->update($data);
 
-        return response()->json(['data' => $this->present($gateway->fresh())]);
+        return response()->json($this->present($gateway->fresh()));
     }
 
     /** DELETE /admin/gateways/{gateway} */

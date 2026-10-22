@@ -29,7 +29,7 @@ class PluginTest extends TestCase
         $id = $this->actingAs($admin)->postJson('/api/v1/admin/gateways', [
             'plugin' => 'twilio', 'name' => 'Twilio', 'is_active' => true, 'priority' => 10,
             'config' => ['account_sid' => 'AC123', 'auth_token' => 'super-secret', 'from' => '+12465550000'],
-        ])->assertCreated()->assertJsonPath('data.config.auth_token', '••••••••')->json('data.id');
+        ])->assertCreated()->assertJsonPath('config.auth_token', '••••••••')->json('id');
 
         $raw = \DB::table('gateways')->where('id', $id)->value('config');
         $this->assertStringNotContainsString('super-secret', $raw, 'encrypted at rest');

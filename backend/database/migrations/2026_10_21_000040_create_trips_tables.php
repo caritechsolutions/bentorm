@@ -19,7 +19,7 @@ return new class extends Migration
             $table->foreignId('dropoff_zone_id')->nullable()->constrained('service_areas')->nullOnDelete();
             $table->string('vehicle_type', 32)->default('standard');
             $table->enum('status', [
-                'requested', 'accepted', 'arrived', 'in_progress', 'completed', 'cancelled', 'no_drivers',
+                'pending_payment', 'requested', 'accepted', 'arrived', 'in_progress', 'completed', 'cancelled', 'no_drivers',
             ])->default('requested')->index();
 
             $table->decimal('pickup_lat', 10, 7);
@@ -49,8 +49,12 @@ return new class extends Migration
             $table->enum('payment_method', ['cash', 'card'])->default('cash');
             $table->enum('payment_status', ['pending', 'paid', 'failed', 'refunded', 'waived'])->default('pending')->index();
             $table->decimal('amount_due', 10, 2)->default(0);
+            $table->foreignId('payment_method_id')->nullable()->constrained('payment_methods')->nullOnDelete();
+            $table->decimal('hold_amount', 10, 2)->nullable();
 
             $table->unsignedTinyInteger('passengers')->default(1);
+            $table->unsignedTinyInteger('luggage')->default(0);
+            $table->json('required_features')->nullable();
             $table->text('rider_note')->nullable();
 
             $table->timestamp('requested_at')->nullable();

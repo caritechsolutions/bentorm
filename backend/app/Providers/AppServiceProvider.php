@@ -10,6 +10,7 @@ use App\Plugins\PluginManager;
 use App\Services\PluginSmsSender;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -28,6 +29,9 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Single resources are returned bare; paginated lists keep {data, links, meta}.
+        JsonResource::withoutWrapping();
+
         RateLimiter::for('api', fn (Request $r) => Limit::perMinute(120)->by($r->user()?->id ?: $r->ip()));
         RateLimiter::for('otp', fn (Request $r) => Limit::perMinute(5)->by($r->ip()));
         RateLimiter::for('location', fn (Request $r) => Limit::perMinute(120)->by($r->user()?->id ?: $r->ip()));

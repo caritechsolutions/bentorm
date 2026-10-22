@@ -32,7 +32,7 @@ class OtpAuthTest extends TestCase
         $res->assertCreated()->assertJsonPath('is_new', true)->assertJsonPath('user.role', 'rider')
             ->assertJsonPath('user.phone', '+12465551234');
 
-        $this->withToken($res->json('token'))->getJson('/api/v1/me')->assertOk()->assertJsonPath('data.name', 'Test Rider');
+        $this->withToken($res->json('token'))->getJson('/api/v1/me')->assertOk()->assertJsonPath('name', 'Test Rider');
     }
 
     public function test_wrong_code_is_rejected(): void
