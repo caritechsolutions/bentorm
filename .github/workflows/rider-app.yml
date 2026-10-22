@@ -1,0 +1,78 @@
+name: Rider app
+
+on:
+  push:
+    branches: [main]
+    paths: ['apps/rider/**', '.github/workflows/rider-app.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rider-app-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: 3.47.5
+  ANDROID_APP_ID: com.ridecoopcustomer.android
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/rider
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter --version
+
+      # One-time: generate the android/ios/web platform folders and commit them back.
+      - name: Generate platform folders (first run only)
+        run: |
+          if [ -d android ]; then echo "platform folders present"; exit 0; fi
+          flutter create --org net.ridecoop --project-name ridecoop_rider --platforms android,ios,web --no-pub .
+          rm -f test/widget_test.dart
+          GRADLE=android/app/build.gradle.kts
+          sed -i -E "s|applicationId = \"[^\"]+\"|applicationId = \"$ANDROID_APP_ID\"|" "$GRADLE"
+          grep -n 'applicationId\|namespace' "$GRADLE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A .
+          git commit -m "Rider app: generate platform folders (flutter create ${FLUTTER_VERSION})"
+          git push
+
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter build apk --debug
+      - run: flutter build web --release
+
+      - name: Publish test build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          APK=ridecoop-rider-debug-$SHA.apk
+          cp build/app/outputs/flutter-apk/app-debug.apk "$APK"
+          sha256sum "$APK" > "$APK.sha256"
+          gh release create "rider-dev-$SHA" "$APK" "$APK.sha256" --prerelease \
+            --title "Rider app test build $SHA" --notes "Debug build of the Ride Coop rider app from $SHA. Not for the store."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rider-web-${{ github.sha }}
+          path: apps/rider/build/web
+          retention-days: 14
