@@ -135,7 +135,18 @@ fi
 # ---------------------------------------------------------------- app
 log "Installing PHP dependencies"
 cd "$BACKEND"
-COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --no-dev --optimize-autoloader --quiet </dev/null
+# composer.lock is not committed, so the server's lock goes stale whenever composer.json changes
+# (new packages). Re-resolve when composer.json differs from the one the lock was built from.
+export COMPOSER_ALLOW_SUPERUSER=1
+JSON_SUM=$(sha256sum composer.json | cut -d' ' -f1)
+SUM_FILE="$BACKEND/storage/composer.json.sha256"
+if [[ ! -f composer.lock || ! -f "$SUM_FILE" || "$(cat "$SUM_FILE")" != "$JSON_SUM" ]]; then
+  log "composer.json changed — resolving dependencies (composer update)"
+  composer update --no-interaction --no-dev --optimize-autoloader --no-progress </dev/null
+else
+  composer install --no-interaction --no-dev --optimize-autoloader --no-progress </dev/null
+fi
+echo "$JSON_SUM" > "$SUM_FILE"
 
 if ! grep -q '^APP_KEY=base64:' "$ENV_FILE"; then
   log "Generating application key"
