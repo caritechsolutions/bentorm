@@ -35,3 +35,8 @@ backend/storage/cache/
 .DS_Store
 Thumbs.db
 *.log
+
+# Filament assets (published by `php artisan filament:upgrade` on composer install)
+backend/public/css/filament/
+backend/public/js/filament/
+backend/public/fonts/filament/

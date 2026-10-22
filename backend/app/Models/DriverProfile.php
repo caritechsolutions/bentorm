@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\DriverStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class DriverProfile extends Model
@@ -39,6 +40,12 @@ class DriverProfile extends Model
     public function serviceArea(): BelongsTo
     {
         return $this->belongsTo(ServiceArea::class);
+    }
+
+    /** The driver's vehicles (vehicles belong to the user). */
+    public function vehicles(): HasMany
+    {
+        return $this->hasMany(Vehicle::class, 'driver_id', 'user_id');
     }
 
     public function documents(): MorphMany

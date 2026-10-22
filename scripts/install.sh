@@ -9,11 +9,12 @@
 #   FRESH=1                     drop and recreate all tables (DESTROYS DATA — pre-launch schema resets only)
 #   API_HOST=api.ridecoop.net   public hostname NPM uses for the API  (sets APP_URL)
 #   WS_HOST=ws.ridecoop.net     public hostname NPM uses for WebSockets (sets REVERB_HOST)
+#   ADMIN_HOST=newadmin.ridecoop.net  public hostname NPM uses for the admin panel (nginx :8082)
 #   BRANCH=main
 #
 # Installs PHP 8.3 + extensions, Composer, MySQL 8, Redis, nginx; clones/updates the repo to
 # /opt/bentorm; creates the database; writes .env; composer install; migrates + seeds; sets up
-# nginx on :8080, Reverb WebSockets on :8081, a queue worker and the scheduler as systemd services.
+# nginx on :8080 (API) and :8082 (admin panel), Reverb WebSockets on :8081, a queue worker and the scheduler as systemd services.
 # Safe to re-run — re-running pulls the latest code and restarts the services.
 
 set -euo pipefail
@@ -122,6 +123,9 @@ set_env DB_PASSWORD "$DB_PASS"
 if [[ -n "${API_HOST:-}" ]]; then
   set_env APP_URL "https://$API_HOST"
 fi
+if [[ -n "${ADMIN_HOST:-}" ]]; then
+  set_env ADMIN_HOST "$ADMIN_HOST"
+fi
 if [[ -n "${WS_HOST:-}" ]]; then
   set_env REVERB_HOST "$WS_HOST"
   set_env REVERB_PORT 443
@@ -147,11 +151,15 @@ else
   php artisan migrate --force --no-interaction
 fi
 php artisan db:seed --force --no-interaction
+ADMIN_LOGIN=$(php artisan bentorm:admin-password --if-missing 2>&1 || true)
 
 log "Caching configuration and routes"
 php artisan config:cache --quiet
 php artisan route:cache --quiet
 php artisan event:cache --quiet
+php artisan filament:assets --quiet
+php artisan filament:optimize-clear --quiet || true
+php artisan filament:optimize --quiet || true
 
 log "Configuring PHP upload limits (document photos)"
 cat > /etc/php/8.3/fpm/conf.d/99-bentorm.ini <<INI
@@ -167,7 +175,7 @@ chown -R www-data:www-data "$INSTALL_DIR"
 chmod -R ug+rwx "$BACKEND/storage" "$BACKEND/bootstrap/cache"
 
 # ---------------------------------------------------------------- services
-log "Configuring nginx (:$API_PORT)"
+log "Configuring nginx (:$API_PORT API, :8082 admin panel)"
 install -m 644 "$INSTALL_DIR/scripts/deploy/nginx-bentorm.conf" /etc/nginx/sites-available/bentorm.conf
 ln -sf /etc/nginx/sites-available/bentorm.conf /etc/nginx/sites-enabled/bentorm.conf
 rm -f /etc/nginx/sites-enabled/default
@@ -198,7 +206,10 @@ echo "  API         : http://$IP:$API_PORT/api/v1  -> $HEALTH"
 echo "  WebSockets  : ws://$IP:$WS_PORT  ($(systemctl is-active bentorm-reverb))"
 echo "  Queue       : $(systemctl is-active bentorm-queue)"
 echo "  Scheduler   : $(systemctl is-active bentorm-scheduler)"
+echo "  Admin panel : http://$IP:8082/admin  ($(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8082/admin/login"))${ADMIN_HOST:+  ->  https://$ADMIN_HOST}"
 echo "  Config      : $ENV_FILE"
+echo
+echo "$ADMIN_LOGIN" | sed 's/^/  /'
 echo
 }
 
