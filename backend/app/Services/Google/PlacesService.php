@@ -20,6 +20,10 @@ class PlacesService
     public const DETAILS_URL = 'https://places.googleapis.com/v1/places/';
     public const GEOCODE_URL = 'https://maps.googleapis.com/maps/api/geocode/json';
 
+    private const AUTOCOMPLETE_FIELDS = 'suggestions.placePrediction.placeId,suggestions.placePrediction.text.text,'
+        .'suggestions.placePrediction.structuredFormat,suggestions.placePrediction.distanceMeters';
+    private const DETAILS_FIELDS = 'id,displayName,formattedAddress,location';
+
     /** @return array<int, array{place_id: string, main_text: string, secondary_text: ?string, distance_m: ?int}> */
     public function autocomplete(string $input, ?float $lat, ?float $lng, ?string $session): array
     {
@@ -37,7 +41,7 @@ class PlacesService
             $body['origin'] = ['latitude' => $lat, 'longitude' => $lng];
         }
 
-        $res = $this->http()->post(self::AUTOCOMPLETE_URL, $body);
+        $res = $this->http(self::AUTOCOMPLETE_FIELDS)->post(self::AUTOCOMPLETE_URL, $body);
         $this->guard($res, 'autocomplete');
 
         return collect($res->json('suggestions', []))
@@ -54,8 +58,7 @@ class PlacesService
     public function details(string $placeId, ?string $session): array
     {
         return Cache::remember('place:'.$placeId, now()->addDay(), function () use ($placeId, $session) {
-            $res = $this->http()
-                ->withHeaders(['X-Goog-FieldMask' => 'id,displayName,formattedAddress,location'])
+            $res = $this->http(self::DETAILS_FIELDS)
                 ->get(self::DETAILS_URL.rawurlencode($placeId), array_filter(['sessionToken' => $session, 'languageCode' => 'en']));
             $this->guard($res, 'details');
 
@@ -102,12 +105,15 @@ class PlacesService
         return (bool) config('services.google_maps.server_key');
     }
 
-    private function http()
+    /**
+     * One withHeaders() call per request: a second withHeaders() for the same header ADDS a value
+     * rather than replacing it, and Google rejects a doubled field mask with 400.
+     */
+    private function http(string $fieldMask)
     {
         return Http::timeout(6)->withHeaders([
             'X-Goog-Api-Key' => (string) config('services.google_maps.server_key'),
-            'X-Goog-FieldMask' => 'suggestions.placePrediction.placeId,suggestions.placePrediction.text.text,'
-                .'suggestions.placePrediction.structuredFormat,suggestions.placePrediction.distanceMeters',
+            'X-Goog-FieldMask' => $fieldMask,
         ]);
     }
 
@@ -116,7 +122,8 @@ class PlacesService
         if ($res->successful() && $res->json('status', 'OK') !== 'REQUEST_DENIED') {
             return;
         }
-        Log::warning("Google Places {$what} failed", ['status' => $res->status(), 'body' => mb_substr($res->body(), 0, 300)]);
+        // Single-line body so `grep | tail` shows the reason.
+        Log::warning("Google Places {$what} failed", ['status' => $res->status(), 'body' => mb_substr(preg_replace('/\s+/', ' ', $res->body()), 0, 400)]);
         throw new ServiceUnavailableHttpException(null, 'Address search is unavailable right now.');
     }
 

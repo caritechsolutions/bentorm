@@ -56,7 +56,7 @@ class GoogleRoutesDistanceProvider implements DistanceProvider
 
                 return $estimate;
             }
-            Log::warning('Google Routes returned no route', ['status' => $res->status(), 'body' => mb_substr($res->body(), 0, 300)]);
+            Log::warning('Google Routes returned no route', ['status' => $res->status(), 'body' => mb_substr(preg_replace('/\s+/', ' ', $res->body()), 0, 400)]);
         } catch (\Throwable $e) {
             Log::warning('Google Routes failed: '.$e->getMessage());
         }

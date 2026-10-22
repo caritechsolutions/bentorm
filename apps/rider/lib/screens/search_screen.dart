@@ -77,7 +77,10 @@ class _SearchScreenState extends State<SearchScreen> {
       final place = await AppScope.of(context).api.place(s.placeId, session: _session);
       if (mounted) Navigator.of(context).pop(place);
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (!mounted) return;
+      final msg = e.status == 503 ? 'Couldn\'t get that location right now. Please try again.' : e.message;
+      setState(() => _error = msg);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

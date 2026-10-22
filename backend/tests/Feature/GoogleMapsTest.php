@@ -88,10 +88,15 @@ class GoogleMapsTest extends TestCase
             ->assertJsonPath('0.main_text', 'Grantley Adams International Airport')
             ->assertJsonPath('0.distance_m', 9100);
         Http::assertSent(fn (HttpRequest $r) => str_contains($r->url(), 'autocomplete')
-            && isset($r['locationRestriction']['rectangle']['low']['latitude']) && $r['sessionToken'] === 'abc123');
+            && isset($r['locationRestriction']['rectangle']['low']['latitude']) && $r['sessionToken'] === 'abc123'
+            && count($r->header('X-Goog-FieldMask')) === 1 && count($r->header('X-Goog-Api-Key')) === 1);
 
         $this->actingAs($rider)->getJson('/api/v1/places/ChIJairport0001?session=abc123')
             ->assertOk()->assertJson(['name' => 'Grantley Adams International Airport', 'lat' => 13.0746, 'lng' => -59.4925]);
+        // Google answers 400 if the field mask is anything but exactly the details fields (a merged
+        // autocomplete + details mask broke this in production).
+        Http::assertSent(fn (HttpRequest $r) => str_contains($r->url(), '/v1/places/ChIJairport0001')
+            && $r->header('X-Goog-FieldMask') === ['id,displayName,formattedAddress,location']);
 
         $this->actingAs($rider)->getJson('/api/v1/places/reverse?lat=13.0969&lng=-59.6145')
             ->assertOk()->assertJson(['name' => 'Bay Street', 'address' => 'Bay Street, Bridgetown, Barbados']);
