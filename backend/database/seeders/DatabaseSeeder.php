@@ -9,7 +9,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            FareConfigSeeder::class,
+            ReferenceDataSeeder::class,
             AdminUserSeeder::class,
         ]);
     }

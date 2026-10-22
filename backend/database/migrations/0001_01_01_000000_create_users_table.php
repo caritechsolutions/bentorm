@@ -15,7 +15,8 @@ return new class extends Migration
             $table->string('email')->nullable()->unique();
             $table->string('password')->nullable();
             $table->enum('role', ['rider', 'driver', 'admin'])->default('rider')->index();
-            $table->string('avatar_url')->nullable();
+            $table->string('avatar_path')->nullable();
+            $table->char('country_code', 2)->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamp('phone_verified_at')->nullable();
             $table->timestamp('last_seen_at')->nullable();

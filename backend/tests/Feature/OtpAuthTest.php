@@ -10,23 +10,29 @@ class OtpAuthTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seedReference();
+    }
+
     public function test_new_rider_can_register_with_otp(): void
     {
-        $res = $this->postJson('/api/v1/auth/otp/request', ['phone' => '246-555-1234']);
-        $res->assertOk()->assertJsonPath('phone', '+12465551234')->assertJsonPath('code', '123456');
+        $this->postJson('/api/v1/auth/otp/request', ['phone' => '246-555-1234'])
+            ->assertOk()->assertJsonPath('phone', '+12465551234')->assertJsonPath('code', '123456');
 
-        $res = $this->postJson('/api/v1/auth/otp/verify', ['phone' => '2465551234', 'code' => '123456']);
-        $res->assertStatus(422)->assertJsonPath('needs_name', true);
+        $this->postJson('/api/v1/auth/otp/verify', ['phone' => '2465551234', 'code' => '123456'])
+            ->assertStatus(422)->assertJsonPath('needs_name', true);
 
         $this->postJson('/api/v1/auth/otp/request', ['phone' => '2465551234'])->assertStatus(422); // cooldown
 
         $this->travel(31)->seconds();
         $this->postJson('/api/v1/auth/otp/request', ['phone' => '2465551234'])->assertOk();
         $res = $this->postJson('/api/v1/auth/otp/verify', ['phone' => '2465551234', 'code' => '123456', 'name' => 'Test Rider']);
-        $res->assertCreated()->assertJsonPath('is_new', true)->assertJsonPath('user.role', 'rider');
+        $res->assertCreated()->assertJsonPath('is_new', true)->assertJsonPath('user.role', 'rider')
+            ->assertJsonPath('user.phone', '+12465551234');
 
-        $token = $res->json('token');
-        $this->withToken($token)->getJson('/api/v1/me')->assertOk()->assertJsonPath('name', 'Test Rider');
+        $this->withToken($res->json('token'))->getJson('/api/v1/me')->assertOk()->assertJsonPath('data.name', 'Test Rider');
     }
 
     public function test_wrong_code_is_rejected(): void
@@ -43,5 +49,11 @@ class OtpAuthTest extends TestCase
             ->assertCreated()->assertJsonPath('user.driver_profile.status', 'pending');
 
         $this->assertNotNull(User::query()->where('phone', '+12465559999')->first()?->driverProfile);
+    }
+
+    public function test_unauthenticated_api_returns_401_json(): void
+    {
+        $this->getJson('/api/v1/me')->assertUnauthorized();
+        $this->get('/api/v1/admin/stats')->assertUnauthorized();
     }
 }

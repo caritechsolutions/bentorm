@@ -9,30 +9,39 @@ class TripResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $isDriverOrAdmin = $request->user() && ($request->user()->isAdmin() || $request->user()->id === $this->driver_id);
+
         return [
             'id' => $this->public_id,
             'status' => $this->status,
             'vehicle_type' => $this->vehicle_type,
+            'service_area_id' => $this->service_area_id,
             'rider' => new UserResource($this->whenLoaded('rider')),
             'driver' => new UserResource($this->whenLoaded('driver')),
             'vehicle' => new VehicleResource($this->whenLoaded('vehicle')),
-            'pickup' => ['lat' => $this->pickup_lat, 'lng' => $this->pickup_lng, 'address' => $this->pickup_address],
-            'dropoff' => ['lat' => $this->dropoff_lat, 'lng' => $this->dropoff_lng, 'address' => $this->dropoff_address],
+            'pickup' => ['lat' => $this->pickup_lat, 'lng' => $this->pickup_lng, 'address' => $this->pickup_address, 'zone_id' => $this->pickup_zone_id],
+            'dropoff' => ['lat' => $this->dropoff_lat, 'lng' => $this->dropoff_lng, 'address' => $this->dropoff_address, 'zone_id' => $this->dropoff_zone_id],
             'estimate' => [
                 'distance_m' => $this->estimated_distance_m,
                 'duration_s' => $this->estimated_duration_s,
-                'fare' => $this->estimated_fare !== null ? (float) $this->estimated_fare : null,
+                'fare' => $this->estimated_fare,
             ],
             'actual' => [
                 'distance_m' => $this->actual_distance_m,
                 'duration_s' => $this->actual_duration_s,
-                'fare' => $this->final_fare !== null ? (float) $this->final_fare : null,
+                'wait_s' => $this->wait_duration_s,
+                'fare' => $this->final_fare,
+                'subtotal' => $this->subtotal,
+                'tax' => $this->tax_amount,
             ],
+            'driver_earnings' => $this->when($isDriverOrAdmin, $this->driver_earnings),
+            'platform_fee' => $this->when($request->user()?->isAdmin() ?? false, $this->platform_fee),
             'currency' => $this->currency,
-            'fare_breakdown' => $this->fare_breakdown,
+            'fare_breakdown' => $this->fare_breakdown ? ['lines' => $this->fare_breakdown['lines'] ?? [], 'total' => $this->fare_breakdown['total'] ?? null] : null,
             'surge_multiplier' => (float) $this->surge_multiplier,
             'payment_method' => $this->payment_method,
             'payment_status' => $this->payment_status,
+            'amount_due' => (float) $this->amount_due,
             'passengers' => $this->passengers,
             'rider_note' => $this->rider_note,
             'cancelled_by' => $this->cancelled_by,

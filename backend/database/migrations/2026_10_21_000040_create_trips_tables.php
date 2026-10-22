@@ -14,6 +14,9 @@ return new class extends Migration
             $table->foreignId('rider_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('driver_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('vehicle_id')->nullable()->constrained('vehicles')->nullOnDelete();
+            $table->foreignId('service_area_id')->nullable()->constrained('service_areas')->nullOnDelete();
+            $table->foreignId('pickup_zone_id')->nullable()->constrained('service_areas')->nullOnDelete();
+            $table->foreignId('dropoff_zone_id')->nullable()->constrained('service_areas')->nullOnDelete();
             $table->string('vehicle_type', 32)->default('standard');
             $table->enum('status', [
                 'requested', 'accepted', 'arrived', 'in_progress', 'completed', 'cancelled', 'no_drivers',
@@ -31,13 +34,21 @@ return new class extends Migration
             $table->decimal('estimated_fare', 10, 2)->nullable();
             $table->unsignedInteger('actual_distance_m')->nullable();
             $table->unsignedInteger('actual_duration_s')->nullable();
+            $table->unsignedInteger('wait_duration_s')->nullable();
+
+            // Money — all in `currency`. total = subtotal + tax.
+            $table->char('currency', 3)->default('BBD');
+            $table->decimal('subtotal', 10, 2)->nullable();
+            $table->decimal('tax_amount', 10, 2)->nullable();
             $table->decimal('final_fare', 10, 2)->nullable();
-            $table->string('currency', 3)->default('BBD');
+            $table->decimal('platform_fee', 10, 2)->nullable();
+            $table->decimal('driver_earnings', 10, 2)->nullable();
             $table->json('fare_breakdown')->nullable();
-            $table->decimal('surge_multiplier', 4, 2)->default(1.00);
+            $table->decimal('surge_multiplier', 5, 2)->default(1.00);
 
             $table->enum('payment_method', ['cash', 'card'])->default('cash');
-            $table->enum('payment_status', ['pending', 'paid', 'failed', 'refunded', 'waived'])->default('pending');
+            $table->enum('payment_status', ['pending', 'paid', 'failed', 'refunded', 'waived'])->default('pending')->index();
+            $table->decimal('amount_due', 10, 2)->default(0);
 
             $table->unsignedTinyInteger('passengers')->default(1);
             $table->text('rider_note')->nullable();
@@ -93,25 +104,10 @@ return new class extends Migration
             $table->unique(['trip_id', 'rater_id']);
             $table->index('ratee_id');
         });
-
-        Schema::create('payments', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('trip_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->enum('method', ['cash', 'card']);
-            $table->string('gateway', 32)->nullable();
-            $table->string('gateway_ref', 128)->nullable()->index();
-            $table->decimal('amount', 10, 2);
-            $table->string('currency', 3)->default('BBD');
-            $table->enum('status', ['pending', 'authorised', 'captured', 'failed', 'refunded'])->default('pending')->index();
-            $table->json('payload')->nullable();
-            $table->timestamps();
-        });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('payments');
         Schema::dropIfExists('ratings');
         Schema::dropIfExists('trip_locations');
         Schema::dropIfExists('trip_offers');

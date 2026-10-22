@@ -2,18 +2,18 @@
 
 namespace App\Services;
 
-use App\Enums\DriverStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\TripStatus;
 use App\Events\DriverLocationUpdated;
 use App\Events\TripUpdated;
-use App\Models\FareConfig;
+use App\Jobs\SendTripReceiptJob;
 use App\Models\Payment;
 use App\Models\Rating;
 use App\Models\Trip;
 use App\Models\TripLocation;
 use App\Models\User;
+use App\Plugins\PluginManager;
 use App\Support\Geo;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -24,6 +24,8 @@ class TripService
         private readonly PricingService $pricing,
         private readonly DispatchService $dispatch,
         private readonly DriverLocationService $locations,
+        private readonly ComplianceService $compliance,
+        private readonly PluginManager $plugins,
     ) {}
 
     // ---------------------------------------------------------------- rider
@@ -33,13 +35,27 @@ class TripService
         if ($rider->activeTrip()) {
             throw ValidationException::withMessages(['trip' => ['You already have an active trip.']]);
         }
+        if ($owed = $rider->outstandingTrips()->first()) {
+            throw ValidationException::withMessages(['payment' => [
+                "Please settle {$owed->currency} ".number_format($owed->amount_due, 2).' owed on a previous trip first.',
+            ]]);
+        }
 
+        // Geofences are enforced inside the estimate.
         $quote = $this->pricing->estimate(
-            $data['pickup_lat'], $data['pickup_lng'], $data['dropoff_lat'], $data['dropoff_lng'], $data['vehicle_type'],
+            (float) $data['pickup_lat'], (float) $data['pickup_lng'], (float) $data['dropoff_lat'], (float) $data['dropoff_lng'], $data['vehicle_type'],
         );
+
+        $method = PaymentMethod::from($data['payment_method'] ?? PaymentMethod::Cash->value);
+        if ($method === PaymentMethod::Card && ! $this->plugins->paymentGatewayFor($quote['service_area_id'])) {
+            throw ValidationException::withMessages(['payment_method' => ['Card payments are not available here yet. Please choose cash.']]);
+        }
 
         $trip = Trip::query()->create([
             'rider_id' => $rider->id,
+            'service_area_id' => $quote['service_area_id'],
+            'pickup_zone_id' => $quote['pickup_zone_id'],
+            'dropoff_zone_id' => $quote['dropoff_zone_id'],
             'vehicle_type' => $data['vehicle_type'],
             'status' => TripStatus::Requested,
             'pickup_lat' => $data['pickup_lat'],
@@ -54,7 +70,7 @@ class TripService
             'currency' => $quote['currency'],
             'fare_breakdown' => $quote['breakdown'],
             'surge_multiplier' => $quote['surge_multiplier'],
-            'payment_method' => $data['payment_method'] ?? PaymentMethod::Cash->value,
+            'payment_method' => $method,
             'passengers' => $data['passengers'] ?? 1,
             'rider_note' => $data['rider_note'] ?? null,
             'requested_at' => now(),
@@ -80,10 +96,11 @@ class TripService
             }
 
             $who = $by->isAdmin() ? 'admin' : ($t->driver_id === $by->id ? 'driver' : 'rider');
-            $fee = 0.0;
-            // Rider pays a cancellation fee once a driver has accepted (and it was not the driver's fault).
+
+            // Rider pays a cancellation fee once a driver has accepted (never when the driver or admin cancels).
+            $charge = ['total' => 0.0, 'tax' => 0.0, 'subtotal' => 0.0, 'platform_fee' => 0.0, 'driver_earnings' => 0.0];
             if ($who === 'rider' && in_array($t->status, [TripStatus::Accepted, TripStatus::Arrived], true)) {
-                $fee = (float) (FareConfig::forType($t->vehicle_type)?->cancellation_fee ?? 0);
+                $charge = $this->pricing->cancellationCharge($t);
             }
 
             if ($t->status === TripStatus::Requested) {
@@ -95,8 +112,13 @@ class TripService
                 'cancelled_at' => now(),
                 'cancelled_by' => $who,
                 'cancellation_reason' => $reason,
-                'cancellation_fee' => $fee,
-                'payment_status' => $fee > 0 ? PaymentStatus::Pending : PaymentStatus::Waived,
+                'cancellation_fee' => $charge['total'],
+                'subtotal' => $charge['total'] > 0 ? $charge['subtotal'] : null,
+                'tax_amount' => $charge['total'] > 0 ? $charge['tax'] : null,
+                'platform_fee' => $charge['total'] > 0 ? $charge['platform_fee'] : null,
+                'driver_earnings' => $charge['total'] > 0 ? $charge['driver_earnings'] : null,
+                'amount_due' => $charge['total'],
+                'payment_status' => $charge['total'] > 0 ? PaymentStatus::Pending : PaymentStatus::Waived,
             ])->save();
 
             if ($t->driver_id) {
@@ -124,7 +146,6 @@ class TripService
             ['ratee_id' => $rateeId, 'score' => $score, 'comment' => $comment],
         );
 
-        // Keep the driver's aggregate rating current.
         $ratee = User::query()->find($rateeId);
         if ($ratee?->isDriver() && $ratee->driverProfile) {
             $agg = Rating::query()->where('ratee_id', $rateeId)->selectRaw('AVG(score) as avg, COUNT(*) as cnt')->first();
@@ -162,33 +183,40 @@ class TripService
 
             $distanceM = $this->trackedDistance($t) ?: ($t->estimated_distance_m ?? 0);
             $durationS = (int) max(0, ($t->started_at ?? now())->diffInSeconds(now(), true));
-            $quote = $this->pricing->finalFare($t->vehicle_type, $distanceM, $durationS, (float) $t->surge_multiplier);
+            $waitS = ($t->arrived_at && $t->started_at) ? (int) max(0, $t->arrived_at->diffInSeconds($t->started_at, true)) : 0;
+            $quote = $this->pricing->finalFare($t, $distanceM, $durationS, $waitS);
+
+            $isCash = $t->payment_method === PaymentMethod::Cash;
 
             $t->forceFill([
                 'status' => TripStatus::Completed,
                 'completed_at' => now(),
                 'actual_distance_m' => $distanceM,
                 'actual_duration_s' => $durationS,
+                'wait_duration_s' => $waitS,
+                'subtotal' => $quote['subtotal'],
+                'tax_amount' => $quote['tax'],
                 'final_fare' => $quote['fare'],
+                'platform_fee' => $quote['platform_fee'],
+                'driver_earnings' => $quote['driver_earnings'],
                 'fare_breakdown' => $quote['breakdown'],
-                // Cash is settled in the car; card is captured later by the gateway flow.
-                'payment_status' => $t->payment_method === PaymentMethod::Cash ? PaymentStatus::Paid : PaymentStatus::Pending,
+                // Cash is settled in the car; card is collected via the payment gateway flow.
+                'payment_status' => $isCash ? PaymentStatus::Paid : PaymentStatus::Pending,
+                'amount_due' => $isCash ? 0 : $quote['fare'],
             ])->save();
 
-            Payment::query()->create([
-                'trip_id' => $t->id,
-                'user_id' => $t->rider_id,
-                'method' => $t->payment_method->value,
-                'gateway' => $t->payment_method === PaymentMethod::Cash ? null : 'pending',
-                'amount' => $quote['fare'],
-                'currency' => $t->currency,
-                'status' => $t->payment_method === PaymentMethod::Cash ? 'captured' : 'pending',
-            ]);
+            if ($isCash) {
+                Payment::query()->create([
+                    'trip_id' => $t->id, 'user_id' => $t->rider_id, 'purpose' => 'trip_fare', 'method' => 'cash',
+                    'amount' => $quote['fare'], 'currency' => $t->currency, 'status' => 'captured', 'paid_at' => now(),
+                ]);
+            }
 
             $driver->driverProfile?->increment('completed_trips');
             $this->releaseDriver($driver);
 
             event(new TripUpdated($t));
+            SendTripReceiptJob::dispatch($t->id)->afterCommit();
 
             return $t;
         });
@@ -212,17 +240,14 @@ class TripService
 
     public function goOnline(User $driver): void
     {
-        $profile = $driver->driverProfile;
-        if (! $profile || $profile->status !== DriverStatus::Approved) {
-            abort(403, 'Your driver account is not approved yet.');
-        }
-        $vehicle = $profile->currentVehicle;
-        if (! $vehicle || ! $vehicle->isApproved()) {
-            abort(403, 'Select an approved vehicle before going online.');
+        $issues = $this->compliance->canGoOnline($driver);
+        if ($issues) {
+            abort(response()->json(['message' => 'You cannot go online yet.', 'issues' => $issues], 403));
         }
 
+        $profile = $driver->driverProfile;
         $profile->forceFill(['is_online' => true])->save();
-        $this->locations->goOnline($driver, $vehicle->vehicle_type);
+        $this->locations->goOnline($driver, $profile->currentVehicle->vehicle_type);
     }
 
     public function goOffline(User $driver): void

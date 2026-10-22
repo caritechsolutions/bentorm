@@ -73,7 +73,7 @@ class OtpController extends Controller
         return response()->json([
             'token' => $token,
             'is_new' => $isNew,
-            'user' => (new UserResource($user->load('driverProfile.currentVehicle')))->resolve($request),
+            'user' => (new UserResource($user->load('driverProfile.currentVehicle')))->asSelf()->resolve($request),
         ], $isNew ? 201 : 200);
     }
 }

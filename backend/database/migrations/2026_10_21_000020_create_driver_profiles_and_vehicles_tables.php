@@ -11,9 +11,9 @@ return new class extends Migration
         Schema::create('driver_profiles', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->unique()->constrained()->cascadeOnDelete();
+            $table->foreignId('service_area_id')->nullable()->constrained('service_areas')->nullOnDelete();
             $table->string('licence_number', 64)->nullable();
             $table->date('licence_expiry')->nullable();
-            $table->string('licence_image_url')->nullable();
             $table->string('psv_permit_number', 64)->nullable();
             $table->enum('status', ['pending', 'approved', 'suspended', 'rejected'])->default('pending')->index();
             $table->text('status_note')->nullable();
@@ -22,6 +22,7 @@ return new class extends Migration
             $table->decimal('rating_avg', 3, 2)->default(5.00);
             $table->unsignedInteger('rating_count')->default(0);
             $table->unsignedInteger('completed_trips')->default(0);
+            $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('approved_at')->nullable();
             $table->timestamps();
         });
@@ -36,9 +37,11 @@ return new class extends Migration
             $table->string('plate', 16)->unique();
             $table->unsignedTinyInteger('seats')->default(4);
             $table->string('vehicle_type', 32)->default('standard')->index();
-            $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending')->index();
-            $table->json('documents')->nullable();
+            $table->enum('status', ['pending', 'approved', 'rejected', 'suspended'])->default('pending')->index();
+            $table->text('status_note')->nullable();
+            $table->timestamp('approved_at')->nullable();
             $table->timestamps();
+            $table->foreign('vehicle_type')->references('key')->on('vehicle_types')->cascadeOnUpdate();
         });
 
         Schema::table('driver_profiles', function (Blueprint $table) {

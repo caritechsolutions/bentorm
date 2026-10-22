@@ -12,13 +12,18 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class FareController extends Controller
 {
-    /** GET /fares — public rate card. */
-    public function index(): AnonymousResourceCollection
+    /** GET /fares?service_area_id= — public rate cards. */
+    public function index(Request $request): AnonymousResourceCollection
     {
-        return FareConfigResource::collection(FareConfig::query()->where('is_active', true)->orderBy('sort_order')->get());
+        $q = FareConfig::query()->with('serviceArea')->where('is_active', true);
+        if ($areaId = $request->integer('service_area_id')) {
+            $q->where('service_area_id', $areaId);
+        }
+
+        return FareConfigResource::collection($q->orderBy('service_area_id')->orderBy('vehicle_type')->get());
     }
 
-    /** POST /fares/estimate — quotes for all vehicle types (or one). */
+    /** POST /fares/estimate — quotes for every vehicle type offered at the pickup (or one type). */
     public function estimate(Request $request, PricingService $pricing): JsonResponse
     {
         $data = $request->validate([
@@ -28,10 +33,24 @@ class FareController extends Controller
             'dropoff_lng' => ['required', 'numeric', 'between:-180,180'],
             'vehicle_type' => ['nullable', 'string', 'max:32'],
         ]);
+        [$pLat, $pLng, $dLat, $dLng] = [(float) $data['pickup_lat'], (float) $data['pickup_lng'], (float) $data['dropoff_lat'], (float) $data['dropoff_lng']];
 
-        $quotes = isset($data['vehicle_type'])
-            ? [$pricing->estimate($data['pickup_lat'], $data['pickup_lng'], $data['dropoff_lat'], $data['dropoff_lng'], $data['vehicle_type'])]
-            : $pricing->estimateAll($data['pickup_lat'], $data['pickup_lng'], $data['dropoff_lat'], $data['dropoff_lng']);
+        if (! empty($data['vehicle_type'])) {
+            $q = $pricing->estimate($pLat, $pLng, $dLat, $dLng, $data['vehicle_type']);
+            unset($q['pickup_context'], $q['dropoff_context']);
+            $quotes = [$q];
+        } else {
+            $quotes = $pricing->estimateAll($pLat, $pLng, $dLat, $dLng);
+        }
+
+        $quotes = array_map(function ($q) use ($request) {
+            unset($q['breakdown']['lock']);
+            if (! $request->user()?->isAdmin()) {
+                unset($q['platform_fee'], $q['driver_earnings']);
+            }
+
+            return $q;
+        }, $quotes);
 
         return response()->json(['quotes' => $quotes]);
     }

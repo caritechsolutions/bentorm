@@ -10,20 +10,20 @@ class FareConfigResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
+            'id' => $this->id,
+            'service_area_id' => $this->service_area_id,
             'vehicle_type' => $this->vehicle_type,
-            'display_name' => $this->display_name,
-            'description' => $this->description,
-            'currency' => $this->currency,
-            'base_fare' => (float) $this->base_fare,
-            'per_km' => (float) $this->per_km,
-            'per_minute' => (float) $this->per_minute,
-            'minimum_fare' => (float) $this->minimum_fare,
-            'booking_fee' => (float) $this->booking_fee,
-            'cancellation_fee' => (float) $this->cancellation_fee,
-            'surge_multiplier' => (float) $this->surge_multiplier,
-            'max_passengers' => $this->max_passengers,
+            'currency' => $this->serviceArea?->currency,
+            'base_fare' => $this->base_fare,
+            'per_km' => $this->per_km,
+            'per_minute' => $this->per_minute,
+            'minimum_fare' => $this->minimum_fare,
+            'booking_fee' => $this->booking_fee,
+            'cancellation_fee' => $this->cancellation_fee,
+            'free_wait_minutes' => $this->free_wait_minutes,
+            'wait_per_minute' => $this->wait_per_minute,
             'is_active' => $this->is_active,
-            'sort_order' => $this->sort_order,
+            'amounts_exclude_tax' => true,
         ];
     }
 }

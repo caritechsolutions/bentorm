@@ -22,7 +22,7 @@ class SessionController extends Controller
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:100'],
             'email' => ['nullable', 'email', 'max:255', 'unique:users,email,'.$request->user()->id],
-            'avatar_url' => ['nullable', 'url', 'max:500'],
+            'country_code' => ['nullable', 'string', 'size:2'],
         ]);
         $request->user()->update($data);
 

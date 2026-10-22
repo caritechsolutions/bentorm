@@ -2,16 +2,14 @@
 
 namespace Tests\Feature;
 
-use App\Enums\DriverStatus;
 use App\Enums\OfferResponse;
 use App\Enums\TripStatus;
-use App\Enums\VehicleStatus;
 use App\Jobs\DispatchTripJob;
+use App\Jobs\SendTripReceiptJob;
 use App\Models\Trip;
 use App\Models\TripOffer;
 use App\Models\User;
 use App\Services\DriverLocationService;
-use Database\Seeders\FareConfigSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Mockery\MockInterface;
@@ -28,28 +26,22 @@ class TripLifecycleTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(FareConfigSeeder::class);
         Queue::fake();
+        $bb = $this->seedReference();
 
-        // Redis is not available in tests — stub the location service.
+        // Redis is not used in tests — stub the live-location service.
         $this->mock(DriverLocationService::class, function (MockInterface $m) {
             $m->shouldReceive('setState', 'goOnline', 'goOffline', 'update')->andReturnNull();
             $m->shouldReceive('position')->andReturn(null);
         });
 
-        $this->rider = User::query()->create(['name' => 'Rider', 'phone' => '+12465550001', 'role' => 'rider']);
-        $this->driver = User::query()->create(['name' => 'Driver', 'phone' => '+12465550002', 'role' => 'driver']);
-        $vehicle = $this->driver->vehicles()->create(['make' => 'Toyota', 'model' => 'Corolla', 'plate' => 'ZR1', 'vehicle_type' => 'standard', 'status' => VehicleStatus::Approved]);
-        $this->driver->driverProfile()->create(['status' => DriverStatus::Approved, 'is_online' => true, 'current_vehicle_id' => $vehicle->id, 'approved_at' => now()]);
+        $this->rider = $this->makeUser('rider');
+        $this->driver = $this->makeApprovedDriver($bb);
     }
 
-    private function requestTrip(): Trip
+    private function requestTrip(array $extra = []): Trip
     {
-        $res = $this->actingAs($this->rider)->postJson('/api/v1/trips', [
-            'pickup_lat' => 13.0969, 'pickup_lng' => -59.6145,
-            'dropoff_lat' => 13.0667, 'dropoff_lng' => -59.5333,
-            'vehicle_type' => 'standard',
-        ]);
+        $res = $this->actingAs($this->rider)->postJson('/api/v1/trips', $this->tripPayload(self::BRIDGETOWN, self::OISTINS, $extra));
         $res->assertCreated()->assertJsonPath('status', 'requested');
         Queue::assertPushed(DispatchTripJob::class);
 
@@ -64,22 +56,31 @@ class TripLifecycleTest extends TestCase
         ]);
     }
 
-    public function test_full_happy_path(): void
+    public function test_full_happy_path_with_money_split(): void
     {
         $trip = $this->requestTrip();
+        $this->assertNotNull($trip->service_area_id);
         $this->offerTo($trip, $this->driver);
 
         $d = $this->actingAs($this->driver);
         $d->postJson("/api/v1/driver/trips/{$trip->public_id}/accept")->assertOk()->assertJsonPath('status', 'accepted');
         $d->postJson("/api/v1/driver/trips/{$trip->public_id}/arrive")->assertOk()->assertJsonPath('status', 'arrived');
+        $this->travel(6)->minutes(); // 3 minutes beyond the free wait
         $d->postJson("/api/v1/driver/trips/{$trip->public_id}/start")->assertOk()->assertJsonPath('status', 'in_progress');
 
         $this->travel(15)->minutes();
-        $res = $d->postJson("/api/v1/driver/trips/{$trip->public_id}/complete", ['lat' => 13.0667, 'lng' => -59.5333]);
+        $res = $d->postJson("/api/v1/driver/trips/{$trip->public_id}/complete", ['lat' => self::OISTINS[0], 'lng' => self::OISTINS[1]]);
         $res->assertOk()->assertJsonPath('status', 'completed')->assertJsonPath('payment_status', 'paid');
-        $this->assertGreaterThan(0, $res->json('actual.fare'));
 
-        $this->actingAs($this->rider)->postJson("/api/v1/trips/{$trip->public_id}/rate", ['score' => 5])->assertOk();
+        $t = $trip->fresh();
+        $this->assertGreaterThan(0, $t->final_fare);
+        $this->assertEqualsWithDelta($t->final_fare, $t->subtotal + $t->tax_amount, 0.001);
+        $this->assertEqualsWithDelta($t->subtotal, $t->platform_fee + $t->driver_earnings, 0.001);
+        $this->assertContains('waiting', array_column($t->fare_breakdown['lines'], 'code'));
+        $this->assertSame((float) $res->json('driver_earnings'), (float) $t->driver_earnings);
+        Queue::assertPushed(SendTripReceiptJob::class);
+
+        $this->actingAs($this->rider)->postJson("/api/v1/trips/{$trip->public_id}/rate", ['score' => 5])->assertCreated();
         $this->assertSame(1, $this->driver->driverProfile->fresh()->rating_count);
         $this->assertSame(1, $this->driver->driverProfile->fresh()->completed_trips);
     }
@@ -87,8 +88,7 @@ class TripLifecycleTest extends TestCase
     public function test_second_driver_cannot_accept_taken_trip(): void
     {
         $trip = $this->requestTrip();
-        $other = User::query()->create(['name' => 'Other', 'phone' => '+12465550003', 'role' => 'driver']);
-        $other->driverProfile()->create(['status' => DriverStatus::Approved]);
+        $other = $this->makeApprovedDriver();
         $this->offerTo($trip, $this->driver);
         $this->offerTo($trip, $other);
 
@@ -98,14 +98,19 @@ class TripLifecycleTest extends TestCase
         $this->assertSame(OfferResponse::Withdrawn, TripOffer::query()->where('driver_id', $other->id)->first()->response);
     }
 
-    public function test_rider_cancel_after_accept_incurs_fee(): void
+    public function test_rider_cancel_after_accept_incurs_fee_and_is_owed(): void
     {
         $trip = $this->requestTrip();
         $this->offerTo($trip, $this->driver);
         $this->actingAs($this->driver)->postJson("/api/v1/driver/trips/{$trip->public_id}/accept")->assertOk();
 
         $res = $this->actingAs($this->rider)->postJson("/api/v1/trips/{$trip->public_id}/cancel", ['reason' => 'Changed plans']);
-        $res->assertOk()->assertJsonPath('status', 'cancelled')->assertJsonPath('cancelled_by', 'rider')->assertJsonPath('cancellation_fee', 5);
+        // BBD 5.00 + 17.5% VAT
+        $res->assertOk()->assertJsonPath('status', 'cancelled')->assertJsonPath('cancelled_by', 'rider')
+            ->assertJsonPath('cancellation_fee', 5.88)->assertJsonPath('amount_due', 5.88);
+
+        $this->actingAs($this->rider)->postJson('/api/v1/trips', $this->tripPayload(self::BRIDGETOWN, self::OISTINS))
+            ->assertStatus(422)->assertJsonValidationErrors('payment');
     }
 
     public function test_rider_cancel_before_accept_is_free(): void
@@ -118,9 +123,20 @@ class TripLifecycleTest extends TestCase
     public function test_rider_cannot_have_two_active_trips(): void
     {
         $this->requestTrip();
-        $this->actingAs($this->rider)->postJson('/api/v1/trips', [
-            'pickup_lat' => 13.1, 'pickup_lng' => -59.6, 'dropoff_lat' => 13.0, 'dropoff_lng' => -59.5, 'vehicle_type' => 'standard',
-        ])->assertStatus(422);
+        $this->actingAs($this->rider)->postJson('/api/v1/trips', $this->tripPayload(self::BRIDGETOWN, self::OISTINS))->assertStatus(422);
+    }
+
+    public function test_request_outside_service_area_is_rejected(): void
+    {
+        $this->actingAs($this->rider)->postJson('/api/v1/trips', $this->tripPayload(self::ST_LUCIA, self::BRIDGETOWN))
+            ->assertStatus(422)->assertJsonValidationErrors('pickup');
+    }
+
+    public function test_driver_without_documents_cannot_go_online(): void
+    {
+        $res = $this->actingAs($this->driver)->postJson('/api/v1/driver/online');
+        $res->assertForbidden()->assertJsonPath('message', 'You cannot go online yet.');
+        $this->assertNotEmpty($res->json('issues'));
     }
 
     public function test_state_machine_rejects_skipping_steps(): void

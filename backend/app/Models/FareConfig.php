@@ -3,33 +3,37 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FareConfig extends Model
 {
     protected $fillable = [
-        'vehicle_type', 'display_name', 'description', 'currency', 'base_fare', 'per_km', 'per_minute',
-        'minimum_fare', 'booking_fee', 'cancellation_fee', 'surge_multiplier', 'max_passengers',
-        'is_active', 'sort_order',
+        'service_area_id', 'vehicle_type', 'base_fare', 'per_km', 'per_minute', 'minimum_fare', 'booking_fee',
+        'cancellation_fee', 'free_wait_minutes', 'wait_per_minute', 'is_active',
     ];
 
     protected function casts(): array
     {
         return [
-            'base_fare' => 'decimal:2',
-            'per_km' => 'decimal:2',
-            'per_minute' => 'decimal:2',
-            'minimum_fare' => 'decimal:2',
-            'booking_fee' => 'decimal:2',
-            'cancellation_fee' => 'decimal:2',
-            'surge_multiplier' => 'decimal:2',
-            'max_passengers' => 'integer',
-            'is_active' => 'boolean',
-            'sort_order' => 'integer',
+            'base_fare' => 'float', 'per_km' => 'float', 'per_minute' => 'float', 'minimum_fare' => 'float',
+            'booking_fee' => 'float', 'cancellation_fee' => 'float', 'wait_per_minute' => 'float',
+            'free_wait_minutes' => 'integer', 'is_active' => 'boolean',
         ];
     }
 
-    public static function forType(string $vehicleType): ?self
+    public function serviceArea(): BelongsTo
     {
-        return static::query()->where('vehicle_type', $vehicleType)->where('is_active', true)->first();
+        return $this->belongsTo(ServiceArea::class);
+    }
+
+    public function vehicleType(): BelongsTo
+    {
+        return $this->belongsTo(VehicleType::class, 'vehicle_type', 'key');
+    }
+
+    public static function for(int $serviceAreaId, string $vehicleType): ?self
+    {
+        return static::query()->where('service_area_id', $serviceAreaId)->where('vehicle_type', $vehicleType)
+            ->where('is_active', true)->first();
     }
 }

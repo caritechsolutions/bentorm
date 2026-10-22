@@ -6,8 +6,8 @@ use App\Contracts\DistanceProvider;
 use App\Contracts\SmsSender;
 use App\Services\Routing\HaversineDistanceProvider;
 use App\Services\Routing\OsrmDistanceProvider;
-use App\Services\Sms\HttpSmsSender;
-use App\Services\Sms\LogSmsSender;
+use App\Plugins\PluginManager;
+use App\Services\PluginSmsSender;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -17,10 +17,8 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(SmsSender::class, fn () => match (config('sms.driver')) {
-            'http' => new HttpSmsSender,
-            default => new LogSmsSender,
-        });
+        $this->app->singleton(PluginManager::class);
+        $this->app->bind(SmsSender::class, PluginSmsSender::class);
 
         $this->app->bind(DistanceProvider::class, fn ($app) => match (config('pricing.distance_provider')) {
             'osrm' => new OsrmDistanceProvider($app->make(HaversineDistanceProvider::class)),

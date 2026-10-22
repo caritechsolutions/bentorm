@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\PaymentStatus;
+use App\Enums\TripStatus;
 use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -15,7 +17,7 @@ class User extends Authenticatable
     use HasApiTokens, Notifiable, SoftDeletes;
 
     protected $fillable = [
-        'name', 'phone', 'email', 'password', 'role', 'avatar_url', 'is_active',
+        'name', 'phone', 'email', 'password', 'role', 'avatar_path', 'country_code', 'is_active',
         'phone_verified_at', 'last_seen_at',
     ];
 
@@ -88,8 +90,17 @@ class User extends Authenticatable
 
         return Trip::query()
             ->where($column, $this->id)
-            ->whereIn('status', array_map(fn ($s) => $s->value, \App\Enums\TripStatus::active()))
+            ->whereIn('status', array_map(fn ($s) => $s->value, TripStatus::active()))
             ->latest('id')
             ->first();
+    }
+
+    /** Trips (as rider) with money still owed — blocks new requests. */
+    public function outstandingTrips()
+    {
+        return Trip::query()->where('rider_id', $this->id)
+            ->where('payment_status', PaymentStatus::Pending->value)
+            ->where('amount_due', '>', 0)
+            ->whereIn('status', [TripStatus::Completed->value, TripStatus::Cancelled->value]);
     }
 }

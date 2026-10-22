@@ -6,6 +6,7 @@
 # Optional environment variables (first run only):
 #   ADMIN_PHONE=2461234567   first admin account (can also be set later in /opt/bentorm/backend/.env)
 #   ADMIN_NAME="Richard"
+#   FRESH=1                     drop and recreate all tables (DESTROYS DATA — pre-launch schema resets only)
 #   API_HOST=api.ridecoop.net   public hostname NPM uses for the API  (sets APP_URL)
 #   WS_HOST=ws.ridecoop.net     public hostname NPM uses for WebSockets (sets REVERB_HOST)
 #   BRANCH=main
@@ -139,13 +140,27 @@ fi
 
 log "Running migrations and seeders"
 php artisan optimize:clear --quiet
-php artisan migrate --force --no-interaction
+if [[ "${FRESH:-0}" == "1" ]]; then
+  warn "FRESH=1 — dropping all tables and recreating them"
+  php artisan migrate:fresh --force --no-interaction
+else
+  php artisan migrate --force --no-interaction
+fi
 php artisan db:seed --force --no-interaction
 
 log "Caching configuration and routes"
 php artisan config:cache --quiet
 php artisan route:cache --quiet
 php artisan event:cache --quiet
+
+log "Configuring PHP upload limits (document photos)"
+cat > /etc/php/8.3/fpm/conf.d/99-bentorm.ini <<INI
+upload_max_filesize = 20M
+post_max_size = 25M
+memory_limit = 256M
+max_execution_time = 60
+INI
+mkdir -p "$BACKEND/storage/app/private"
 
 log "Setting permissions"
 chown -R www-data:www-data "$INSTALL_DIR"

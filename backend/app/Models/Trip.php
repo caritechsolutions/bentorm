@@ -15,11 +15,12 @@ class Trip extends Model
     use HasUlids;
 
     protected $fillable = [
-        'rider_id', 'driver_id', 'vehicle_id', 'vehicle_type', 'status',
+        'rider_id', 'driver_id', 'vehicle_id', 'service_area_id', 'pickup_zone_id', 'dropoff_zone_id', 'vehicle_type', 'status',
         'pickup_lat', 'pickup_lng', 'pickup_address', 'dropoff_lat', 'dropoff_lng', 'dropoff_address',
         'estimated_distance_m', 'estimated_duration_s', 'estimated_fare',
-        'actual_distance_m', 'actual_duration_s', 'final_fare', 'currency', 'fare_breakdown', 'surge_multiplier',
-        'payment_method', 'payment_status', 'passengers', 'rider_note',
+        'actual_distance_m', 'actual_duration_s', 'wait_duration_s', 'currency', 'subtotal', 'tax_amount', 'final_fare',
+        'platform_fee', 'driver_earnings', 'fare_breakdown', 'surge_multiplier',
+        'payment_method', 'payment_status', 'amount_due', 'passengers', 'rider_note',
         'requested_at', 'accepted_at', 'arrived_at', 'started_at', 'completed_at', 'cancelled_at',
         'cancelled_by', 'cancellation_reason', 'cancellation_fee',
     ];
@@ -45,10 +46,15 @@ class Trip extends Model
             'pickup_lng' => 'float',
             'dropoff_lat' => 'float',
             'dropoff_lng' => 'float',
-            'estimated_fare' => 'decimal:2',
-            'final_fare' => 'decimal:2',
-            'cancellation_fee' => 'decimal:2',
-            'surge_multiplier' => 'decimal:2',
+            'estimated_fare' => 'float',
+            'subtotal' => 'float',
+            'tax_amount' => 'float',
+            'final_fare' => 'float',
+            'platform_fee' => 'float',
+            'driver_earnings' => 'float',
+            'amount_due' => 'float',
+            'cancellation_fee' => 'float',
+            'surge_multiplier' => 'float',
             'fare_breakdown' => 'array',
             'passengers' => 'integer',
             'requested_at' => 'datetime',
@@ -73,6 +79,11 @@ class Trip extends Model
     public function vehicle(): BelongsTo
     {
         return $this->belongsTo(Vehicle::class);
+    }
+
+    public function serviceArea(): BelongsTo
+    {
+        return $this->belongsTo(ServiceArea::class);
     }
 
     public function offers(): HasMany

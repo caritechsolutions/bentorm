@@ -23,6 +23,8 @@ class DashboardController extends Controller
             'riders_total' => User::query()->where('role', 'rider')->count(),
             'drivers_total' => User::query()->where('role', 'driver')->count(),
             'drivers_pending' => DriverProfile::query()->where('status', DriverStatus::Pending->value)->count(),
+            'documents_pending' => \App\Models\Document::query()->where('status', 'pending')->count(),
+            'amount_outstanding' => (float) Trip::query()->where('payment_status', 'pending')->where('amount_due', '>', 0)->sum('amount_due'),
             'drivers_online' => count($locations->allLive()),
             'trips_active' => Trip::query()->whereIn('status', $active)->count(),
             'trips_today' => Trip::query()->where('created_at', '>=', $today)->count(),
