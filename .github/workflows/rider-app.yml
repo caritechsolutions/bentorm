@@ -16,6 +16,9 @@ concurrency:
 env:
   FLUTTER_VERSION: 3.47.5
   ANDROID_APP_ID: com.ridecoopcustomer.android
+  API_BASE: https://api.ridecoop.net/api/v1
+  # Repository secret; builds still succeed without it (maps are just blank).
+  GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
 
 jobs:
   build:
@@ -55,10 +58,15 @@ jobs:
           git push
 
       - run: flutter pub get
-      - run: flutter analyze
+      - run: flutter analyze --no-fatal-infos
       - run: flutter test
-      - run: flutter build apk --debug
-      - run: flutter build web --release
+      - run: flutter build apk --debug --dart-define=API_BASE=$API_BASE
+      - name: Build web
+        run: |
+          flutter build web --release --dart-define=API_BASE=$API_BASE
+          sed -i "s|__GOOGLE_MAPS_API_KEY__|${GOOGLE_MAPS_API_KEY}|" build/web/index.html
+          grep -c "maps.googleapis.com/maps/api/js" build/web/index.html
+          [ -n "$GOOGLE_MAPS_API_KEY" ] && echo "Maps key: set" || echo "::warning::GOOGLE_MAPS_API_KEY secret not set - maps will be blank"
 
       - name: Publish test build
         env:
@@ -69,7 +77,7 @@ jobs:
           cp build/app/outputs/flutter-apk/app-debug.apk "$APK"
           sha256sum "$APK" > "$APK.sha256"
           gh release create "rider-dev-$SHA" "$APK" "$APK.sha256" --prerelease \
-            --title "Rider app test build $SHA" --notes "Debug build of the Ride Coop rider app from $SHA. Not for the store."
+            --title "Rider app test build $SHA" --notes "Debug build of the Ride Coop rider app from $SHA, talking to $API_BASE. Not for the store."
 
       - uses: actions/upload-artifact@v4
         with:

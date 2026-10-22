@@ -15,7 +15,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        // Same ID as the existing Play listing, so this ships as an update to "Ride Coop".
         applicationId = "com.ridecoopcustomer.android"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -27,6 +27,7 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["MAPS_API_KEY"] = System.getenv("GOOGLE_MAPS_API_KEY") ?: ""
     }
 
     buildTypes {

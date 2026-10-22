@@ -1,0 +1,18 @@
+{
+  "payment_method": {
+    "id": "01m5j2vw2frrs175hg7ssc3c4w",
+    "status": "pending",
+    "brand": null,
+    "last4": null,
+    "exp_month": null,
+    "exp_year": null,
+    "expired": false,
+    "holder_name": null,
+    "is_default": false,
+    "gateway_id": 3,
+    "redirect_url": "http://127.0.0.1:8099/api/v1/payment-methods/test/01m5j2vw2frrs175hg7ssc3c4w?expires=1792683894&signature=47c6b2b740114d201c0bfc77060b3ad8e60403ccd856d89dbecf34e1aa907138",
+    "failure_reason": null,
+    "created_at": "2026-10-22T15:14:54+00:00"
+  },
+  "redirect_url": "http://127.0.0.1:8099/api/v1/payment-methods/test/01m5j2vw2frrs175hg7ssc3c4w?expires=1792683894&signature=47c6b2b740114d201c0bfc77060b3ad8e60403ccd856d89dbecf34e1aa907138"
+}

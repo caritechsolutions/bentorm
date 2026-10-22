@@ -1,0 +1,174 @@
+{
+  "quotes": [
+    {
+      "vehicle_type": "standard",
+      "service_area_id": 1,
+      "service_area": "BB",
+      "currency": "BBD",
+      "distance_m": 12238,
+      "duration_s": 1469,
+      "fare": 57.5,
+      "subtotal": 48.94,
+      "tax": 8.56,
+      "surge_multiplier": 1.0,
+      "pickup_zone_id": null,
+      "dropoff_zone_id": null,
+      "breakdown": {
+        "lines": [
+          {
+            "code": "base",
+            "label": "Base fare",
+            "amount": 5.0
+          },
+          {
+            "code": "distance",
+            "label": "Distance (12.2 km)",
+            "amount": 30.6
+          },
+          {
+            "code": "time",
+            "label": "Time (24 min)",
+            "amount": 12.24
+          },
+          {
+            "code": "booking_fee",
+            "label": "Booking fee",
+            "amount": 1.0
+          },
+          {
+            "code": "rounding",
+            "label": "Rounding",
+            "amount": 0.1
+          },
+          {
+            "code": "tax",
+            "label": "VAT 17.5%",
+            "amount": 8.56
+          }
+        ],
+        "total": 57.5
+      },
+      "hold_amount": 69.0,
+      "display_name": "Standard",
+      "description": "Everyday rides",
+      "max_passengers": 4,
+      "max_luggage": 2,
+      "icon_url": null
+    },
+    {
+      "vehicle_type": "xl",
+      "service_area_id": 1,
+      "service_area": "BB",
+      "currency": "BBD",
+      "distance_m": 12238,
+      "duration_s": 1469,
+      "fare": 81.5,
+      "subtotal": 69.36,
+      "tax": 12.14,
+      "surge_multiplier": 1.0,
+      "pickup_zone_id": null,
+      "dropoff_zone_id": null,
+      "breakdown": {
+        "lines": [
+          {
+            "code": "base",
+            "label": "Base fare",
+            "amount": 8.0
+          },
+          {
+            "code": "distance",
+            "label": "Distance (12.2 km)",
+            "amount": 42.83
+          },
+          {
+            "code": "time",
+            "label": "Time (24 min)",
+            "amount": 17.14
+          },
+          {
+            "code": "booking_fee",
+            "label": "Booking fee",
+            "amount": 1.0
+          },
+          {
+            "code": "rounding",
+            "label": "Rounding",
+            "amount": 0.39
+          },
+          {
+            "code": "tax",
+            "label": "VAT 17.5%",
+            "amount": 12.14
+          }
+        ],
+        "total": 81.5
+      },
+      "hold_amount": 98.0,
+      "display_name": "XL",
+      "description": "Larger vehicles for groups and luggage",
+      "max_passengers": 6,
+      "max_luggage": 5,
+      "icon_url": null
+    },
+    {
+      "vehicle_type": "premium",
+      "service_area_id": 1,
+      "service_area": "BB",
+      "currency": "BBD",
+      "distance_m": 12238,
+      "duration_s": 1469,
+      "fare": 107.5,
+      "subtotal": 91.49,
+      "tax": 16.01,
+      "surge_multiplier": 1.0,
+      "pickup_zone_id": null,
+      "dropoff_zone_id": null,
+      "breakdown": {
+        "lines": [
+          {
+            "code": "base",
+            "label": "Base fare",
+            "amount": 12.0
+          },
+          {
+            "code": "distance",
+            "label": "Distance (12.2 km)",
+            "amount": 55.07
+          },
+          {
+            "code": "time",
+            "label": "Time (24 min)",
+            "amount": 22.04
+          },
+          {
+            "code": "booking_fee",
+            "label": "Booking fee",
+            "amount": 2.0
+          },
+          {
+            "code": "rounding",
+            "label": "Rounding",
+            "amount": 0.38
+          },
+          {
+            "code": "tax",
+            "label": "VAT 17.5%",
+            "amount": 16.01
+          }
+        ],
+        "total": 107.5
+      },
+      "hold_amount": 129.0,
+      "display_name": "Premium",
+      "description": "Top-rated drivers, premium vehicles",
+      "max_passengers": 4,
+      "max_luggage": 3,
+      "icon_url": null
+    }
+  ],
+  "route": {
+    "distance_m": 12238,
+    "duration_s": 1469,
+    "polyline": null
+  }
+}

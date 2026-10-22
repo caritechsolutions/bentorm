@@ -1,0 +1,12 @@
+{
+  "realtime": {
+    "key": "localkey123",
+    "host": "127.0.0.1",
+    "port": 8098,
+    "scheme": "http",
+    "auth_endpoint": "http://127.0.0.1:8099/api/broadcasting/auth"
+  },
+  "address_search": false,
+  "app_scheme": "ridecoop",
+  "otp_length": 6
+}

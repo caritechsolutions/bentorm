@@ -1,0 +1,12 @@
+{
+  "id": 7,
+  "name": "Rita Rider",
+  "phone": "+12465552447",
+  "email": null,
+  "role": "rider",
+  "country_code": null,
+  "avatar_url": null,
+  "is_active": true,
+  "driver_profile": null,
+  "created_at": "2026-10-22T15:14:52+00:00"
+}
