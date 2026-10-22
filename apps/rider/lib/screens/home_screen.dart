@@ -336,12 +336,14 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Text('${distanceText(route.distanceM)} · about ${durationText(route.durationS)}', style: const TextStyle(color: Colors.black54)),
           ),
         const SizedBox(height: 8),
-        Row(
+        // Wrap, not Row: on 360-wide phones the three controls don't fit on one line.
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             _Stepper(icon: Icons.person, value: _passengers, min: 1, max: 8, onChanged: (v) => setState(() => _passengers = v), onDone: _quote),
-            const SizedBox(width: 8),
             _Stepper(icon: Icons.luggage, value: _luggage, min: 0, max: 8, onChanged: (v) => setState(() => _luggage = v), onDone: _quote),
-            const Spacer(),
             TextButton.icon(
               onPressed: _chooseFeatures,
               icon: const Icon(Icons.tune, size: 18),
