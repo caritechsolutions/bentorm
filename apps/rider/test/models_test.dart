@@ -24,9 +24,9 @@ void main() {
     final accepted = TripSnapshot.fromJson(fixture('active_accepted'));
     expect(accepted.trip!.status, 'accepted');
     expect(accepted.trip!.hasDriver, isTrue);
-    expect(accepted.trip!.driver!.name, 'Smoke Driver');
+    expect(accepted.trip!.driver!.name, fixture('active_accepted')['trip']['driver']['name']);
     expect(accepted.trip!.driver!.rating, isNotNull);
-    expect(accepted.trip!.vehicle!.plate, 'SMOKE1');
+    expect(accepted.trip!.vehicle!.plate, fixture('active_accepted')['trip']['vehicle']['plate']);
     expect(accepted.driverPosition!.lat, closeTo(13.0975, 0.0001));
 
     final done = TripSnapshot.fromJson(fixture('trip_completed')).trip!;

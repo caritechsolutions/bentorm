@@ -51,8 +51,8 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
     await settle(tester);
     expect(find.text('Your driver is on the way'), findsOneWidget);
-    expect(find.text('Smoke Driver'), findsOneWidget);
-    expect(find.text('SMOKE1'), findsOneWidget);
+    expect(find.text(fixture('active_accepted')['trip']['driver']['name'] as String), findsOneWidget);
+    expect(find.text(fixture('active_accepted')['trip']['vehicle']['plate'] as String), findsOneWidget);
 
     stage = 'trip_completed';
     server.on('POST /trips/$tripId/rate', fixture('rate'), status: 201);
@@ -106,7 +106,7 @@ void main() {
     server.on('GET /trips/$tripId', fixture('active_accepted'));
     await pumpApp(tester, server);
     expect(find.text('Your driver is on the way'), findsOneWidget);
-    expect(find.text('SMOKE1'), findsOneWidget);
+    expect(find.text(fixture('active_accepted')['trip']['vehicle']['plate'] as String), findsOneWidget);
     await unmount(tester);
   });
 }
