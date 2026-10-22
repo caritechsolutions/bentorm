@@ -11,7 +11,7 @@ class AppScope extends InheritedWidget {
   final Session session;
   final LocationService location;
 
-  RiderApi get api => session.api;
+  RiderApi get api => session.api as RiderApi;
 
   static AppScope of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();

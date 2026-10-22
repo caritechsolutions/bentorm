@@ -3,7 +3,7 @@ name: Rider app
 on:
   push:
     branches: [main]
-    paths: ['apps/rider/**', '.github/workflows/rider-app.yml']
+    paths: ['apps/rider/**', 'apps/core/**', '.github/workflows/rider-app.yml']
   workflow_dispatch:
 
 permissions:
@@ -58,6 +58,9 @@ jobs:
           git push
 
       - run: flutter pub get
+      - name: Analyze shared core
+        working-directory: apps/core
+        run: flutter pub get && flutter analyze --no-fatal-infos
       - run: flutter analyze --no-fatal-infos
       - name: Test
         run: |

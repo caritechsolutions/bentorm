@@ -57,7 +57,7 @@ Future<({Session session, FakeServer server})> pumpApp(WidgetTester tester, Fake
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
 
-  final session = Session(RiderApi(ApiClient(client: server.client, baseUrl: 'https://api.test/api/v1')), MemoryTokenStore(signedIn ? 'tok' : null));
+  final session = Session(RiderApi(ApiClient(client: server.client, baseUrl: 'https://api.test/api/v1')), MemoryTokenStore(signedIn ? 'tok' : null), role: 'rider');
   await tester.pumpWidget(RideCoopApp(session: session, location: FixedLocationService(const LatLngPoint(13.0969, -59.6145))));
   // Not awaited: the fake clock (pump) drives it, like the real app's first frames.
   unawaited(session.restore());

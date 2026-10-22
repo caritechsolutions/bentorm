@@ -1,5 +1,9 @@
 // Data models, parsed from the API's JSON (shapes are pinned by test/fixtures, captured from the real backend).
 
+import 'package:ridecoop_core/ridecoop_core.dart' show User;
+
+export 'package:ridecoop_core/ridecoop_core.dart' show User;
+
 double _d(dynamic v, [double fallback = 0]) => v == null ? fallback : (v is num ? v.toDouble() : double.tryParse('$v') ?? fallback);
 double? _dn(dynamic v) => v == null ? null : (v is num ? v.toDouble() : double.tryParse('$v'));
 int? _in(dynamic v) => v == null ? null : (v is num ? v.toInt() : int.tryParse('$v'));
@@ -12,32 +16,6 @@ class LatLngPoint {
   const LatLngPoint(this.lat, this.lng);
   final double lat;
   final double lng;
-}
-
-class User {
-  User({required this.id, required this.name, this.phone, this.email, required this.role, this.avatarUrl, this.rating});
-
-  final int id;
-  final String name;
-  final String? phone;
-  final String? email;
-  final String role;
-  final String? avatarUrl;
-
-  /// Drivers only: average rating.
-  final double? rating;
-
-  factory User.fromJson(Map<String, dynamic> j) => User(
-        id: _in(j['id']) ?? 0,
-        name: _s(j['name']) ?? '',
-        phone: _s(j['phone']),
-        email: _s(j['email']),
-        role: _s(j['role']) ?? 'rider',
-        avatarUrl: _s(j['avatar_url']),
-        rating: _dn(_m(j['driver_profile'])['rating_avg']),
-      );
-
-  String get firstName => name.split(' ').first;
 }
 
 /// A chosen location: from search, reverse geocoding, or the device.

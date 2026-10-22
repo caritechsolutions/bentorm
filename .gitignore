@@ -43,3 +43,6 @@ backend/public/fonts/filament/
 
 # Redis snapshots written by a local redis-server
 dump.rdb
+
+# Flutter package lock files for path packages are generated in CI
+apps/core/pubspec.lock

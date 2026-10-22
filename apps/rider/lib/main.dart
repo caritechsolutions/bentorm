@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'api/api_client.dart';
 import 'api/rider_api.dart';
 import 'brand.dart';
+import 'config.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'state/location.dart';
@@ -10,7 +11,7 @@ import 'state/scope.dart';
 import 'state/session.dart';
 
 void main() {
-  final session = Session(RiderApi(ApiClient()), SecureTokenStore());
+  final session = Session(RiderApi(ApiClient(baseUrl: AppConfig.apiBase)), SecureTokenStore(), role: 'rider');
   runApp(RideCoopApp(session: session, location: LocationService()));
   session.restore();
 }

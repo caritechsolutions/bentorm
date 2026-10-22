@@ -1,0 +1,19 @@
+name: ridecoop_core
+description: Shared code for the Ride Coop rider and driver apps (API client, sign-in, brand).
+publish_to: none
+version: 1.0.0
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.2
+  http_parser: ^4.0.2
+  flutter_secure_storage: ">=9.2.2 <11.0.0"
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
