@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Plugins\PluginManager;
+use App\Enums\GatewayType;
 use App\Models\Gateway;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -79,5 +81,39 @@ class PluginTest extends TestCase
         $g = Gateway::query()->where('plugin', 'log_sms')->first();
         $this->actingAs($this->makeUser('admin'))->postJson("/api/v1/admin/gateways/{$g->id}/test", ['to' => '+12465550000'])->assertOk()->assertJsonPath('ok', true);
         $this->assertStringStartsWith('OK:', $g->fresh()->last_test_result);
+    }
+
+    public function test_gateway_command_creates_updates_and_keeps_secrets(): void
+    {
+        $this->seedReference();
+        $this->artisan('bentorm:gateway', ['plugin' => 'smtp', '--name' => 'Email (SMTP)', '--set' => [
+            'host=smtp.ipower.com', 'port=465', 'encryption=ssl', 'username=secure@ridecoop.net', 'password=@W@!ditw!k234567', 'from_address=secure@ridecoop.net',
+        ]])->expectsOutputToContain('Created email gateway')->assertSuccessful();
+
+        $g = Gateway::query()->where('plugin', 'smtp')->sole();
+        $this->assertSame('@W@!ditw!k234567', $g->config['password']);
+        $this->assertSame(465, $g->config['port']);
+        $this->assertStringNotContainsString('ipower', (string) \DB::table('gateways')->where('id', $g->id)->value('config'), 'stored encrypted');
+        $this->assertSame($g->id, app(PluginManager::class)->gatewayFor(GatewayType::Email)?->id, 'beats the dev log gateway');
+
+        // Re-run without the password: updated in place, password kept.
+        $this->artisan('bentorm:gateway', ['plugin' => 'smtp', '--name' => 'Email (SMTP)', '--set' => ['host=mail.example.com']])
+            ->expectsOutputToContain('Updated email gateway')->assertSuccessful();
+        $g->refresh();
+        $this->assertSame(['mail.example.com', '@W@!ditw!k234567'], [$g->config['host'], $g->config['password']]);
+        $this->assertSame(1, Gateway::query()->where('plugin', 'smtp')->count());
+
+        $this->artisan('bentorm:gateway', ['plugin' => 'smtp', '--name' => 'Other', '--set' => ['port=465']])
+            ->expectsOutputToContain('SMTP host is required')->assertFailed();
+        $this->artisan('bentorm:gateway', ['plugin' => 'nope'])->assertFailed();
+    }
+
+    public function test_gateway_command_test_failure_is_recorded_and_fails(): void
+    {
+        $this->seedReference();
+        Http::fake(['api.twilio.com/*' => Http::response(['message' => 'Authenticate'], 401)]);
+        $this->artisan('bentorm:gateway', ['plugin' => 'twilio', '--set' => ['account_sid=AC1', 'auth_token=bad', 'from=+12465550000'], '--test' => true])
+            ->expectsOutputToContain('Test: FAIL: Twilio 401: Authenticate')->assertFailed();
+        $this->assertStringStartsWith('FAIL', Gateway::query()->where('plugin', 'twilio')->value('last_test_result'));
     }
 }

@@ -27,6 +27,14 @@ curl -fsSL "https://raw.githubusercontent.com/caritechsolutions/bentorm/main/scr
 
 Brings up the API on `:8080`, the admin panel on `:8082`, WebSockets on `:8081`, plus queue worker and scheduler as systemd services. Re-run to deploy the latest `main`. The first run prints the admin panel password; change it with `php artisan bentorm:admin-password <phone>`.
 
+Email and SMS senders can be set from the same command (stored encrypted; only needed once, or to change them — start the line with a space to keep it out of bash history, and single-quote passwords):
+
+```bash
+ curl -fsSL ".../scripts/bootstrap.sh?$(date +%s)" | sudo ... SMTP_HOST=smtp.example.com SMTP_PORT=465 SMTP_ENCRYPTION=ssl SMTP_USER=noreply@example.com SMTP_PASSWORD='secret' TWILIO_SID=AC... TWILIO_TOKEN='...' TWILIO_FROM=+1... bash
+```
+
+Or from the admin panel (**Settings → Gateways**), or `php artisan bentorm:gateway <plugin> --set key=value ... --test`.
+
 Live end-to-end check (run on the server): `curl -fsSL ".../scripts/smoke.sh?$(date +%s)" | sudo API_HOST=api.example.com ADMIN_PHONE=... bash`
 
 ## Admin panel (Filament)

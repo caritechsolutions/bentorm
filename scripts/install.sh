@@ -11,6 +11,11 @@
 #   WS_HOST=ws.ridecoop.net     public hostname NPM uses for WebSockets (sets REVERB_HOST)
 #   ADMIN_HOST=newadmin.ridecoop.net  public hostname NPM uses for the admin panel (nginx :8082)
 #   GOOGLE_MAPS_KEY=AIza...      Google Maps Platform key: road distances (Routes API) + address search (Places)
+#   SMTP_HOST, SMTP_PORT (465), SMTP_ENCRYPTION (ssl|tls|none), SMTP_USER, SMTP_PASSWORD, SMTP_FROM, SMTP_FROM_NAME
+#                               email sender for sign-in codes and receipts (stored encrypted in the gateways table)
+#   TWILIO_SID, TWILIO_TOKEN, TWILIO_FROM (or TWILIO_MESSAGING_SID)   SMS sender for sign-in codes
+#   Secrets are only needed once (or to change them). Start the command with a space so bash keeps
+#   it out of your history, and use single quotes around passwords containing ! or $.
 #   BRANCH=main
 #
 # Installs PHP 8.3 + extensions, Composer, MySQL 8, Redis, nginx; clones/updates the repo to
@@ -170,6 +175,28 @@ fi
 php artisan db:seed --force --no-interaction
 ADMIN_LOGIN=$(php artisan bentorm:admin-password --if-missing 2>&1 || true)
 
+# ---------------------------------------------------------------- gateways (optional, from env)
+if [[ -n "${SMTP_HOST:-}" ]]; then
+  log "Configuring email gateway (SMTP $SMTP_HOST)"
+  SMTP_ARGS=(--set "host=$SMTP_HOST" --set "port=${SMTP_PORT:-465}" --set "encryption=${SMTP_ENCRYPTION:-ssl}")
+  [[ -n "${SMTP_USER:-}" ]] && SMTP_ARGS+=(--set "username=$SMTP_USER")
+  [[ -n "${SMTP_PASSWORD:-}" ]] && SMTP_ARGS+=(--set "password=$SMTP_PASSWORD")
+  SMTP_ARGS+=(--set "from_address=${SMTP_FROM:-${SMTP_USER:-}}" --set "from_name=${SMTP_FROM_NAME:-Ride Coop}")
+  php artisan bentorm:gateway smtp --name="Email (SMTP)" "${SMTP_ARGS[@]}" --test 2>&1 | sed 's/^/    /' || warn "Email gateway test failed - see above"
+fi
+if [[ -n "${TWILIO_SID:-}" ]]; then
+  if [[ -z "${TWILIO_FROM:-}" && -z "${TWILIO_MESSAGING_SID:-}" ]]; then
+    warn "TWILIO_SID given without TWILIO_FROM or TWILIO_MESSAGING_SID - Twilio not configured"
+  else
+    log "Configuring SMS gateway (Twilio)"
+    TW_ARGS=(--set "account_sid=$TWILIO_SID")
+    [[ -n "${TWILIO_TOKEN:-}" ]] && TW_ARGS+=(--set "auth_token=$TWILIO_TOKEN")
+    [[ -n "${TWILIO_FROM:-}" ]] && TW_ARGS+=(--set "from=$TWILIO_FROM")
+    [[ -n "${TWILIO_MESSAGING_SID:-}" ]] && TW_ARGS+=(--set "messaging_service_sid=$TWILIO_MESSAGING_SID")
+    php artisan bentorm:gateway twilio --name="SMS (Twilio)" "${TW_ARGS[@]}" --test 2>&1 | sed 's/^/    /' || warn "Twilio test failed - see above"
+  fi
+fi
+
 log "Caching configuration and routes"
 php artisan config:cache --quiet
 php artisan route:cache --quiet
@@ -225,6 +252,8 @@ echo "  Queue       : $(systemctl is-active bentorm-queue)"
 echo "  Scheduler   : $(systemctl is-active bentorm-scheduler)"
 echo "  Admin panel : http://$IP:8082/admin  ($(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8082/admin/login"))${ADMIN_HOST:+  ->  https://$ADMIN_HOST}"
 echo "  Google Maps : $(grep -q '^GOOGLE_MAPS_SERVER_KEY=.\+' "$ENV_FILE" && echo "configured (distance: $(grep '^DISTANCE_PROVIDER=' "$ENV_FILE" | cut -d= -f2))" || echo "not set — pass GOOGLE_MAPS_KEY=... (address search off, straight-line distances)")"
+echo "  SMS         : $(php artisan tinker --execute='$g=app(App\Plugins\PluginManager::class)->gatewayFor(App\Enums\GatewayType::Sms); echo $g ? "{$g->name} ({$g->plugin})".($g->last_test_result ? " - last test {$g->last_test_result}" : "") : "none (codes only in the log)";' 2>/dev/null | tail -1)"
+echo "  Email       : $(php artisan tinker --execute='$g=app(App\Plugins\PluginManager::class)->gatewayFor(App\Enums\GatewayType::Email); echo $g ? "{$g->name} ({$g->plugin})".($g->last_test_result ? " - last test {$g->last_test_result}" : "") : "none";' 2>/dev/null | tail -1)"
 echo "  Config      : $ENV_FILE"
 echo
 echo "$ADMIN_LOGIN" | sed 's/^/  /'
