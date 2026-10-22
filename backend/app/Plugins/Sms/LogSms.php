@@ -26,7 +26,7 @@ class LogSms extends AbstractPlugin implements SmsPlugin
 
     public function test(array $context = []): array
     {
-        $this->send($context['to'] ?? '+10000000000', 'Bentorm test message');
+        $this->send($context['to'] ?? '+10000000000', config('bentorm.brand_name', 'Ride Coop').' test message');
 
         return ['ok' => true, 'message' => 'Written to storage/logs/laravel.log'];
     }

@@ -50,7 +50,7 @@ class TwilioSms extends AbstractPlugin implements SmsPlugin
     {
         try {
             if (! empty($context['to'])) {
-                $this->send($context['to'], 'RideCoop test message');
+                $this->send($context['to'], config('bentorm.brand_name', 'Ride Coop').' test message');
 
                 return ['ok' => true, 'message' => "Sent to {$context['to']}"];
             }

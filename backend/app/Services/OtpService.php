@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Contracts\SmsSender;
 use App\Models\OtpCode;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 
 class OtpService
 {
@@ -27,13 +29,21 @@ class OtpService
         $code = config('otp.static_code') ?: $this->generate();
 
         OtpCode::query()->where('phone', $phone)->whereNull('consumed_at')->delete();
-        OtpCode::query()->create([
+        $otp = OtpCode::query()->create([
             'phone' => $phone,
             'code_hash' => Hash::make($code),
             'expires_at' => now()->addMinutes((int) config('otp.ttl_minutes')),
         ]);
 
-        $this->sms->send($phone, "Your Bentorm verification code is {$code}. It expires in ".config('otp.ttl_minutes').' minutes.');
+        $brand = config('bentorm.brand_name', 'Ride Coop');
+        try {
+            $this->sms->send($phone, "Your {$brand} code is {$code}. It expires in ".config('otp.ttl_minutes').' minutes.');
+        } catch (\Throwable $e) {
+            // Don't leave a code nobody received (it would also block a retry for the cooldown).
+            $otp->delete();
+            Log::error('OTP SMS failed: '.$e->getMessage(), ['phone' => $phone]);
+            throw new ServiceUnavailableHttpException(null, 'We couldn\'t send the text message right now. Please try again in a minute.');
+        }
 
         return config('otp.expose_code') ? $code : null;
     }

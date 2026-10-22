@@ -61,7 +61,7 @@ class HttpSms extends AbstractPlugin implements SmsPlugin
             return ['ok' => false, 'message' => 'Provide a phone number to send a test SMS.'];
         }
         try {
-            $this->send($context['to'], 'RideCoop test message');
+            $this->send($context['to'], config('bentorm.brand_name', 'Ride Coop').' test message');
 
             return ['ok' => true, 'message' => "Sent to {$context['to']}"];
         } catch (\Throwable $e) {

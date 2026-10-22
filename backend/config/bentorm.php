@@ -1,6 +1,9 @@
 <?php
 
 return [
+    // Name riders and drivers see (SMS codes, emails, payment pages).
+    'brand_name' => env('BRAND_NAME', 'Ride Coop'),
+
     'admin_phone' => env('ADMIN_PHONE'),
     'admin_name' => env('ADMIN_NAME', 'Administrator'),
     // Host serving the web admin panel (requests to "/" there redirect to /admin).

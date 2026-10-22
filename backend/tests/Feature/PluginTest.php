@@ -51,7 +51,26 @@ class PluginTest extends TestCase
 
         $this->postJson('/api/v1/auth/otp/request', ['phone' => '12465551234'])->assertOk();
 
-        Http::assertSent(fn ($req) => str_contains($req->url(), 'Accounts/AC1/Messages.json') && $req['To'] === '+12465551234' && str_contains($req['Body'], '123456'));
+        Http::assertSent(fn ($req) => str_contains($req->url(), 'Accounts/AC1/Messages.json') && $req['To'] === '+12465551234'
+            && $req['Body'] === 'Your Ride Coop code is 123456. It expires in 5 minutes.'
+            && $req->header('Authorization') === ['Basic '.base64_encode('AC1:t')]);
+    }
+
+    public function test_failed_sms_is_a_clear_503_and_can_be_retried_at_once(): void
+    {
+        $this->seedReference();
+        Http::fake(['api.twilio.com/*' => Http::sequence()
+            ->push(['code' => 21211, 'message' => "The 'To' number is not a valid phone number."], 400)
+            ->push(['sid' => 'SM2'], 201)]);
+        Gateway::query()->create(['type' => 'sms', 'plugin' => 'twilio', 'name' => 'Twilio', 'is_active' => true, 'priority' => 10,
+            'config' => ['account_sid' => 'AC1', 'auth_token' => 't', 'from' => '+12465550000']]);
+
+        $this->postJson('/api/v1/auth/otp/request', ['phone' => '12465551234'])
+            ->assertStatus(503)->assertJsonPath('message', "We couldn't send the text message right now. Please try again in a minute.");
+        $this->assertDatabaseMissing('otp_codes', ['phone' => '+12465551234']);
+
+        // No 30 s cooldown after a failed send: the rider can try again straight away.
+        $this->postJson('/api/v1/auth/otp/request', ['phone' => '12465551234'])->assertOk();
     }
 
     public function test_gateway_test_endpoint_records_result(): void
