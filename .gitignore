@@ -40,3 +40,6 @@ Thumbs.db
 backend/public/css/filament/
 backend/public/js/filament/
 backend/public/fonts/filament/
+
+# Redis snapshots written by a local redis-server
+dump.rdb
