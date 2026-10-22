@@ -33,7 +33,11 @@ class AppServiceProvider extends ServiceProvider
         JsonResource::withoutWrapping();
 
         RateLimiter::for('api', fn (Request $r) => Limit::perMinute(120)->by($r->user()?->id ?: $r->ip()));
-        RateLimiter::for('otp', fn (Request $r) => Limit::perMinute(5)->by($r->ip()));
+        // Per phone number (the real abuse target) plus a looser per-IP cap — many users can share one IP.
+        RateLimiter::for('otp', fn (Request $r) => [
+            Limit::perMinute(6)->by('otp-phone:'.preg_replace('/\D+/', '', (string) $r->input('phone'))),
+            Limit::perMinute(30)->by('otp-ip:'.$r->ip()),
+        ]);
         RateLimiter::for('location', fn (Request $r) => Limit::perMinute(120)->by($r->user()?->id ?: $r->ip()));
     }
 }

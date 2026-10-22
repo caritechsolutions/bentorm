@@ -3,9 +3,9 @@
 namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\JsonResource;
 
-class PaymentResource extends JsonResource
+
+class PaymentResource extends Resource
 {
     public function toArray(Request $request): array
     {

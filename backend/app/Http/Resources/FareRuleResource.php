@@ -3,9 +3,9 @@
 namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\JsonResource;
 
-class FareRuleResource extends JsonResource
+
+class FareRuleResource extends Resource
 {
     public function toArray(Request $request): array
     {

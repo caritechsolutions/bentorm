@@ -92,7 +92,7 @@ class Trip extends Model
 
     public function card(): BelongsTo
     {
-        return $this->belongsTo(PaymentMethod::class, 'payment_method_id');
+        return $this->belongsTo(\App\Models\PaymentMethod::class, 'payment_method_id');
     }
 
     /** The authorisation placed when the trip was requested, if any. */

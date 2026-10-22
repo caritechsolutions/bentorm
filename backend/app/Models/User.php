@@ -23,6 +23,9 @@ class User extends Authenticatable
 
     protected $hidden = ['password', 'remember_token'];
 
+    /** Mirror the column defaults so a freshly created model behaves like a reloaded one. */
+    protected $attributes = ['role' => 'rider', 'is_active' => true];
+
     protected function casts(): array
     {
         return [

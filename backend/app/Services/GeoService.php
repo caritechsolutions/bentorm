@@ -11,11 +11,18 @@ use Illuminate\Validation\ValidationException;
 
 class GeoService
 {
-    /** All active areas, cached; flushed automatically whenever an area is saved or deleted. */
+    /**
+     * All active areas, cached; flushed automatically whenever an area is saved or deleted.
+     * The cache holds plain attribute arrays (Laravel refuses to unserialize objects from the cache by default),
+     * rehydrated into models here.
+     */
     public function areas(): Collection
     {
-        return Cache::remember(ServiceArea::CACHE_KEY, 300, fn () => ServiceArea::query()
-            ->where('is_active', true)->orderByDesc('priority')->orderBy('id')->get());
+        $rows = Cache::remember(ServiceArea::CACHE_KEY, 300, fn () => ServiceArea::query()
+            ->where('is_active', true)->orderByDesc('priority')->orderBy('id')->get()
+            ->map(fn (ServiceArea $a) => $a->getAttributes())->all());
+
+        return ServiceArea::hydrate($rows);
     }
 
     public function resolve(float $lat, float $lng): GeoContext

@@ -4,9 +4,9 @@ namespace App\Http\Resources;
 
 use App\Enums\DocumentStatus;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\JsonResource;
 
-class VehicleResource extends JsonResource
+
+class VehicleResource extends Resource
 {
     public function toArray(Request $request): array
     {

@@ -15,7 +15,7 @@ class EnsureRole
         if (! $user || ! in_array($user->role->value, $roles, true)) {
             abort(403, 'Forbidden for your account type.');
         }
-        if (! $user->is_active) {
+        if ($user->is_active === false) {
             abort(403, 'Your account has been deactivated.');
         }
 

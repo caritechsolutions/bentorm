@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureRole;
+use App\Http\Middleware\PreserveZeroFraction;
 use App\Http\Middleware\TouchLastSeen;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
         // API has no login page: unauthenticated requests get 401 JSON, never a redirect.
         $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*', 'broadcasting/*') ? null : '/');
+        $middleware->api(append: [PreserveZeroFraction::class]);
         $middleware->alias([
             'role' => EnsureRole::class,
             'last-seen' => TouchLastSeen::class,
