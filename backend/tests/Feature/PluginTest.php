@@ -116,4 +116,34 @@ class PluginTest extends TestCase
             ->expectsOutputToContain('Test: FAIL: Twilio 401: Authenticate')->assertFailed();
         $this->assertStringStartsWith('FAIL', Gateway::query()->where('plugin', 'twilio')->value('last_test_result'));
     }
+
+    public function test_twilio_without_from_uses_the_accounts_sms_number(): void
+    {
+        $this->seedReference();
+        Http::fake([
+            'api.twilio.com/2010-04-01/Accounts/AC9/IncomingPhoneNumbers.json*' => Http::response(['incoming_phone_numbers' => [
+                ['phone_number' => '+15550001111', 'capabilities' => ['sms' => false, 'voice' => true]],
+                ['phone_number' => '+12465552222', 'capabilities' => ['sms' => true, 'voice' => true]],
+            ]]),
+            'api.twilio.com/2010-04-01/Accounts/AC9.json' => Http::response(['friendly_name' => 'Ride Coop']),
+            'api.twilio.com/2010-04-01/Accounts/AC9/Messages.json' => Http::response(['sid' => 'SM1'], 201),
+        ]);
+
+        $this->artisan('bentorm:gateway', ['plugin' => 'twilio', '--name' => 'SMS (Twilio)', '--set' => ['account_sid=AC9', 'auth_token=tok'], '--test' => true])
+            ->expectsOutputToContain('Test: OK: Credentials valid (Ride Coop); sending from +12465552222')->assertSuccessful();
+
+        $this->postJson('/api/v1/auth/otp/request', ['phone' => '2465551234', 'email' => 'r@example.com'])->assertOk()->assertJsonPath('channels', ['sms', 'email']);
+        Http::assertSent(fn ($r) => str_ends_with($r->url(), '/Messages.json') && $r['From'] === '+12465552222' && $r['To'] === '+12465551234');
+    }
+
+    public function test_twilio_account_without_sms_number_says_so(): void
+    {
+        $this->seedReference();
+        Http::fake([
+            'api.twilio.com/2010-04-01/Accounts/AC8/IncomingPhoneNumbers.json*' => Http::response(['incoming_phone_numbers' => []]),
+            'api.twilio.com/2010-04-01/Accounts/AC8.json' => Http::response(['friendly_name' => 'Empty']),
+        ]);
+        $this->artisan('bentorm:gateway', ['plugin' => 'twilio', '--set' => ['account_sid=AC8', 'auth_token=tok'], '--test' => true])
+            ->expectsOutputToContain('has no SMS-capable phone number')->assertFailed();
+    }
 }

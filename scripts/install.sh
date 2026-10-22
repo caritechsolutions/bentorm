@@ -13,7 +13,8 @@
 #   GOOGLE_MAPS_KEY=AIza...      Google Maps Platform key: road distances (Routes API) + address search (Places)
 #   SMTP_HOST, SMTP_PORT (465), SMTP_ENCRYPTION (ssl|tls|none), SMTP_USER, SMTP_PASSWORD, SMTP_FROM, SMTP_FROM_NAME
 #                               email sender for sign-in codes and receipts (stored encrypted in the gateways table)
-#   TWILIO_SID, TWILIO_TOKEN, TWILIO_FROM (or TWILIO_MESSAGING_SID)   SMS sender for sign-in codes
+#   TWILIO_SID, TWILIO_TOKEN [, TWILIO_FROM | TWILIO_MESSAGING_SID]  SMS sender for sign-in codes
+#                               (no FROM: the account's first SMS-capable number is used)
 #   Secrets are only needed once (or to change them). Start the command with a space so bash keeps
 #   it out of your history, and use single quotes around passwords containing ! or $.
 #   BRANCH=main
@@ -185,16 +186,13 @@ if [[ -n "${SMTP_HOST:-}" ]]; then
   php artisan bentorm:gateway smtp --name="Email (SMTP)" "${SMTP_ARGS[@]}" --test 2>&1 | sed 's/^/    /' || warn "Email gateway test failed - see above"
 fi
 if [[ -n "${TWILIO_SID:-}" ]]; then
-  if [[ -z "${TWILIO_FROM:-}" && -z "${TWILIO_MESSAGING_SID:-}" ]]; then
-    warn "TWILIO_SID given without TWILIO_FROM or TWILIO_MESSAGING_SID - Twilio not configured"
-  else
-    log "Configuring SMS gateway (Twilio)"
-    TW_ARGS=(--set "account_sid=$TWILIO_SID")
-    [[ -n "${TWILIO_TOKEN:-}" ]] && TW_ARGS+=(--set "auth_token=$TWILIO_TOKEN")
-    [[ -n "${TWILIO_FROM:-}" ]] && TW_ARGS+=(--set "from=$TWILIO_FROM")
-    [[ -n "${TWILIO_MESSAGING_SID:-}" ]] && TW_ARGS+=(--set "messaging_service_sid=$TWILIO_MESSAGING_SID")
-    php artisan bentorm:gateway twilio --name="SMS (Twilio)" "${TW_ARGS[@]}" --test 2>&1 | sed 's/^/    /' || warn "Twilio test failed - see above"
-  fi
+  # TWILIO_FROM is optional: without it the first SMS-capable number on the account is used.
+  log "Configuring SMS gateway (Twilio)"
+  TW_ARGS=(--set "account_sid=$TWILIO_SID")
+  [[ -n "${TWILIO_TOKEN:-}" ]] && TW_ARGS+=(--set "auth_token=$TWILIO_TOKEN")
+  [[ -n "${TWILIO_FROM:-}" ]] && TW_ARGS+=(--set "from=$TWILIO_FROM")
+  [[ -n "${TWILIO_MESSAGING_SID:-}" ]] && TW_ARGS+=(--set "messaging_service_sid=$TWILIO_MESSAGING_SID")
+  php artisan bentorm:gateway twilio --name="SMS (Twilio)" "${TW_ARGS[@]}" --test 2>&1 | sed 's/^/    /' || warn "Twilio test failed - see above"
 fi
 
 log "Caching configuration and routes"
