@@ -3,6 +3,7 @@
 namespace App\Events;
 
 use App\Http\Resources\TripResource;
+use App\Support\PublicView;
 use App\Models\Trip;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
@@ -35,8 +36,13 @@ class TripUpdated implements ShouldBroadcast
         return 'trip.updated';
     }
 
+    /**
+     * Resolved as nobody: everyone on these channels (rider AND driver) receives the same payload, so
+     * per-viewer fields — the ride PIN, driver earnings, platform fee, phone numbers — must never be in it.
+     * Apps fetch those over the API.
+     */
     public function broadcastWith(): array
     {
-        return ['trip' => (new TripResource($this->trip->loadMissing(['rider', 'driver.driverProfile', 'vehicle'])))->resolve()];
+        return ['trip' => PublicView::resolve(new TripResource($this->trip->loadMissing(['rider', 'driver.driverProfile', 'vehicle'])))];
     }
 }

@@ -50,11 +50,12 @@ class TripService
         $passengers = (int) ($data['passengers'] ?? 1);
         $luggage = (int) ($data['luggage'] ?? 0);
         $features = array_values(array_unique($data['features'] ?? []));
+        $stops = self::normaliseStops($data['stops'] ?? []);
 
-        // Geofences and capacity are enforced inside the estimate.
+        // Geofences, stops and capacity are enforced inside the estimate.
         $quote = $this->pricing->estimate(
             (float) $data['pickup_lat'], (float) $data['pickup_lng'], (float) $data['dropoff_lat'], (float) $data['dropoff_lng'],
-            $data['vehicle_type'], null, $passengers, $luggage,
+            $data['vehicle_type'], null, $passengers, $luggage, $stops,
         );
 
         $method = PaymentMethod::from($data['payment_method'] ?? PaymentMethod::Cash->value);
@@ -75,6 +76,8 @@ class TripService
             'dropoff_lat' => $data['dropoff_lat'],
             'dropoff_lng' => $data['dropoff_lng'],
             'dropoff_address' => $data['dropoff_address'] ?? null,
+            'stops' => $stops ?: null,
+            'pin' => self::newPin(),
             'estimated_distance_m' => $quote['distance_m'],
             'estimated_duration_s' => $quote['duration_s'],
             'estimated_fare' => $quote['fare'],
@@ -198,9 +201,194 @@ class TripService
         return $this->transition($trip, $driver, TripStatus::Arrived, ['arrived_at' => now()]);
     }
 
-    public function start(Trip $trip, User $driver): Trip
+    /** Start the trip. The driver must enter the rider's PIN (rides created before PINs existed have none). */
+    public function start(Trip $trip, User $driver, ?string $pin = null): Trip
     {
-        return $this->transition($trip, $driver, TripStatus::InProgress, ['started_at' => now()]);
+        $max = (int) config('bentorm.pin_max_attempts', 5);
+        $lockMinutes = (int) config('bentorm.pin_lock_minutes', 2);
+
+        // The check runs in the transaction; a wrong PIN is recorded after it, so the count isn't rolled back.
+        $result = DB::transaction(function () use ($trip, $driver, $pin, $max, $lockMinutes) {
+            /** @var Trip $t */
+            $t = Trip::query()->whereKey($trip->id)->lockForUpdate()->firstOrFail();
+            $this->assertDriverCan($t, $driver, TripStatus::InProgress);
+
+            if ($t->pin) {
+                if ($t->pin_attempts >= $max && $t->pin_failed_at?->gt(now()->subMinutes($lockMinutes))) {
+                    return 'locked';
+                }
+                if (! is_string($pin) || ! hash_equals($t->pin, trim($pin))) {
+                    return $pin === null || trim($pin) === '' ? 'missing' : 'wrong';
+                }
+            }
+
+            $t->forceFill([
+                'status' => TripStatus::InProgress, 'started_at' => now(),
+                'pin_verified_at' => $t->pin ? now() : null, 'pin_attempts' => 0,
+            ])->save();
+            event(new TripUpdated($t));
+
+            return $t;
+        });
+
+        if ($result instanceof Trip) {
+            return $result;
+        }
+        if ($result === 'locked') {
+            $rider = $trip->rider?->firstName() ?? 'the rider';
+            abort(429, "Too many wrong PINs. Ask {$rider} to read the PIN from their app, and try again in {$lockMinutes} minutes.");
+        }
+        if ($result === 'missing') {
+            throw ValidationException::withMessages(['pin' => ['Ask the rider for their 4-digit PIN.']]);
+        }
+
+        // Wrong PIN: count it (a lock that has expired starts a fresh count).
+        $t = $trip->fresh();
+        $attempts = ($t->pin_attempts >= $max) ? 1 : $t->pin_attempts + 1;
+        $t->forceFill(['pin_attempts' => $attempts, 'pin_failed_at' => now()])->save();
+        $left = max(0, $max - $attempts);
+        throw ValidationException::withMessages(['pin' => [$left > 0
+            ? "That PIN is not right. {$left} ".($left === 1 ? 'try' : 'tries').' left.'
+            : "That PIN is not right. Wait {$lockMinutes} minutes, then check it with the rider."]]);
+    }
+
+    // ================================================================= stops
+
+    /**
+     * Rider changes the stops. Before a driver accepts it applies at once; afterwards the driver must
+     * confirm. Stops already reached are kept; $stops are the remaining ones, in order.
+     */
+    public function changeStops(Trip $trip, User $rider, array $stops): Trip
+    {
+        return DB::transaction(function () use ($trip, $rider, $stops) {
+            /** @var Trip $t */
+            $t = Trip::query()->whereKey($trip->id)->lockForUpdate()->firstOrFail();
+            if ($t->rider_id !== $rider->id) {
+                abort(403, 'This is not your trip.');
+            }
+            if (! in_array($t->status, [TripStatus::PendingPayment, TripStatus::Requested, TripStatus::Accepted, TripStatus::Arrived, TripStatus::InProgress], true)) {
+                throw ValidationException::withMessages(['stops' => ['Stops can only be changed during a ride.']]);
+            }
+            $reached = array_values(array_filter($t->stops ?? [], fn ($s) => ! empty($s['reached_at'])));
+            $all = array_merge($reached, self::normaliseStops($stops));
+            $quote = $this->pricing->requote($t, $all);
+            $change = [
+                'stops' => $all,
+                'estimated_fare' => $quote['fare'],
+                'distance_m' => $quote['distance_m'],
+                'duration_s' => $quote['duration_s'],
+                'fare_breakdown' => $quote['breakdown'],
+                'requested_at' => now()->toIso8601String(),
+            ];
+
+            if (in_array($t->status, [TripStatus::PendingPayment, TripStatus::Requested], true)) {
+                $this->applyStops($t, $change);
+                $t->forceFill(['stop_change' => null])->save();
+            } else {
+                $t->forceFill(['stop_change' => $change + ['status' => 'pending']])->save();
+            }
+            event(new TripUpdated($t));
+
+            return $t;
+        });
+    }
+
+    /** The rider withdraws a change the driver hasn't answered yet. */
+    public function withdrawStopChange(Trip $trip, User $rider): Trip
+    {
+        if ($trip->rider_id !== $rider->id) {
+            abort(403, 'This is not your trip.');
+        }
+        if (($trip->stop_change['status'] ?? null) === 'pending') {
+            $trip->forceFill(['stop_change' => null])->save();
+            event(new TripUpdated($trip));
+        }
+
+        return $trip;
+    }
+
+    /** Driver accepts or declines the rider's pending stop change. */
+    public function respondToStopChange(Trip $trip, User $driver, bool $accept): Trip
+    {
+        return DB::transaction(function () use ($trip, $driver, $accept) {
+            /** @var Trip $t */
+            $t = Trip::query()->whereKey($trip->id)->lockForUpdate()->firstOrFail();
+            if ($t->driver_id !== $driver->id) {
+                abort(403, 'This is not your trip.');
+            }
+            $change = $t->stop_change;
+            if (($change['status'] ?? null) !== 'pending' || ! $t->isActive()) {
+                abort(409, 'There is no stop change waiting for you.');
+            }
+            if ($accept) {
+                $this->applyStops($t, $change);
+            }
+            $t->forceFill(['stop_change' => [
+                'stops' => $change['stops'], 'estimated_fare' => $change['estimated_fare'],
+                'status' => $accept ? 'accepted' : 'declined', 'requested_at' => $change['requested_at'], 'responded_at' => now()->toIso8601String(),
+            ]])->save();
+            event(new TripUpdated($t));
+
+            return $t;
+        });
+    }
+
+    /** Driver reached stop $index (0-based). Stops are visited in order, during the trip. */
+    public function reachStop(Trip $trip, User $driver, int $index): Trip
+    {
+        return DB::transaction(function () use ($trip, $driver, $index) {
+            /** @var Trip $t */
+            $t = Trip::query()->whereKey($trip->id)->lockForUpdate()->firstOrFail();
+            if ($t->driver_id !== $driver->id) {
+                abort(403, 'This is not your trip.');
+            }
+            if ($t->status !== TripStatus::InProgress) {
+                abort(409, 'Stops are reached after the trip has started.');
+            }
+            $stops = $t->stops ?? [];
+            if (! isset($stops[$index])) {
+                abort(404, 'No such stop.');
+            }
+            foreach (array_slice($stops, 0, $index) as $earlier) {
+                if (empty($earlier['reached_at'])) {
+                    abort(409, 'Reach the earlier stops first.');
+                }
+            }
+            if (empty($stops[$index]['reached_at'])) {
+                $stops[$index]['reached_at'] = now()->toIso8601String();
+                $t->forceFill(['stops' => $stops])->save();
+                event(new TripUpdated($t));
+            }
+
+            return $t;
+        });
+    }
+
+    private function applyStops(Trip $t, array $change): void
+    {
+        $t->forceFill([
+            'stops' => $change['stops'] ?: null,
+            'estimated_fare' => $change['estimated_fare'],
+            'estimated_distance_m' => $change['distance_m'],
+            'estimated_duration_s' => $change['duration_s'],
+            'fare_breakdown' => $change['fare_breakdown'],
+        ])->save();
+    }
+
+    /** [{lat, lng, address, reached_at}] from request input, keeping reached_at when present. */
+    public static function normaliseStops(array $stops): array
+    {
+        return array_values(array_map(fn ($s) => [
+            'lat' => round((float) $s['lat'], 7),
+            'lng' => round((float) $s['lng'], 7),
+            'address' => isset($s['address']) ? mb_substr((string) $s['address'], 0, 255) : null,
+            'reached_at' => $s['reached_at'] ?? null,
+        ], $stops));
+    }
+
+    public static function newPin(): string
+    {
+        return str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
     }
 
     public function complete(Trip $trip, User $driver, ?float $endLat = null, ?float $endLng = null): Trip

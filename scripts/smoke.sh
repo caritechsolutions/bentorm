@@ -79,15 +79,22 @@ main() {
 
   echo "== Cash ride (dispatch via queue worker + Redis)"
   for t in $(req GET /trips/active "$RIDER" | jq -r '.trip.id // empty'); do req POST /trips/$t/cancel "$RIDER" >/dev/null; done
-  TRIP=$(req POST /trips "$RIDER" "{$BT,\"vehicle_type\":\"standard\",\"features\":[\"child_seat\"]}" | jq -r .id)
+  TRIP=$(req POST /trips "$RIDER" "{$BT,\"vehicle_type\":\"standard\",\"features\":[\"child_seat\"],\"stops\":[{\"lat\":13.079,\"lng\":-59.608,\"address\":\"Garrison\"}]}" | jq -r .id)
+  PIN=$(req GET /trips/$TRIP "$RIDER" | jq -r .trip.pin)
+  check "rider sees a 4-digit PIN" "$([[ "$PIN" =~ ^[0-9]{4}$ ]] && echo y)" "y"
+  check "trip has the stop" "$(req GET /trips/$TRIP "$RIDER" | jq -r '.trip.stops|length')" "1"
   check "ride requested" "$(req GET /trips/active "$RIDER" | jq -r .trip.status)" "requested"
   check "driver received the offer" "$(wait_offer "$DRIVER")" "1"
   check "accept" "$(req POST /driver/trips/$TRIP/accept "$DRIVER" | jq -r .status)" "accepted"
   check "arrive" "$(req POST /driver/trips/$TRIP/arrive "$DRIVER" | jq -r .status)" "arrived"
-  check "start" "$(req POST /driver/trips/$TRIP/start "$DRIVER" | jq -r .status)" "in_progress"
+  check "driver never sees the PIN" "$(req GET /driver/trips/$TRIP "$DRIVER" | jq -r 'has("pin")')" "false"
+  check "start without PIN refused" "$(code POST /driver/trips/$TRIP/start "$DRIVER")" "422"
+  check "start with PIN" "$(req POST /driver/trips/$TRIP/start "$DRIVER" "{\"pin\":\"$PIN\"}" | jq -r .status)" "in_progress"
+  check "stop reached" "$(req POST /driver/trips/$TRIP/stops/0/reached "$DRIVER" | jq -r '.stops[0].reached_at != null')" "true"
   req POST /driver/location "$DRIVER" '{"lat":13.0900,"lng":-59.5900}' >/dev/null; req POST /driver/location "$DRIVER" '{"lat":13.0750,"lng":-59.5500}' >/dev/null
   DONE=$(req POST /driver/trips/$TRIP/complete "$DRIVER" '{"lat":13.0667,"lng":-59.5333}')
   check "complete, cash paid" "$(echo "$DONE" | jq -r '.status + "/" + .payment_status')" "completed/paid"
+  check "stop fee on the fare" "$(echo "$DONE" | jq -r '[.fare_breakdown.lines[]|select(.code=="stops")]|length')" "1"
   echo "     fare $(echo "$DONE" | jq -r '.currency + " " + (.actual.fare|tostring)') · driver earns $(echo "$DONE" | jq -r .driver_earnings)"
   check "rider rates driver" "$(code POST /trips/$TRIP/rate "$RIDER" '{"score":5}')" "201"
 
@@ -104,7 +111,9 @@ main() {
   check "hold approved, ride requested" "$(echo "$CR" | jq -r .status)" "requested"
   echo "     held $(echo "$CR" | jq -r .hold_amount) against estimate $(echo "$CR" | jq -r .estimate.fare)"
   check "driver received the offer" "$(wait_offer "$DRIVER")" "1"
-  for s in accept arrive start; do req POST /driver/trips/$CTRIP/$s "$DRIVER" >/dev/null; done
+  for s in accept arrive; do req POST /driver/trips/$CTRIP/$s "$DRIVER" >/dev/null; done
+  CPIN=$(req GET /trips/$CTRIP "$RIDER" | jq -r .trip.pin)
+  check "card ride started with PIN" "$(req POST /driver/trips/$CTRIP/start "$DRIVER" "{\"pin\":\"$CPIN\"}" | jq -r .status)" "in_progress"
   CD=$(req POST /driver/trips/$CTRIP/complete "$DRIVER" '{"lat":13.0667,"lng":-59.5333}')
   check "fare captured from hold" "$(echo "$CD" | jq -r .payment_status)" "paid"
   check "hold shows captured" "$(req GET "/admin/payments?trip_id=$CTRIP" "$ADMIN" | jq -r '[.data[]|select(.purpose=="hold")][0].status')" "captured"

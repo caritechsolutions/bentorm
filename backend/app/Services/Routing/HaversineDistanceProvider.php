@@ -22,4 +22,17 @@ class HaversineDistanceProvider implements DistanceProvider
 
         return new RouteEstimate($distanceM, $durationS);
     }
+
+    public function route(array $points): RouteEstimate
+    {
+        $d = 0;
+        $t = 0;
+        for ($i = 1; $i < count($points); $i++) {
+            $leg = $this->estimate($points[$i - 1][0], $points[$i - 1][1], $points[$i][0], $points[$i][1]);
+            $d += $leg->distanceM;
+            $t += $leg->durationS;
+        }
+
+        return new RouteEstimate($d, $t);
+    }
 }

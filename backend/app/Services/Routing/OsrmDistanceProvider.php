@@ -13,8 +13,14 @@ class OsrmDistanceProvider implements DistanceProvider
 
     public function estimate(float $fromLat, float $fromLng, float $toLat, float $toLng): RouteEstimate
     {
+        return $this->route([[$fromLat, $fromLng], [$toLat, $toLng]]);
+    }
+
+    public function route(array $points): RouteEstimate
+    {
         $base = rtrim(config('pricing.osrm_url', 'https://router.project-osrm.org'), '/');
-        $url = "{$base}/route/v1/driving/{$fromLng},{$fromLat};{$toLng},{$toLat}";
+        $coords = implode(';', array_map(fn ($p) => "{$p[1]},{$p[0]}", $points));
+        $url = "{$base}/route/v1/driving/{$coords}";
 
         try {
             $res = Http::timeout(5)->get($url, ['overview' => 'simplified', 'geometries' => 'geojson']);
@@ -30,6 +36,6 @@ class OsrmDistanceProvider implements DistanceProvider
             // fall through
         }
 
-        return $this->fallback->estimate($fromLat, $fromLng, $toLat, $toLng);
+        return $this->fallback->route($points);
     }
 }

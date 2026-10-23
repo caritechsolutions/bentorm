@@ -53,9 +53,9 @@ class ReferenceDataSeeder extends Seeder
 
         // ---------------------------------------------------------------- BB rate cards (ex-VAT)
         foreach ([
-            'standard' => ['base_fare' => 5.00, 'per_km' => 2.50, 'per_minute' => 0.50, 'minimum_fare' => 10.00, 'booking_fee' => 1.00, 'cancellation_fee' => 5.00, 'wait_per_minute' => 0.50],
-            'xl' => ['base_fare' => 8.00, 'per_km' => 3.50, 'per_minute' => 0.70, 'minimum_fare' => 15.00, 'booking_fee' => 1.00, 'cancellation_fee' => 8.00, 'wait_per_minute' => 0.70],
-            'premium' => ['base_fare' => 12.00, 'per_km' => 4.50, 'per_minute' => 0.90, 'minimum_fare' => 25.00, 'booking_fee' => 2.00, 'cancellation_fee' => 10.00, 'wait_per_minute' => 1.00],
+            'standard' => ['base_fare' => 5.00, 'per_km' => 2.50, 'per_minute' => 0.50, 'minimum_fare' => 10.00, 'booking_fee' => 1.00, 'stop_fee' => 2.00, 'cancellation_fee' => 5.00, 'wait_per_minute' => 0.50],
+            'xl' => ['base_fare' => 8.00, 'per_km' => 3.50, 'per_minute' => 0.70, 'minimum_fare' => 15.00, 'booking_fee' => 1.00, 'stop_fee' => 3.00, 'cancellation_fee' => 8.00, 'wait_per_minute' => 0.70],
+            'premium' => ['base_fare' => 12.00, 'per_km' => 4.50, 'per_minute' => 0.90, 'minimum_fare' => 25.00, 'booking_fee' => 2.00, 'stop_fee' => 4.00, 'cancellation_fee' => 10.00, 'wait_per_minute' => 1.00],
         ] as $type => $rates) {
             FareConfig::query()->firstOrCreate(['service_area_id' => $bb->id, 'vehicle_type' => $type], $rates + ['free_wait_minutes' => 3]);
         }

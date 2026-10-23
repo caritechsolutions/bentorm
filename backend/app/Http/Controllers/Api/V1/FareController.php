@@ -35,17 +35,22 @@ class FareController extends Controller
             'vehicle_type' => ['nullable', 'string', 'max:32'],
             'passengers' => ['nullable', 'integer', 'min:1', 'max:16'],
             'luggage' => ['nullable', 'integer', 'min:0', 'max:20'],
+            'stops' => ['nullable', 'array', 'max:'.config('bentorm.max_stops', 2)],
+            'stops.*.lat' => ['required', 'numeric', 'between:-90,90'],
+            'stops.*.lng' => ['required', 'numeric', 'between:-180,180'],
+            'stops.*.address' => ['nullable', 'string', 'max:255'],
         ]);
+        $stops = array_values($data['stops'] ?? []);
         $pax = (int) ($data['passengers'] ?? 1);
         $bags = (int) ($data['luggage'] ?? 0);
         [$pLat, $pLng, $dLat, $dLng] = [(float) $data['pickup_lat'], (float) $data['pickup_lng'], (float) $data['dropoff_lat'], (float) $data['dropoff_lng']];
 
         if (! empty($data['vehicle_type'])) {
-            $q = $pricing->estimate($pLat, $pLng, $dLat, $dLng, $data['vehicle_type'], null, $pax, $bags);
+            $q = $pricing->estimate($pLat, $pLng, $dLat, $dLng, $data['vehicle_type'], null, $pax, $bags, $stops);
             unset($q['pickup_context'], $q['dropoff_context']);
             $quotes = [$q];
         } else {
-            $quotes = $pricing->estimateAll($pLat, $pLng, $dLat, $dLng, null, $pax, $bags);
+            $quotes = $pricing->estimateAll($pLat, $pLng, $dLat, $dLng, null, $pax, $bags, $stops);
         }
 
         $quotes = array_map(function ($q) use ($request) {
@@ -58,7 +63,7 @@ class FareController extends Controller
         }, $quotes);
 
         // Same lookup the quotes used (cached for Google), returned so apps can draw the route.
-        $route = $distance->estimate($pLat, $pLng, $dLat, $dLng);
+        $route = $distance->route(PricingService::points($pLat, $pLng, $stops, $dLat, $dLng));
 
         return response()->json([
             'quotes' => $quotes,

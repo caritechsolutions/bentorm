@@ -41,6 +41,7 @@ class FareConfigsRelationManager extends RelationManager
             $money('per_km', 'Per km'),
             $money('per_minute', 'Per minute'),
             $money('booking_fee', 'Booking fee')->default(0),
+            $money('stop_fee', 'Fee per extra stop')->default(0)->helperText('On top of the longer route through the stops. 0 = route only.'),
             $money('cancellation_fee', 'Cancellation fee')->default(0),
             TextInput::make('free_wait_minutes')->label('Free waiting')->numeric()->suffix('min')->default(3)->required(),
             $money('wait_per_minute', 'Waiting per minute')->default(0),
@@ -61,6 +62,7 @@ class FareConfigsRelationManager extends RelationManager
                 TextColumn::make('per_minute')->label('/ min')->money(fn () => $cur()),
                 TextColumn::make('minimum_fare')->label('Minimum')->money(fn () => $cur()),
                 TextColumn::make('booking_fee')->label('Booking')->money(fn () => $cur()),
+                TextColumn::make('stop_fee')->label('Per stop')->money(fn () => $cur()),
                 TextColumn::make('cancellation_fee')->label('Cancel fee')->money(fn () => $cur()),
                 TextColumn::make('wait_per_minute')->label('Wait / min')->money(fn () => $cur())
                     ->description(fn ($record) => "after {$record->free_wait_minutes} min"),

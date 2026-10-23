@@ -59,6 +59,10 @@ class TripController extends Controller
             'features' => ['nullable', 'array'],
             'features.*' => ['string', \Illuminate\Validation\Rule::in(array_keys(config('bentorm.vehicle_features')))],
             'rider_note' => ['nullable', 'string', 'max:500'],
+            'stops' => ['nullable', 'array', 'max:'.config('bentorm.max_stops', 2)],
+            'stops.*.lat' => ['required', 'numeric', 'between:-90,90'],
+            'stops.*.lng' => ['required', 'numeric', 'between:-180,180'],
+            'stops.*.address' => ['nullable', 'string', 'max:255'],
         ]);
 
         $trip = $this->trips->request($request->user(), $data)->load(['rider', 'card']);
@@ -113,5 +117,24 @@ class TripController extends Controller
         if (! $user->isAdmin() && ! $trip->involves($user)) {
             abort(403, 'This is not your trip.');
         }
+    }
+
+    /** POST /trips/{trip}/stops — replace the stops not yet reached. After a driver accepted, they must confirm. */
+    public function changeStops(Request $request, Trip $trip): TripResource
+    {
+        $data = $request->validate([
+            'stops' => ['present', 'array', 'max:'.config('bentorm.max_stops', 2)],
+            'stops.*.lat' => ['required', 'numeric', 'between:-90,90'],
+            'stops.*.lng' => ['required', 'numeric', 'between:-180,180'],
+            'stops.*.address' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        return new TripResource($this->trips->changeStops($trip, $request->user(), $data['stops'] ?? [])->load(['rider', 'driver.driverProfile', 'vehicle', 'card']));
+    }
+
+    /** DELETE /trips/{trip}/stops/pending — withdraw a change the driver hasn't answered. */
+    public function withdrawStopChange(Request $request, Trip $trip): TripResource
+    {
+        return new TripResource($this->trips->withdrawStopChange($trip, $request->user())->load(['rider', 'driver.driverProfile', 'vehicle', 'card']));
     }
 }

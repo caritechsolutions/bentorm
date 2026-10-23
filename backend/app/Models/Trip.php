@@ -16,7 +16,8 @@ class Trip extends Model
 
     protected $fillable = [
         'rider_id', 'driver_id', 'vehicle_id', 'service_area_id', 'pickup_zone_id', 'dropoff_zone_id', 'vehicle_type', 'status',
-        'pickup_lat', 'pickup_lng', 'pickup_address', 'dropoff_lat', 'dropoff_lng', 'dropoff_address',
+        'pickup_lat', 'pickup_lng', 'pickup_address', 'dropoff_lat', 'dropoff_lng', 'dropoff_address', 'stops', 'stop_change',
+        'pin', 'pin_attempts', 'pin_failed_at', 'pin_verified_at',
         'estimated_distance_m', 'estimated_duration_s', 'estimated_fare',
         'actual_distance_m', 'actual_duration_s', 'wait_duration_s', 'currency', 'subtotal', 'tax_amount', 'final_fare',
         'platform_fee', 'driver_earnings', 'fare_breakdown', 'surge_multiplier',
@@ -58,6 +59,11 @@ class Trip extends Model
             'luggage' => 'integer',
             'required_features' => 'array',
             'cancellation_fee' => 'float',
+            'stops' => 'array',
+            'stop_change' => 'array',
+            'pin_attempts' => 'integer',
+            'pin_failed_at' => 'datetime',
+            'pin_verified_at' => 'datetime',
             'surge_multiplier' => 'float',
             'fare_breakdown' => 'array',
             'passengers' => 'integer',
@@ -145,5 +151,20 @@ class Trip extends Model
         $commission = (float) ($area?->commission_rate ?? 0);
 
         return round(((float) $this->estimated_fare / (1 + $tax)) * (1 - $commission), 2);
+    }
+
+    /** Route points in order: pickup, stops…, drop-off — [[lat, lng], …]. */
+    public function routePoints(): array
+    {
+        return array_merge(
+            [[(float) $this->pickup_lat, (float) $this->pickup_lng]],
+            array_map(fn ($s) => [(float) $s['lat'], (float) $s['lng']], $this->stops ?? []),
+            [[(float) $this->dropoff_lat, (float) $this->dropoff_lng]],
+        );
+    }
+
+    public function stopCount(): int
+    {
+        return count($this->stops ?? []);
     }
 }

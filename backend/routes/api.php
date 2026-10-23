@@ -101,6 +101,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/', [RiderTripController::class, 'store'])->middleware('role:rider,admin');
             Route::get('{trip}', [RiderTripController::class, 'show']);
             Route::post('{trip}/cancel', [RiderTripController::class, 'cancel']);
+            Route::post('{trip}/stops', [RiderTripController::class, 'changeStops']);
+            Route::delete('{trip}/stops/pending', [RiderTripController::class, 'withdrawStopChange']);
             Route::post('{trip}/rate', [RiderTripController::class, 'rate']);
             Route::post('{trip}/pay', [PaymentController::class, 'pay']);
         });
@@ -132,6 +134,9 @@ Route::prefix('v1')->group(function () {
             Route::get('trips/{trip}', [DriverTripController::class, 'show']);
             Route::post('trips/{trip}/accept', [DriverTripController::class, 'accept']);
             Route::post('trips/{trip}/decline', [DriverTripController::class, 'decline']);
+            Route::post('trips/{trip}/stops/accept', [DriverTripController::class, 'acceptStops']);
+            Route::post('trips/{trip}/stops/decline', [DriverTripController::class, 'declineStops']);
+            Route::post('trips/{trip}/stops/{index}/reached', [DriverTripController::class, 'reachStop'])->whereNumber('index');
             Route::post('trips/{trip}/arrive', [DriverTripController::class, 'arrive']);
             Route::post('trips/{trip}/start', [DriverTripController::class, 'start']);
             Route::post('trips/{trip}/complete', [DriverTripController::class, 'complete']);

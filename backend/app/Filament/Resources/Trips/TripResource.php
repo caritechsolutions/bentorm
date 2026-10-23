@@ -74,7 +74,16 @@ class TripResource extends Resource
                         ->formatStateUsing(fn ($state, Trip $record) => "{$state} · {$record->vehicle?->make} {$record->vehicle?->model}"),
                     TextEntry::make('passengers')->formatStateUsing(fn ($state, Trip $record) => "{$state} passengers · {$record->luggage} bags"),
                     TextEntry::make('pickup_address')->label('Pickup')->placeholder(fn (Trip $record) => "{$record->pickup_lat}, {$record->pickup_lng}"),
+                    TextEntry::make('stops_list')->label('Stops')->placeholder('None')
+                        ->state(fn (Trip $record) => collect($record->stops ?? [])->values()->map(fn ($s, $i) => ($i + 1).'. '.($s['address'] ?? "{$s['lat']}, {$s['lng']}")
+                            .(! empty($s['reached_at']) ? ' ✓' : ''))->all())
+                        ->listWithLineBreaks(),
                     TextEntry::make('dropoff_address')->label('Drop-off')->placeholder(fn (Trip $record) => "{$record->dropoff_lat}, {$record->dropoff_lng}"),
+                    TextEntry::make('stop_change.status')->label('Stop change')->placeholder('—')
+                        ->formatStateUsing(fn ($state) => ['pending' => 'Waiting for the driver', 'accepted' => 'Accepted by the driver', 'declined' => 'Declined by the driver'][$state] ?? $state),
+                    TextEntry::make('pin_verified_at')->label('Ride PIN')
+                        ->state(fn (Trip $record) => $record->pin_verified_at ? 'Checked at '.$record->pin_verified_at->setTimezone($record->serviceArea?->timezone ?: config('app.timezone'))->format('g:i a') : ($record->pin ? 'Not entered yet' : 'No PIN on this ride'))
+                        ->helperText(fn (Trip $record) => $record->pin_attempts > 0 ? "{$record->pin_attempts} wrong attempt(s)" : null),
                     TextEntry::make('required_features')->label('Requested features')->badge()->formatStateUsing(fn ($state) => Ui::features()[$state] ?? $state)->placeholder('None'),
                     TextEntry::make('rider_note')->placeholder('—'),
                     TextEntry::make('cancellation_reason')->label('Cancelled')

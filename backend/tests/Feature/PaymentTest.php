@@ -60,7 +60,7 @@ class PaymentTest extends TestCase
         $d = $this->actingAs($this->driver);
         $d->postJson("/api/v1/driver/trips/{$trip->public_id}/accept")->assertOk();
         $d->postJson("/api/v1/driver/trips/{$trip->public_id}/arrive")->assertOk();
-        $d->postJson("/api/v1/driver/trips/{$trip->public_id}/start")->assertOk();
+        $d->postJson("/api/v1/driver/trips/{$trip->public_id}/start", ['pin' => $trip->fresh()->pin])->assertOk();
         $this->travel($minutes)->minutes();
         $d->postJson("/api/v1/driver/trips/{$trip->public_id}/complete", ['lat' => self::OISTINS[0], 'lng' => self::OISTINS[1]])->assertOk();
 

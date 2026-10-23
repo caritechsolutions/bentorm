@@ -10,6 +10,8 @@ class TripResource extends Resource
     public function toArray(Request $request): array
     {
         $isDriverOrAdmin = $request->user() && ($request->user()->isAdmin() || $request->user()->id === $this->driver_id);
+        $isRiderOrAdmin = $request->user() && ($request->user()->isAdmin() || $request->user()->id === $this->rider_id);
+        $change = $this->stop_change;
 
         return [
             'id' => $this->public_id,
@@ -21,6 +23,19 @@ class TripResource extends Resource
             'vehicle' => new VehicleResource($this->whenLoaded('vehicle')),
             'pickup' => ['lat' => $this->pickup_lat, 'lng' => $this->pickup_lng, 'address' => $this->pickup_address, 'zone_id' => $this->pickup_zone_id],
             'dropoff' => ['lat' => $this->dropoff_lat, 'lng' => $this->dropoff_lng, 'address' => $this->dropoff_address, 'zone_id' => $this->dropoff_zone_id],
+            // Extra stops in order; reached_at is set when the driver gets there.
+            'stops' => array_map(fn ($s) => ['lat' => (float) $s['lat'], 'lng' => (float) $s['lng'], 'address' => $s['address'] ?? null, 'reached_at' => $s['reached_at'] ?? null], $this->stops ?? []),
+            // A mid-ride change of stops: status pending (driver to confirm) / accepted / declined.
+            'stop_change' => $change ? [
+                'status' => $change['status'] ?? null,
+                'stops' => array_map(fn ($s) => ['lat' => (float) $s['lat'], 'lng' => (float) $s['lng'], 'address' => $s['address'] ?? null], $change['stops'] ?? []),
+                'estimated_fare' => isset($change['estimated_fare']) ? (float) $change['estimated_fare'] : null,
+                'requested_at' => $change['requested_at'] ?? null,
+                'responded_at' => $change['responded_at'] ?? null,
+            ] : null,
+            // The rider reads this to the driver, who must enter it to start the trip. Never sent to drivers.
+            'pin' => $this->when($isRiderOrAdmin && $this->pin !== null && ($this->isActive() || $this->status?->value === 'pending_payment'), $this->pin),
+            'pin_verified' => $this->pin_verified_at !== null,
             'estimate' => [
                 'distance_m' => $this->estimated_distance_m,
                 'duration_s' => $this->estimated_duration_s,

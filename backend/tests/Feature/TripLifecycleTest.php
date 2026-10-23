@@ -66,7 +66,7 @@ class TripLifecycleTest extends TestCase
         $d->postJson("/api/v1/driver/trips/{$trip->public_id}/accept")->assertOk()->assertJsonPath('status', 'accepted');
         $d->postJson("/api/v1/driver/trips/{$trip->public_id}/arrive")->assertOk()->assertJsonPath('status', 'arrived');
         $this->travel(6)->minutes(); // 3 minutes beyond the free wait
-        $d->postJson("/api/v1/driver/trips/{$trip->public_id}/start")->assertOk()->assertJsonPath('status', 'in_progress');
+        $d->postJson("/api/v1/driver/trips/{$trip->public_id}/start", ['pin' => $trip->fresh()->pin])->assertOk()->assertJsonPath('status', 'in_progress');
 
         $this->travel(15)->minutes();
         $res = $d->postJson("/api/v1/driver/trips/{$trip->public_id}/complete", ['lat' => self::OISTINS[0], 'lng' => self::OISTINS[1]]);

@@ -22,15 +22,31 @@ class GoogleRoutesDistanceProvider implements DistanceProvider
 
     public function estimate(float $fromLat, float $fromLng, float $toLat, float $toLng): RouteEstimate
     {
+        return $this->route([[$fromLat, $fromLng], [$toLat, $toLng]]);
+    }
+
+    public function route(array $points): RouteEstimate
+    {
         $key = config('services.google_maps.server_key');
-        if (! $key) {
-            return $this->fallback->estimate($fromLat, $fromLng, $toLat, $toLng);
+        if (! $key || count($points) < 2) {
+            return $this->fallback->route($points);
         }
 
-        $cacheKey = sprintf('route:g:%.4f,%.4f:%.4f,%.4f', $fromLat, $fromLng, $toLat, $toLng);
+        $cacheKey = 'route:g:'.implode(':', array_map(fn ($p) => sprintf('%.4f,%.4f', $p[0], $p[1]), $points));
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
             return new RouteEstimate($cached['d'], $cached['t'], $cached['p']);
+        }
+
+        $loc = fn (array $p) => ['location' => ['latLng' => ['latitude' => (float) $p[0], 'longitude' => (float) $p[1]]]];
+        $body = [
+            'origin' => $loc($points[0]),
+            'destination' => $loc($points[count($points) - 1]),
+            'travelMode' => 'DRIVE',
+            'routingPreference' => 'TRAFFIC_UNAWARE',
+        ];
+        if (count($points) > 2) {
+            $body['intermediates'] = array_map($loc, array_slice($points, 1, -1));
         }
 
         try {
@@ -39,12 +55,7 @@ class GoogleRoutesDistanceProvider implements DistanceProvider
                     'X-Goog-Api-Key' => $key,
                     'X-Goog-FieldMask' => 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
                 ])
-                ->post(self::URL, [
-                    'origin' => ['location' => ['latLng' => ['latitude' => $fromLat, 'longitude' => $fromLng]]],
-                    'destination' => ['location' => ['latLng' => ['latitude' => $toLat, 'longitude' => $toLng]]],
-                    'travelMode' => 'DRIVE',
-                    'routingPreference' => 'TRAFFIC_UNAWARE',
-                ]);
+                ->post(self::URL, $body);
             $route = $res->json('routes.0');
             if ($res->successful() && isset($route['distanceMeters'])) {
                 $estimate = new RouteEstimate(
@@ -61,6 +72,6 @@ class GoogleRoutesDistanceProvider implements DistanceProvider
             Log::warning('Google Routes failed: '.$e->getMessage());
         }
 
-        return $this->fallback->estimate($fromLat, $fromLng, $toLat, $toLng);
+        return $this->fallback->route($points);
     }
 }

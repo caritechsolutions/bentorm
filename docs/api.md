@@ -30,7 +30,7 @@ Response shapes: single objects are returned bare; paginated lists are `{data, l
 | GET | `/vehicle-types?service_area_id=` | Types offered in an area, with `max_passengers`, `max_luggage` |
 | GET | `/vehicle-features` | `[{key, label}]` — wheelchair_accessible, child_seat, pet_friendly, extra_luggage |
 | GET | `/fares?service_area_id=` | Rate cards (amounts exclude tax) |
-| POST | `/fares/estimate` | `pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, vehicle_type?, passengers?, luggage?` → `quotes[]` with `fare, hold_amount, subtotal, tax, currency, surge_multiplier, breakdown.lines[]`. Only types that fit the party are quoted. Also returns `route {distance_m, duration_s, polyline: [[lat, lng], …] \| null}` for drawing. 422 `pickup`/`dropoff` when outside service or blocked. |
+| POST | `/fares/estimate` | `pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, vehicle_type?, passengers?, luggage?, stops?[{lat, lng}]` (up to 2, in order) → `quotes[]` with `fare, hold_amount, subtotal, tax, currency, surge_multiplier, breakdown.lines[]`. Only types that fit the party are quoted. Also returns `route {distance_m, duration_s, polyline: [[lat, lng], …] \| null}` for drawing. 422 `pickup`/`dropoff` when outside service or blocked. |
 
 ## Rider
 
@@ -38,9 +38,11 @@ Response shapes: single objects are returned bare; paginated lists are `{data, l
 |---|---|---|---|
 | GET | `/trips` | | History, paginated |
 | GET | `/trips/active` | | Current trip + live `driver_position` |
-| POST | `/trips` | `pickup_*, dropoff_*, vehicle_type, payment_method? (cash\|card), payment_method_id? (saved card; default card if omitted), passengers?, luggage?, features[]?, rider_note?` | **201** `requested` — searching for a driver · **202** `pending_payment` — card needs 3-D Secure: open `payment_action.url` · **402** card hold declined (trip cancelled, nothing owed) · 422 active trip / amount owed / party too big |
+| POST | `/trips` | `pickup_*, dropoff_*, stops?[{lat, lng, address}], vehicle_type, payment_method? (cash\|card), payment_method_id? (saved card; default card if omitted), passengers?, luggage?, features[]?, rider_note?` | **201** `requested` — searching for a driver · **202** `pending_payment` — card needs 3-D Secure: open `payment_action.url` · **402** card hold declined (trip cancelled, nothing owed) · 422 active trip / amount owed / party too big |
 | GET | `/trips/{id}` | | `id` is the trip's public ULID |
 | POST | `/trips/{id}/cancel` | `reason?` | Free while `requested`; cancellation fee after a driver accepted |
+| POST | `/trips/{id}/stops` | `stops[{lat, lng, address}]` (the stops not yet reached; `[]` removes them) | Before a driver accepts: applied at once. After: `stop_change.status = pending` until the driver accepts or declines (fare re-estimated; the card hold is not changed — any overrun is charged at the end) |
+| DELETE | `/trips/{id}/stops/pending` | | Withdraw a change the driver hasn't answered |
 | POST | `/trips/{id}/rate` | `score 1–5, comment?` | Completed trips only |
 | POST | `/trips/{id}/pay` | `payment_method_id?` | Settle an amount owed. With a saved card it's charged directly; otherwise returns `redirect_url` for a hosted page, which deep-links back to `ridecoop://payment?id=&status=` |
 | GET | `/me/payment-methods` | | Saved cards (`brand, last4, exp_month, exp_year, is_default`) |
@@ -78,7 +80,9 @@ Google Places, called from the server so the key never ships for search and web 
 | GET | `/driver/trips` · `/driver/trips/active` · `/driver/trips/{id}` | | `{id}`: a trip this driver was assigned — e.g. to show that the rider cancelled |
 | POST | `/driver/trips/{id}/accept` | | 409 if taken/expired |
 | POST | `/driver/trips/{id}/decline` | | |
-| POST | `/driver/trips/{id}/arrive` → `/start` → `/complete` | `complete: lat?, lng?` | |
+| POST | `/driver/trips/{id}/arrive` → `/start` → `/complete` | `start: pin` · `complete: lat?, lng?` | **Start needs the rider's 4-digit PIN** (422 `pin` if missing/wrong, with tries left; 429 after 5 wrong for 2 minutes) |
+| POST | `/driver/trips/{id}/stops/accept` · `/stops/decline` | | Answer the rider's pending stop change |
+| POST | `/driver/trips/{id}/stops/{index}/reached` | | Arrived at stop `index` (0-based), in order, during the trip |
 | POST | `/driver/trips/{id}/cancel` | `reason` | |
 
 ## Admin (`role=admin`)
@@ -117,6 +121,11 @@ requested ──accept──► accepted ──arrive──► arrived ──sta
     │                     │                   │                    │
     └─ cancel / no_drivers└── cancel ─────────┴── cancel ──────────┴── cancel (admin only)
 ```
+
+## Stops and ride PIN
+
+- **Stops:** up to `MAX_STOPS` (2) between pickup and drop-off, each inside the pickup's service area and outside blocked areas. The fare follows the road route through them, plus the rate card's `stop_fee` per stop (line `stops`, ex tax). Fixed-route fares don't apply to rides with stops. Trips carry `stops[{lat, lng, address, reached_at}]` and `stop_change {status, stops, estimated_fare, requested_at, responded_at}`.
+- **PIN:** every ride gets a random 4-digit `pin`, shown only to the rider (`GET /trips/{id}`, `/trips/active`) while the ride is active — never to drivers, never in websocket broadcasts or offers. `pin_verified` turns true when the driver starts the trip with it.
 
 ## Dispatch
 

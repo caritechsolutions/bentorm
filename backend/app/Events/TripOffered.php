@@ -4,6 +4,7 @@ namespace App\Events;
 
 use App\Http\Resources\TripResource;
 use App\Models\TripOffer;
+use App\Support\PublicView;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
@@ -36,7 +37,7 @@ class TripOffered implements ShouldBroadcast
                 'expires_at' => $this->offer->expires_at->toIso8601String(),
                 'estimated_earnings' => $this->offer->trip->estimatedDriverEarnings(),
             ],
-            'trip' => (new TripResource($this->offer->trip->loadMissing('rider')))->resolve(),
+            'trip' => PublicView::resolve(new TripResource($this->offer->trip->loadMissing('rider'))),
         ];
     }
 }

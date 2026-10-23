@@ -62,7 +62,26 @@ class TripController extends Controller
     /** POST /driver/trips/{trip}/start */
     public function start(Request $request, Trip $trip): TripResource
     {
-        return new TripResource($this->trips->start($trip, $request->user())->load(['rider', 'vehicle']));
+        $data = $request->validate(['pin' => ['nullable', 'string', 'max:8']]);
+
+        return new TripResource($this->trips->start($trip, $request->user(), $data['pin'] ?? null)->load(['rider', 'vehicle']));
+    }
+
+    /** POST /driver/trips/{trip}/stops/accept · /decline — answer the rider's stop change. */
+    public function acceptStops(Request $request, Trip $trip): TripResource
+    {
+        return new TripResource($this->trips->respondToStopChange($trip, $request->user(), true)->load(['rider', 'vehicle']));
+    }
+
+    public function declineStops(Request $request, Trip $trip): TripResource
+    {
+        return new TripResource($this->trips->respondToStopChange($trip, $request->user(), false)->load(['rider', 'vehicle']));
+    }
+
+    /** POST /driver/trips/{trip}/stops/{index}/reached — arrived at a stop (0-based, in order). */
+    public function reachStop(Request $request, Trip $trip, int $index): TripResource
+    {
+        return new TripResource($this->trips->reachStop($trip, $request->user(), $index)->load(['rider', 'vehicle']));
     }
 
     /** POST /driver/trips/{trip}/complete */

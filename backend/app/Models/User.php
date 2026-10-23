@@ -45,6 +45,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->isAdmin() && $this->is_active;
     }
 
+    public function firstName(): string
+    {
+        return explode(' ', trim((string) $this->name))[0] ?: (string) $this->name;
+    }
+
     // ---------------------------------------------------------------- roles
 
     public function isRider(): bool

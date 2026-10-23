@@ -66,4 +66,27 @@ class GeoService
 
         return [$pickup, $dropoff];
     }
+
+    /**
+     * Each stop must be in the pickup's service area and not in a blocked area; at most bentorm.max_stops.
+     *
+     * @param  array<int, array{lat: float, lng: float}>  $stops
+     */
+    public function assertStopsAllowed(GeoContext $pickup, array $stops): void
+    {
+        $max = (int) config('bentorm.max_stops', 2);
+        if (count($stops) > $max) {
+            throw ValidationException::withMessages(['stops' => ["You can add up to {$max} stops."]]);
+        }
+        foreach (array_values($stops) as $i => $s) {
+            $ctx = $this->resolve((float) $s['lat'], (float) $s['lng']);
+            $n = $i + 1;
+            if ($ctx->blocked) {
+                throw ValidationException::withMessages(["stops.{$i}" => [$ctx->blocked->message ?: "Stop {$n} is in an area we can't stop in."]]);
+            }
+            if (! $ctx->service || $ctx->service->id !== $pickup->service->id) {
+                throw ValidationException::withMessages(["stops.{$i}" => ["Stop {$n} must be within {$pickup->service->name}."]]);
+            }
+        }
+    }
 }

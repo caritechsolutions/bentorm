@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class FareConfig extends Model
 {
     protected $fillable = [
-        'service_area_id', 'vehicle_type', 'base_fare', 'per_km', 'per_minute', 'minimum_fare', 'booking_fee',
+        'service_area_id', 'vehicle_type', 'base_fare', 'per_km', 'per_minute', 'minimum_fare', 'booking_fee', 'stop_fee',
         'cancellation_fee', 'free_wait_minutes', 'wait_per_minute', 'is_active',
     ];
 
@@ -16,7 +16,7 @@ class FareConfig extends Model
     {
         return [
             'base_fare' => 'float', 'per_km' => 'float', 'per_minute' => 'float', 'minimum_fare' => 'float',
-            'booking_fee' => 'float', 'cancellation_fee' => 'float', 'wait_per_minute' => 'float',
+            'booking_fee' => 'float', 'stop_fee' => 'float', 'cancellation_fee' => 'float', 'wait_per_minute' => 'float',
             'free_wait_minutes' => 'integer', 'is_active' => 'boolean',
         ];
     }

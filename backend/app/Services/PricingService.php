@@ -36,10 +36,12 @@ class PricingService
     ) {}
 
     /** Quotes for every vehicle type offered in the pickup's service area that can carry the party. */
-    public function estimateAll(float $pLat, float $pLng, float $dLat, float $dLng, ?CarbonInterface $at = null, int $passengers = 1, int $luggage = 0): array
+    /** @param  array<int, array{lat: float, lng: float}>  $stops  extra stops, in order */
+    public function estimateAll(float $pLat, float $pLng, float $dLat, float $dLng, ?CarbonInterface $at = null, int $passengers = 1, int $luggage = 0, array $stops = []): array
     {
         [$pickup, $dropoff] = $this->geo->assertTripAllowed($pLat, $pLng, $dLat, $dLng);
-        $route = $this->distance->estimate($pLat, $pLng, $dLat, $dLng);
+        $this->geo->assertStopsAllowed($pickup, $stops);
+        $route = $this->distance->route(self::points($pLat, $pLng, $stops, $dLat, $dLng));
 
         $configs = FareConfig::query()->where('service_area_id', $pickup->service->id)->where('is_active', true)->get()->keyBy('vehicle_type');
         $types = VehicleType::query()->where('is_active', true)->whereIn('key', $configs->keys())
@@ -47,7 +49,7 @@ class PricingService
             ->orderBy('sort_order')->get();
 
         return $types->map(fn (VehicleType $t) => $this->withHold($pickup->service,
-            $this->calculate($pickup, $dropoff, $t->key, $route->distanceM, $route->durationS, 0, $at ?? now())) + [
+            $this->calculate($pickup, $dropoff, $t->key, $route->distanceM, $route->durationS, 0, $at ?? now(), stopCount: count($stops))) + [
                 'display_name' => $t->name,
                 'description' => $t->description,
                 'max_passengers' => $t->max_passengers,
@@ -57,9 +59,10 @@ class PricingService
     }
 
     /** Quote for one vehicle type. Also returns the geo contexts so the caller can store them. */
-    public function estimate(float $pLat, float $pLng, float $dLat, float $dLng, string $vehicleType, ?CarbonInterface $at = null, int $passengers = 1, int $luggage = 0): array
+    public function estimate(float $pLat, float $pLng, float $dLat, float $dLng, string $vehicleType, ?CarbonInterface $at = null, int $passengers = 1, int $luggage = 0, array $stops = []): array
     {
         [$pickup, $dropoff] = $this->geo->assertTripAllowed($pLat, $pLng, $dLat, $dLng);
+        $this->geo->assertStopsAllowed($pickup, $stops);
 
         $type = VehicleType::query()->where('key', $vehicleType)->where('is_active', true)->first();
         if (! $type) {
@@ -72,10 +75,33 @@ class PricingService
             throw ValidationException::withMessages(['luggage' => ["{$type->name} takes up to {$type->max_luggage} pieces of luggage."]]);
         }
 
-        $route = $this->distance->estimate($pLat, $pLng, $dLat, $dLng);
+        $route = $this->distance->route(self::points($pLat, $pLng, $stops, $dLat, $dLng));
 
-        return $this->withHold($pickup->service, $this->calculate($pickup, $dropoff, $vehicleType, $route->distanceM, $route->durationS, 0, $at ?? now()))
+        return $this->withHold($pickup->service, $this->calculate($pickup, $dropoff, $vehicleType, $route->distanceM, $route->durationS, 0, $at ?? now(), stopCount: count($stops)))
             + ['pickup_context' => $pickup, 'dropoff_context' => $dropoff];
+    }
+
+    /**
+     * New estimate for a trip whose stops are changing (mid-ride). Priced at the time of the original
+     * request with the multiplier locked then; a fixed route no longer applies once there are stops.
+     */
+    public function requote(Trip $trip, array $stops): array
+    {
+        [$pickup, $dropoff] = $this->geo->assertTripAllowed($trip->pickup_lat, $trip->pickup_lng, $trip->dropoff_lat, $trip->dropoff_lng);
+        $this->geo->assertStopsAllowed($pickup, $stops);
+        $route = $this->distance->route(self::points($trip->pickup_lat, $trip->pickup_lng, $stops, $trip->dropoff_lat, $trip->dropoff_lng));
+        $lock = $trip->fare_breakdown['lock'] ?? [];
+        $fixed = $stops ? null : ($lock['fixed_rule_id'] ?? null);
+
+        return $this->withHold($pickup->service, $this->calculate($pickup, $dropoff, $trip->vehicle_type, $route->distanceM, $route->durationS, 0,
+            $trip->requested_at ?? now(), $fixed ? null : ($lock['multiplier'] ?? null), $fixed, stopCount: count($stops)))
+            + ['route' => $route];
+    }
+
+    /** [[lat, lng], …] for pickup, stops…, drop-off. */
+    public static function points(float $pLat, float $pLng, array $stops, float $dLat, float $dLng): array
+    {
+        return array_merge([[$pLat, $pLng]], array_map(fn ($s) => [(float) $s['lat'], (float) $s['lng']], array_values($stops)), [[$dLat, $dLng]]);
     }
 
     /** Amount held on a card at request: estimate × (1 + hold buffer), rounded up like fares. */
@@ -97,7 +123,7 @@ class PricingService
         $lock = $trip->fare_breakdown['lock'] ?? [];
 
         return $this->calculate($pickup, $dropoff, $trip->vehicle_type, $distanceM, $durationS, $waitS,
-            $trip->requested_at ?? now(), $lock['multiplier'] ?? null, $lock['fixed_rule_id'] ?? null);
+            $trip->requested_at ?? now(), $lock['multiplier'] ?? null, $trip->stopCount() ? null : ($lock['fixed_rule_id'] ?? null), stopCount: $trip->stopCount());
     }
 
     /** Cancellation charge for a trip, split into tax / commission like a fare. */
@@ -117,7 +143,7 @@ class PricingService
 
     private function calculate(
         GeoContext $pickup, GeoContext $dropoff, string $vehicleType, int $distanceM, int $durationS, int $waitS,
-        CarbonInterface $at, ?float $lockedMultiplier = null, ?int $lockedFixedRuleId = null,
+        CarbonInterface $at, ?float $lockedMultiplier = null, ?int $lockedFixedRuleId = null, int $stopCount = 0,
     ): array {
         $area = $pickup->service;
         $cfg = FareConfig::for($area->id, $vehicleType);
@@ -132,10 +158,10 @@ class PricingService
         $km = $distanceM / 1000;
         $min = $durationS / 60;
 
-        // ---- fixed route?
+        // ---- fixed route? (A-to-B flat fares only: a ride with stops is metered along its route.)
         $fixed = $lockedFixedRuleId
             ? $rules->firstWhere('id', $lockedFixedRuleId)
-            : ($lockedMultiplier === null ? $this->matchFixedRoute($rules, $pickup, $dropoff, $at, $local) : null);
+            : ($lockedMultiplier === null && $stopCount === 0 ? $this->matchFixedRoute($rules, $pickup, $dropoff, $at, $local) : null);
 
         if ($fixed) {
             $fare = (float) $fixed->amount;
@@ -189,6 +215,13 @@ class PricingService
                     $fare += (float) $rule->amount;
                 }
             }
+        }
+
+        // ---- extra stops (the longer route is already in distance/time)
+        if ($stopCount > 0 && $cfg->stop_fee > 0) {
+            $stopFee = round($stopCount * $cfg->stop_fee, 2);
+            $lines[] = ['code' => 'stops', 'label' => $stopCount === 1 ? 'Extra stop' : "Extra stops ({$stopCount})", 'amount' => $stopFee];
+            $fare += $stopFee;
         }
 
         // ---- booking fee
