@@ -9,15 +9,15 @@
   "licence_number": "L123456",
   "licence_expiry": "2030-06-30",
   "psv_permit_number": "PSV-889",
-  "current_vehicle_id": 7,
+  "current_vehicle_id": 8,
   "current_vehicle": {
-    "id": 7,
-    "driver_id": 13,
+    "id": 8,
+    "driver_id": 17,
     "make": "Toyota",
     "model": "Axio",
     "year": 2019,
     "colour": "Silver",
-    "plate": "Z20331",
+    "plate": "Z42628",
     "seats": 4,
     "luggage_capacity": 2,
     "features": [
@@ -26,7 +26,7 @@
     "vehicle_type": "standard",
     "status": "approved",
     "status_note": null,
-    "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/35"
+    "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/51"
   },
-  "approved_at": "2026-10-22T23:48:15+00:00"
+  "approved_at": "2026-10-23T21:54:16+00:00"
 }

@@ -1,17 +1,17 @@
 {
   "offers": [
     {
-      "id": 18,
+      "id": 30,
       "distance_m": 176,
-      "expires_at": "2026-10-22T23:48:38+00:00",
+      "expires_at": "2026-10-23T21:54:39+00:00",
       "estimated_earnings": 39.15,
       "trip": {
-        "id": "01m5k07wzjwxdzcwt4m85kkcq0",
+        "id": "01m5nc3ydg057yyp0azj4q500v",
         "status": "requested",
         "vehicle_type": "standard",
         "service_area_id": 1,
         "rider": {
-          "id": 14,
+          "id": 18,
           "name": "Rita Rider",
           "role": "rider",
           "avatar_url": null
@@ -28,6 +28,9 @@
           "address": "Oistins Fish Fry",
           "zone_id": null
         },
+        "stops": [],
+        "stop_change": null,
+        "pin_verified": false,
         "estimate": {
           "distance_m": 12238,
           "duration_s": 1469,
@@ -91,7 +94,7 @@
         "cancellation_reason": null,
         "cancellation_fee": 0.0,
         "timestamps": {
-          "requested_at": "2026-10-22T23:48:17+00:00",
+          "requested_at": "2026-10-23T21:54:19+00:00",
           "accepted_at": null,
           "arrived_at": null,
           "started_at": null,

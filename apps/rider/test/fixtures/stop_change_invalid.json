@@ -1,0 +1,8 @@
+{
+  "message": "Stop 1 must be within Barbados.",
+  "errors": {
+    "stops.0": [
+      "Stop 1 must be within Barbados."
+    ]
+  }
+}

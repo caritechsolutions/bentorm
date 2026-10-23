@@ -56,6 +56,9 @@ class AdminPanelTest extends TestCase
             'rider_id' => $this->makeUser()->id, 'driver_id' => $driver->id, 'vehicle_id' => $vehicle->id, 'service_area_id' => $bb->id,
             'status' => 'completed', 'pickup_lat' => 13.1, 'pickup_lng' => -59.6, 'dropoff_lat' => 13.07, 'dropoff_lng' => -59.53,
             'final_fare' => 30.5, 'fare_breakdown' => ['lines' => [['code' => 'base', 'label' => 'Base fare', 'amount' => 5.0]]],
+            'stops' => [['lat' => 13.079, 'lng' => -59.608, 'address' => 'Garrison Savannah', 'reached_at' => now()->toIso8601String()]],
+            'stop_change' => ['status' => 'accepted', 'stops' => [], 'estimated_fare' => 31.0, 'requested_at' => now()->toIso8601String()],
+            'pin' => '4821', 'pin_verified_at' => now(), 'pin_attempts' => 1,
         ]);
 
         $this->actingAs($admin);
@@ -68,6 +71,7 @@ class AdminPanelTest extends TestCase
         ] as $url) {
             $this->get($url)->assertOk();
         }
+        $this->get("/admin/trips/{$trip->public_id}")->assertSee('Garrison Savannah')->assertSee('Accepted by the driver')->assertSee('1 wrong attempt(s)');
 
         $this->get(route('admin.document.file', $doc))->assertOk()->assertHeader('Content-Type', 'image/jpeg');
         $this->getJson(route('admin.live'))->assertOk()->assertJsonStructure(['drivers', 'trips']);

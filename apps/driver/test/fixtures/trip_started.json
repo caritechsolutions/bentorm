@@ -1,22 +1,22 @@
 {
-  "id": "01m5k07wzjwxdzcwt4m85kkcq0",
+  "id": "01m5nc3ydg057yyp0azj4q500v",
   "status": "in_progress",
   "vehicle_type": "standard",
   "service_area_id": 1,
   "rider": {
-    "id": 14,
+    "id": 18,
     "name": "Rita Rider",
     "role": "rider",
     "avatar_url": null
   },
   "vehicle": {
-    "id": 7,
-    "driver_id": 13,
+    "id": 8,
+    "driver_id": 17,
     "make": "Toyota",
     "model": "Axio",
     "year": 2019,
     "colour": "Silver",
-    "plate": "Z20331",
+    "plate": "Z42628",
     "seats": 4,
     "luggage_capacity": 2,
     "features": [
@@ -25,7 +25,7 @@
     "vehicle_type": "standard",
     "status": "approved",
     "status_note": null,
-    "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/35"
+    "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/51"
   },
   "pickup": {
     "lat": 13.0969,
@@ -39,6 +39,9 @@
     "address": "Oistins Fish Fry",
     "zone_id": null
   },
+  "stops": [],
+  "stop_change": null,
+  "pin_verified": true,
   "estimate": {
     "distance_m": 12238,
     "duration_s": 1469,
@@ -103,10 +106,10 @@
   "cancellation_reason": null,
   "cancellation_fee": 0.0,
   "timestamps": {
-    "requested_at": "2026-10-22T23:48:17+00:00",
-    "accepted_at": "2026-10-22T23:48:18+00:00",
-    "arrived_at": "2026-10-22T23:48:18+00:00",
-    "started_at": "2026-10-22T23:48:18+00:00",
+    "requested_at": "2026-10-23T21:54:19+00:00",
+    "accepted_at": "2026-10-23T21:54:20+00:00",
+    "arrived_at": "2026-10-23T21:54:20+00:00",
+    "started_at": "2026-10-23T21:54:21+00:00",
     "completed_at": null,
     "cancelled_at": null
   }

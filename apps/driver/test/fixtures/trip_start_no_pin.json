@@ -1,0 +1,8 @@
+{
+  "message": "Ask the rider for their 4-digit PIN.",
+  "errors": {
+    "pin": [
+      "Ask the rider for their 4-digit PIN."
+    ]
+  }
+}

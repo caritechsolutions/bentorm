@@ -1,0 +1,145 @@
+{
+  "id": "01m5nc4087ea9nw81pdr4rw8jc",
+  "status": "accepted",
+  "vehicle_type": "standard",
+  "service_area_id": 1,
+  "rider": {
+    "id": 18,
+    "name": "Rita Rider",
+    "role": "rider",
+    "avatar_url": null
+  },
+  "vehicle": {
+    "id": 8,
+    "driver_id": 17,
+    "make": "Toyota",
+    "model": "Axio",
+    "year": 2019,
+    "colour": "Silver",
+    "plate": "Z42628",
+    "seats": 4,
+    "luggage_capacity": 2,
+    "features": [
+      "child_seat"
+    ],
+    "vehicle_type": "standard",
+    "status": "approved",
+    "status_note": null,
+    "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/51"
+  },
+  "pickup": {
+    "lat": 13.0969,
+    "lng": -59.6145,
+    "address": "Bay Street, Bridgetown",
+    "zone_id": null
+  },
+  "dropoff": {
+    "lat": 13.0667,
+    "lng": -59.5333,
+    "address": "Oistins Fish Fry",
+    "zone_id": null
+  },
+  "stops": [
+    {
+      "lat": 13.079,
+      "lng": -59.608,
+      "address": "Garrison Savannah",
+      "reached_at": null
+    }
+  ],
+  "stop_change": {
+    "status": "pending",
+    "stops": [
+      {
+        "lat": 13.079,
+        "lng": -59.608,
+        "address": "Garrison Savannah"
+      },
+      {
+        "lat": 13.1,
+        "lng": -59.57,
+        "address": "Welches"
+      }
+    ],
+    "estimated_fare": 77.5,
+    "requested_at": "2026-10-23T21:54:22+00:00",
+    "responded_at": null
+  },
+  "pin_verified": false,
+  "estimate": {
+    "distance_m": 13413,
+    "duration_s": 1609,
+    "fare": 65.0
+  },
+  "actual": {
+    "distance_m": null,
+    "duration_s": null,
+    "wait_s": null,
+    "fare": null,
+    "subtotal": null,
+    "tax": null
+  },
+  "driver_earnings": null,
+  "currency": "BBD",
+  "fare_breakdown": {
+    "lines": [
+      {
+        "code": "base",
+        "label": "Base fare",
+        "amount": 5
+      },
+      {
+        "code": "distance",
+        "label": "Distance (13.4 km)",
+        "amount": 33.53
+      },
+      {
+        "code": "time",
+        "label": "Time (27 min)",
+        "amount": 13.41
+      },
+      {
+        "code": "stops",
+        "label": "Extra stop",
+        "amount": 2
+      },
+      {
+        "code": "booking_fee",
+        "label": "Booking fee",
+        "amount": 1
+      },
+      {
+        "code": "rounding",
+        "label": "Rounding",
+        "amount": 0.38
+      },
+      {
+        "code": "tax",
+        "label": "VAT 17.5%",
+        "amount": 9.68
+      }
+    ],
+    "total": 65
+  },
+  "surge_multiplier": 1.0,
+  "payment_method": "cash",
+  "payment_status": "pending",
+  "amount_due": 0.0,
+  "passengers": 1,
+  "luggage": 0,
+  "required_features": [],
+  "hold_amount": null,
+  "payment_action": null,
+  "rider_note": null,
+  "cancelled_by": null,
+  "cancellation_reason": null,
+  "cancellation_fee": 0.0,
+  "timestamps": {
+    "requested_at": "2026-10-23T21:54:21+00:00",
+    "accepted_at": "2026-10-23T21:54:22+00:00",
+    "arrived_at": null,
+    "started_at": null,
+    "completed_at": null,
+    "cancelled_at": null
+  }
+}

@@ -1,19 +1,19 @@
 {
-  "id": "01m5k07wzjwxdzcwt4m85kkcq0",
+  "id": "01m5nc3ydg057yyp0azj4q500v",
   "status": "accepted",
   "vehicle_type": "standard",
   "service_area_id": 1,
   "rider": {
-    "id": 14,
+    "id": 18,
     "name": "Rita Rider",
     "role": "rider",
     "avatar_url": null
   },
   "driver": {
-    "id": 13,
+    "id": 17,
     "name": "Dave Driver",
-    "phone": "+12465554250",
-    "email": "dave12465554250@example.com",
+    "phone": "+12465554807",
+    "email": "dave12465554807@example.com",
     "role": "driver",
     "country_code": null,
     "avatar_url": null,
@@ -29,19 +29,19 @@
       "licence_number": "L123456",
       "licence_expiry": "2030-06-30",
       "psv_permit_number": "PSV-889",
-      "current_vehicle_id": 7,
-      "approved_at": "2026-10-22T23:48:15+00:00"
+      "current_vehicle_id": 8,
+      "approved_at": "2026-10-23T21:54:16+00:00"
     },
-    "created_at": "2026-10-22T23:48:14+00:00"
+    "created_at": "2026-10-23T21:54:14+00:00"
   },
   "vehicle": {
-    "id": 7,
-    "driver_id": 13,
+    "id": 8,
+    "driver_id": 17,
     "make": "Toyota",
     "model": "Axio",
     "year": 2019,
     "colour": "Silver",
-    "plate": "Z20331",
+    "plate": "Z42628",
     "seats": 4,
     "luggage_capacity": 2,
     "features": [
@@ -50,7 +50,7 @@
     "vehicle_type": "standard",
     "status": "approved",
     "status_note": null,
-    "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/35"
+    "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/51"
   },
   "pickup": {
     "lat": 13.0969,
@@ -64,6 +64,9 @@
     "address": "Oistins Fish Fry",
     "zone_id": null
   },
+  "stops": [],
+  "stop_change": null,
+  "pin_verified": false,
   "estimate": {
     "distance_m": 12238,
     "duration_s": 1469,
@@ -128,8 +131,8 @@
   "cancellation_reason": null,
   "cancellation_fee": 0.0,
   "timestamps": {
-    "requested_at": "2026-10-22T23:48:17+00:00",
-    "accepted_at": "2026-10-22T23:48:18+00:00",
+    "requested_at": "2026-10-23T21:54:19+00:00",
+    "accepted_at": "2026-10-23T21:54:20+00:00",
     "arrived_at": null,
     "started_at": null,
     "completed_at": null,

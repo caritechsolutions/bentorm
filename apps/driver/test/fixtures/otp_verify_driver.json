@@ -1,11 +1,11 @@
 {
-  "token": "40|58g3bzjR2nUfLaQtGIHpzaTNosv1VQkOpE7qKz2xe807badf",
+  "token": "53|pFL96Q91AfG3nT69BRiba3yx8vY2MKuo9gNXBw32526f5f06",
   "is_new": true,
   "user": {
-    "id": 13,
+    "id": 17,
     "name": "Dave Driver",
-    "phone": "+12465554250",
-    "email": "dave12465554250@example.com",
+    "phone": "+12465554807",
+    "email": "dave12465554807@example.com",
     "role": "driver",
     "country_code": null,
     "avatar_url": null,
@@ -21,6 +21,6 @@
       "current_vehicle": null,
       "approved_at": null
     },
-    "created_at": "2026-10-22T23:48:14+00:00"
+    "created_at": "2026-10-23T21:54:14+00:00"
   }
 }

@@ -1,0 +1,189 @@
+{
+  "quotes": [
+    {
+      "vehicle_type": "standard",
+      "service_area_id": 1,
+      "service_area": "BB",
+      "currency": "BBD",
+      "distance_m": 13413,
+      "duration_s": 1609,
+      "fare": 65.0,
+      "subtotal": 55.32,
+      "tax": 9.68,
+      "surge_multiplier": 1.0,
+      "pickup_zone_id": null,
+      "dropoff_zone_id": null,
+      "breakdown": {
+        "lines": [
+          {
+            "code": "base",
+            "label": "Base fare",
+            "amount": 5.0
+          },
+          {
+            "code": "distance",
+            "label": "Distance (13.4 km)",
+            "amount": 33.53
+          },
+          {
+            "code": "time",
+            "label": "Time (27 min)",
+            "amount": 13.41
+          },
+          {
+            "code": "stops",
+            "label": "Extra stop",
+            "amount": 2.0
+          },
+          {
+            "code": "booking_fee",
+            "label": "Booking fee",
+            "amount": 1.0
+          },
+          {
+            "code": "rounding",
+            "label": "Rounding",
+            "amount": 0.38
+          },
+          {
+            "code": "tax",
+            "label": "VAT 17.5%",
+            "amount": 9.68
+          }
+        ],
+        "total": 65.0
+      },
+      "hold_amount": 78.0,
+      "display_name": "Standard",
+      "description": "Everyday rides",
+      "max_passengers": 4,
+      "max_luggage": 2,
+      "icon_url": null
+    },
+    {
+      "vehicle_type": "xl",
+      "service_area_id": 1,
+      "service_area": "BB",
+      "currency": "BBD",
+      "distance_m": 13413,
+      "duration_s": 1609,
+      "fare": 90.5,
+      "subtotal": 77.02,
+      "tax": 13.48,
+      "surge_multiplier": 1.0,
+      "pickup_zone_id": null,
+      "dropoff_zone_id": null,
+      "breakdown": {
+        "lines": [
+          {
+            "code": "base",
+            "label": "Base fare",
+            "amount": 8.0
+          },
+          {
+            "code": "distance",
+            "label": "Distance (13.4 km)",
+            "amount": 46.95
+          },
+          {
+            "code": "time",
+            "label": "Time (27 min)",
+            "amount": 18.77
+          },
+          {
+            "code": "stops",
+            "label": "Extra stop",
+            "amount": 2.0
+          },
+          {
+            "code": "booking_fee",
+            "label": "Booking fee",
+            "amount": 1.0
+          },
+          {
+            "code": "rounding",
+            "label": "Rounding",
+            "amount": 0.3
+          },
+          {
+            "code": "tax",
+            "label": "VAT 17.5%",
+            "amount": 13.48
+          }
+        ],
+        "total": 90.5
+      },
+      "hold_amount": 109.0,
+      "display_name": "XL",
+      "description": "Larger vehicles for groups and luggage",
+      "max_passengers": 6,
+      "max_luggage": 5,
+      "icon_url": null
+    },
+    {
+      "vehicle_type": "premium",
+      "service_area_id": 1,
+      "service_area": "BB",
+      "currency": "BBD",
+      "distance_m": 13413,
+      "duration_s": 1609,
+      "fare": 118.5,
+      "subtotal": 100.85,
+      "tax": 17.65,
+      "surge_multiplier": 1.0,
+      "pickup_zone_id": null,
+      "dropoff_zone_id": null,
+      "breakdown": {
+        "lines": [
+          {
+            "code": "base",
+            "label": "Base fare",
+            "amount": 12.0
+          },
+          {
+            "code": "distance",
+            "label": "Distance (13.4 km)",
+            "amount": 60.36
+          },
+          {
+            "code": "time",
+            "label": "Time (27 min)",
+            "amount": 24.14
+          },
+          {
+            "code": "stops",
+            "label": "Extra stop",
+            "amount": 2.0
+          },
+          {
+            "code": "booking_fee",
+            "label": "Booking fee",
+            "amount": 2.0
+          },
+          {
+            "code": "rounding",
+            "label": "Rounding",
+            "amount": 0.35
+          },
+          {
+            "code": "tax",
+            "label": "VAT 17.5%",
+            "amount": 17.65
+          }
+        ],
+        "total": 118.5
+      },
+      "hold_amount": 142.5,
+      "display_name": "Premium",
+      "description": "Top-rated drivers, premium vehicles",
+      "max_passengers": 4,
+      "max_luggage": 3,
+      "icon_url": null
+    }
+  ],
+  "route": {
+    "distance_m": 13413,
+    "duration_s": 1609,
+    "polyline": null
+  }
+}
