@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TripOffer extends Model
 {
-    protected $fillable = ['trip_id', 'driver_id', 'distance_m', 'response', 'offered_at', 'expires_at', 'responded_at'];
+    protected $fillable = ['trip_id', 'driver_id', 'distance_m', 'eta_s', 'radius_m', 'wave', 'response', 'offered_at', 'expires_at', 'responded_at'];
 
     protected function casts(): array
     {

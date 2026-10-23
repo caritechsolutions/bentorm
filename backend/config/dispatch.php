@@ -1,5 +1,7 @@
 <?php
 
+// Dispatch strategy, radius, batch size, offer time and waves are set in the admin panel
+// (Settings → Driver dispatch). The values below are only used if that table has no default row.
 return [
     // Search radius for nearby drivers, in metres.
     'search_radius_m' => (int) env('DISPATCH_RADIUS_M', 8000),

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Redis;
  * Live driver presence and position, kept in Redis (phpredis client).
  *
  *  drivers:geo        GEO set, member = driver user id
- *  driver:{id}        HASH  lat, lng, heading, speed, vehicle_type, state (idle|busy), updated_at
+ *  driver:{id}        HASH  lat, lng, heading, speed, vehicle_type, state (idle|busy), idle_since, updated_at
  *  driver:{id}:hb     heartbeat key with TTL — missing means the driver dropped off
  */
 class DriverLocationService
@@ -39,12 +39,16 @@ class DriverLocationService
 
     public function setState(User $driver, string $state): void
     {
-        Redis::hset("driver:{$driver->id}", 'state', $state);
+        $fields = ['state' => $state];
+        if ($state === 'idle') {
+            $fields['idle_since'] = now()->timestamp; // waiting for a ride from now (fair "longest waiting" dispatch)
+        }
+        Redis::hmset("driver:{$driver->id}", $fields);
     }
 
     public function goOnline(User $driver, string $vehicleType): void
     {
-        Redis::hmset("driver:{$driver->id}", ['state' => 'idle', 'vehicle_type' => $vehicleType, 'updated_at' => now()->timestamp]);
+        Redis::hmset("driver:{$driver->id}", ['state' => 'idle', 'vehicle_type' => $vehicleType, 'idle_since' => now()->timestamp, 'updated_at' => now()->timestamp]);
         Redis::setex("driver:{$driver->id}:hb", $this->heartbeatTtl(), '1');
     }
 
@@ -87,7 +91,7 @@ class DriverLocationService
     /**
      * Nearest idle, heartbeat-alive drivers of a given vehicle type.
      *
-     * @return array<int, array{driver_id: int, distance_m: int}>
+     * @return array<int, array{driver_id: int, distance_m: int, lat: ?float, lng: ?float, idle_since: ?int}>
      */
     public function nearbyIdle(float $lat, float $lng, int $radiusM, string $vehicleType, int $limit = 10, array $excludeIds = []): array
     {
@@ -106,13 +110,19 @@ class DriverLocationService
                 $this->goOfflineById($id);
                 continue;
             }
-            $h = Redis::hmget("driver:{$id}", ['state', 'vehicle_type']);
-            $state = $h[0] ?? ($h['state'] ?? 'idle');
-            $type = $h[1] ?? ($h['vehicle_type'] ?? null);
+            $h = array_values((array) Redis::hmget("driver:{$id}", ['state', 'vehicle_type', 'lat', 'lng', 'idle_since']));
+            $state = $h[0] ?: 'idle';
+            $type = $h[1] ?: null;
             if ($state !== 'idle' || $type !== $vehicleType) {
                 continue;
             }
-            $results[] = ['driver_id' => $id, 'distance_m' => (int) round((float) $dist)];
+            $results[] = [
+                'driver_id' => $id,
+                'distance_m' => (int) round((float) $dist),
+                'lat' => is_numeric($h[2] ?? null) ? (float) $h[2] : null,
+                'lng' => is_numeric($h[3] ?? null) ? (float) $h[3] : null,
+                'idle_since' => is_numeric($h[4] ?? null) ? (int) $h[4] : null,
+            ];
             if (count($results) >= $limit) {
                 break;
             }

@@ -23,6 +23,11 @@ class HaversineDistanceProvider implements DistanceProvider
         return new RouteEstimate($distanceM, $durationS);
     }
 
+    public function etaMany(array $origins, float $toLat, float $toLng): array
+    {
+        return array_map(fn (array $o) => $this->estimate($o[0], $o[1], $toLat, $toLng)->durationS, $origins);
+    }
+
     public function route(array $points): RouteEstimate
     {
         $d = 0;

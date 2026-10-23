@@ -15,4 +15,12 @@ interface DistanceProvider
      * @param  array<int, array{0: float, 1: float}>  $points  [[lat, lng], …], at least two
      */
     public function route(array $points): RouteEstimate;
+
+    /**
+     * Driving time from each origin to one destination (used to rank drivers by arrival time).
+     *
+     * @param  array<int, array{0: float, 1: float}>  $origins  [[lat, lng], …]
+     * @return array<int, int|null> seconds, same keys as $origins; null when no route was found
+     */
+    public function etaMany(array $origins, float $toLat, float $toLng): array;
 }

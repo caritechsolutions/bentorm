@@ -59,6 +59,7 @@ class StatusController extends Controller
             'offers' => $offers->map(fn (TripOffer $o) => [
                 'id' => $o->id,
                 'distance_m' => $o->distance_m,
+                'eta_s' => $o->eta_s,
                 'expires_at' => $o->expires_at->toIso8601String(),
                 'estimated_earnings' => $o->trip->estimatedDriverEarnings(),
                 'trip' => (new TripResource($o->trip))->resolve($request),

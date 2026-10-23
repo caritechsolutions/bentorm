@@ -8,6 +8,8 @@ use App\Events\OfferWithdrawn;
 use App\Events\TripOffered;
 use App\Events\TripUpdated;
 use App\Jobs\DispatchTripJob;
+use App\Contracts\DistanceProvider;
+use App\Models\DispatchSetting;
 use App\Models\Trip;
 use App\Models\TripOffer;
 use App\Models\User;
@@ -16,7 +18,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Offers a requested trip to nearby idle drivers in waves; first to accept wins.
+ * Offers a requested trip to nearby idle drivers in waves (or all at once); first to accept wins.
+ * How is set per service area in the admin panel (DispatchSetting).
  */
 class DispatchService
 {
@@ -26,6 +29,7 @@ class DispatchService
     public function start(Trip $trip): void
     {
         Cache::put($this->waveKey($trip), 0, now()->addHour());
+        Cache::put($this->ringKey($trip), 0, now()->addHour());
         DispatchTripJob::dispatch($trip->id);
     }
 
@@ -54,46 +58,104 @@ class DispatchService
             return;
         }
 
-        $wave = (int) Cache::get($this->waveKey($trip), 0);
-        if ($wave >= (int) config('dispatch.max_waves')) {
-            $this->markNoDrivers($trip);
-
-            return;
-        }
-
+        $settings = DispatchSetting::forTrip($trip);
         $alreadyOffered = $trip->offers()->pluck('driver_id')->all();
-        $batch = (int) config('dispatch.offer_batch_size');
-        // Over-fetch, then keep only drivers whose current vehicle fits the party, luggage and requested features.
-        $candidates = $this->fitting($trip, $this->locations->nearbyIdle(
-            $trip->pickup_lat, $trip->pickup_lng,
-            (int) config('dispatch.search_radius_m'),
-            $trip->vehicle_type,
-            $batch * 4,
-            $alreadyOffered,
-        ), $batch);
 
-        if (empty($candidates)) {
-            // Nobody new in range this wave — count it and try again.
-            Cache::put($this->waveKey($trip), $wave + 1, now()->addHour());
-            $this->scheduleNextWave($trip);
+        // Each wave (round of offers) searches a ring: start radius, widening by the step up to the maximum.
+        // A ring with nobody new in it widens straight away without using up a wave. At the widest ring, an
+        // empty search does use a wave: it waits one offer period for drivers to come online or free up.
+        while (true) {
+            $wave = (int) Cache::get($this->waveKey($trip), 0);
+            if ($wave >= $settings->max_waves) {
+                $this->markNoDrivers($trip);
 
-            return;
+                return;
+            }
+            $ring = (int) Cache::get($this->ringKey($trip), 0);
+            $radius = $settings->radiusForWave($ring);
+            $candidates = $this->candidates($trip, $settings, $radius, $alreadyOffered);
+            $widest = $settings->radiusForWave($ring + 1) <= $radius;
+            Cache::put($this->ringKey($trip), $widest ? $ring : $ring + 1, now()->addHour());
+
+            if ($candidates) {
+                Cache::put($this->waveKey($trip), $wave + 1, now()->addHour());
+                break;
+            }
+            if ($widest) {
+                Cache::put($this->waveKey($trip), $wave + 1, now()->addHour());
+                $this->scheduleNextWave($trip, $settings);
+
+                return;
+            }
         }
 
-        $ttl = (int) config('dispatch.offer_ttl_seconds');
+        $ttl = $settings->offer_ttl_seconds;
         foreach ($candidates as $c) {
             $offer = TripOffer::query()->create([
                 'trip_id' => $trip->id,
                 'driver_id' => $c['driver_id'],
                 'distance_m' => $c['distance_m'],
+                'eta_s' => $c['eta_s'] ?? null,
+                'radius_m' => $radius,
+                'wave' => $wave + 1,
                 'offered_at' => now(),
                 'expires_at' => now()->addSeconds($ttl),
             ]);
             event(new TripOffered($offer));
         }
 
-        Cache::put($this->waveKey($trip), $wave + 1, now()->addHour());
-        $this->scheduleNextWave($trip);
+        $this->scheduleNextWave($trip, $settings);
+    }
+
+    /**
+     * Who gets this wave's offers: idle drivers of the right type within $radius, whose vehicle fits,
+     * not offered this trip before, best first by the area's ranking, cut to the batch (or broadcast limit).
+     *
+     * @param  array<int, int>  $exclude
+     * @return array<int, array{driver_id: int, distance_m: int, eta_s?: ?int}>
+     */
+    private function candidates(Trip $trip, DispatchSetting $s, int $radius, array $exclude): array
+    {
+        $limit = $s->isBroadcast() ? max(1, $s->broadcast_limit) : max(1, $s->batch_size);
+        $fetch = $s->isBroadcast() ? $limit * 2 : max($limit * 4, $s->ranking === 'eta' ? $s->eta_candidates : 0, $s->ranking === 'longest_idle' ? 50 : 0);
+
+        $nearby = $this->locations->nearbyIdle($trip->pickup_lat, $trip->pickup_lng, $radius, $trip->vehicle_type, $fetch, $exclude);
+        $fit = $this->fitting($trip, $nearby, PHP_INT_MAX);
+
+        $ranked = match ($s->ranking) {
+            'eta' => $this->byArrival($trip, $fit, max(1, $s->eta_candidates)),
+            'longest_idle' => $this->byLongestIdle($fit),
+            default => $fit, // already nearest first
+        };
+
+        return array_slice($ranked, 0, $limit);
+    }
+
+    /** Fastest by road first. Only the nearest $checkCount are routed (cost); the rest follow, nearest first. */
+    private function byArrival(Trip $trip, array $fit, int $checkCount): array
+    {
+        $check = array_values(array_filter(array_slice($fit, 0, $checkCount), fn ($c) => isset($c['lat'], $c['lng'])));
+        $rest = array_values(array_filter($fit, fn ($c) => ! in_array($c['driver_id'], array_column($check, 'driver_id'), true)));
+        if (! $check) {
+            return $fit;
+        }
+        $etas = app(DistanceProvider::class)->etaMany(array_map(fn ($c) => [$c['lat'], $c['lng']], $check), (float) $trip->pickup_lat, (float) $trip->pickup_lng);
+        foreach ($check as $i => &$c) {
+            $c['eta_s'] = $etas[$i] ?? null;
+        }
+        unset($c);
+        usort($check, fn ($a, $b) => [$a['eta_s'] === null, $a['eta_s'] ?? 0, $a['distance_m']] <=> [$b['eta_s'] === null, $b['eta_s'] ?? 0, $b['distance_m']]);
+
+        return array_merge($check, $rest);
+    }
+
+    /** Waiting longest first (unknown counts as just started); nearest breaks ties. */
+    private function byLongestIdle(array $fit): array
+    {
+        $now = now()->timestamp;
+        usort($fit, fn ($a, $b) => [$a['idle_since'] ?? $now, $a['distance_m']] <=> [$b['idle_since'] ?? $now, $b['distance_m']]);
+
+        return $fit;
     }
 
     /** Driver accepts an offer. Atomic — only one driver can win. */
@@ -141,6 +203,7 @@ class DispatchService
 
             $this->locations->setState($driver, 'busy');
             Cache::forget($this->waveKey($locked));
+            Cache::forget($this->ringKey($locked));
 
             event(new TripUpdated($locked));
 
@@ -173,6 +236,7 @@ class DispatchService
             event(new OfferWithdrawn($o->driver_id, $o->id, $trip->public_id, $reason));
         }
         Cache::forget($this->waveKey($trip));
+        Cache::forget($this->ringKey($trip));
     }
 
     private function markNoDrivers(Trip $trip): void
@@ -214,13 +278,19 @@ class DispatchService
         return $out;
     }
 
-    private function scheduleNextWave(Trip $trip): void
+    private function scheduleNextWave(Trip $trip, ?DispatchSetting $settings = null): void
     {
-        DispatchTripJob::dispatch($trip->id)->delay(now()->addSeconds((int) config('dispatch.offer_ttl_seconds')));
+        $ttl = ($settings ?? DispatchSetting::forTrip($trip))->offer_ttl_seconds;
+        DispatchTripJob::dispatch($trip->id)->delay(now()->addSeconds($ttl));
     }
 
     private function waveKey(Trip $trip): string
     {
         return "trip:{$trip->id}:dispatch_wave";
+    }
+
+    private function ringKey(Trip $trip): string
+    {
+        return "trip:{$trip->id}:dispatch_ring";
     }
 }

@@ -76,7 +76,7 @@ Google Places, called from the server so the key never ships for search and web 
 | POST | `/driver/vehicles/{id}/select` | | Set current vehicle (must be offline) |
 | POST | `/driver/online` · `/driver/offline` | | Requires approved profile + approved current vehicle |
 | POST | `/driver/location` | `lat, lng, heading?, speed?` | Send every 3–5 s while online. Doubles as heartbeat (90 s TTL). Returns `active_trip` for resync. |
-| GET | `/driver/offers` | | Pending offers (resync after reconnect), each with `estimated_earnings` (ex VAT, after commission) |
+| GET | `/driver/offers` | | Pending offers (resync after reconnect), each with `distance_m`, `eta_s` (road arrival seconds when the area ranks by arrival, else null) and `estimated_earnings` (ex VAT, after commission) |
 | GET | `/driver/trips` · `/driver/trips/active` · `/driver/trips/{id}` | | `{id}`: a trip this driver was assigned — e.g. to show that the rider cancelled |
 | POST | `/driver/trips/{id}/accept` | | 409 if taken/expired |
 | POST | `/driver/trips/{id}/decline` | | |
@@ -129,10 +129,16 @@ requested ──accept──► accepted ──arrive──► arrived ──sta
 
 ## Dispatch
 
+Set in the admin panel under **Settings → Driver dispatch**: one default, plus optional overrides per service area (the pickup's area decides).
+
 1. Rider requests → trip `requested`, `DispatchTripJob` queued.
-2. Each wave offers the trip to the `DISPATCH_BATCH_SIZE` (3) nearest idle drivers of that vehicle type within `DISPATCH_RADIUS_M` (8 km), via Redis GEO. Offers expire after `DISPATCH_OFFER_TTL` (20 s).
-3. First driver to `accept` wins (row lock); other offers are withdrawn. Declines by everyone trigger the next wave immediately.
-4. After `DISPATCH_MAX_WAVES` (4) with no acceptance → `no_drivers`.
+2. Candidates: idle, heartbeat-alive drivers of the vehicle type within the current search radius (Redis GEO), whose current vehicle fits the party, luggage and features, and who haven't been offered this trip before.
+3. **Strategy** — `waves`: the best `batch_size` get the offer; `broadcast`: every candidate (up to `broadcast_limit`) at once. Offers last `offer_ttl_seconds`; first to `accept` wins (row lock), the rest are withdrawn. Declines by everyone start the next wave immediately.
+4. **Ranking** ("best") — `distance`: nearest in a straight line; `eta`: fastest by road (the nearest `eta_candidates` are checked in one Google Route Matrix / OSRM table call; falls back to straight-line estimates); `longest_idle`: longest since going online or finishing a ride (`idle_since` in Redis).
+5. **Radius** starts at `radius_start_m` and widens by `radius_step_m` up to `radius_max_m`. A ring with nobody new widens at once without using a wave; at the widest ring an empty search uses a wave (waits one offer period for drivers to appear).
+6. After `max_waves` waves with no acceptance → `no_drivers` (longest wait ≈ `max_waves × offer_ttl_seconds`).
+
+Offers record `wave`, `radius_m` and, for `eta` ranking, `eta_s` (also sent to the driver in `/driver/offers` and the `trip.offered` event). The admin trip page lists every offer.
 
 ## Realtime (Laravel Reverb / Pusher protocol)
 

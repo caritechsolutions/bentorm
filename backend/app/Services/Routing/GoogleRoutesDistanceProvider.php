@@ -18,11 +18,56 @@ class GoogleRoutesDistanceProvider implements DistanceProvider
 {
     public const URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
 
+    public const MATRIX_URL = 'https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix';
+
     public function __construct(private readonly HaversineDistanceProvider $fallback) {}
 
     public function estimate(float $fromLat, float $fromLng, float $toLat, float $toLng): RouteEstimate
     {
         return $this->route([[$fromLat, $fromLng], [$toLat, $toLng]]);
+    }
+
+    /**
+     * Route Matrix (traffic-unaware, Essentials): every origin → one destination in a single request.
+     * Billed per element, so callers keep the origin list short.
+     */
+    public function etaMany(array $origins, float $toLat, float $toLng): array
+    {
+        $key = config('services.google_maps.server_key');
+        if (! $key || ! $origins) {
+            return $this->fallback->etaMany($origins, $toLat, $toLng);
+        }
+        $keys = array_keys($origins);
+        $wp = fn (float $lat, float $lng) => ['waypoint' => ['location' => ['latLng' => ['latitude' => $lat, 'longitude' => $lng]]]];
+        $body = [
+            'origins' => array_map(fn ($o) => $wp((float) $o[0], (float) $o[1]), array_values($origins)),
+            'destinations' => [$wp($toLat, $toLng)],
+            'travelMode' => 'DRIVE',
+            'routingPreference' => 'TRAFFIC_UNAWARE',
+        ];
+
+        try {
+            $res = Http::timeout(6)
+                ->withHeaders(['X-Goog-Api-Key' => $key, 'X-Goog-FieldMask' => 'originIndex,destinationIndex,duration,condition'])
+                ->post(self::MATRIX_URL, $body);
+            $elements = $res->json();
+            if ($res->successful() && is_array($elements) && array_is_list($elements)) {
+                $out = array_fill_keys($keys, null);
+                foreach ($elements as $e) {
+                    $i = $e['originIndex'] ?? 0; // proto3 JSON omits zero values
+                    if (isset($keys[$i]) && ($e['condition'] ?? '') === 'ROUTE_EXISTS' && isset($e['duration'])) {
+                        $out[$keys[$i]] = (int) rtrim((string) $e['duration'], 's');
+                    }
+                }
+
+                return $out;
+            }
+            Log::warning('Google Route Matrix failed', ['status' => $res->status(), 'body' => mb_substr(preg_replace('/\s+/', ' ', $res->body()), 0, 400)]);
+        } catch (\Throwable $e) {
+            Log::warning('Google Route Matrix failed: '.$e->getMessage());
+        }
+
+        return $this->fallback->etaMany($origins, $toLat, $toLng);
     }
 
     public function route(array $points): RouteEstimate

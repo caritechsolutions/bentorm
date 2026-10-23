@@ -40,6 +40,7 @@ class TripAdminController extends Controller
             'trip' => (new TripResource($trip))->resolve(),
             'offers' => $trip->offers->map(fn ($o) => [
                 'driver_id' => $o->driver_id, 'driver_name' => $o->driver?->name, 'distance_m' => $o->distance_m,
+                'eta_s' => $o->eta_s, 'wave' => $o->wave, 'radius_m' => $o->radius_m,
                 'response' => $o->response, 'offered_at' => $o->offered_at?->toIso8601String(), 'responded_at' => $o->responded_at?->toIso8601String(),
             ]),
             'route' => $trip->locations()->get(['lat', 'lng', 'speed_mps', 'heading', 'recorded_at']),

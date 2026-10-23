@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Trips;
 use App\Enums\TripStatus;
 use App\Filament\Resources\Trips\Pages\ListTrips;
 use App\Filament\Resources\Trips\Pages\ViewTrip;
+use App\Filament\Resources\Trips\RelationManagers\OffersRelationManager;
 use App\Filament\Resources\Trips\RelationManagers\PaymentsRelationManager;
 use App\Filament\Support\Ui;
 use App\Models\ServiceArea;
@@ -163,7 +164,7 @@ class TripResource extends Resource
 
     public static function getRelations(): array
     {
-        return [PaymentsRelationManager::class];
+        return [OffersRelationManager::class, PaymentsRelationManager::class];
     }
 
     public static function getPages(): array
