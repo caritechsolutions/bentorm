@@ -101,7 +101,16 @@ class DriverApi extends AuthApi {
 
   Future<DriverTrip> arrive(String tripId) async => DriverTrip.fromJson(_map(await client.post('/driver/trips/$tripId/arrive')));
 
-  Future<DriverTrip> start(String tripId) async => DriverTrip.fromJson(_map(await client.post('/driver/trips/$tripId/start')));
+  /// [pin] is the 4-digit code the rider reads out. Wrong/missing → ApiException 422 (errors.pin); too many tries → 429.
+  Future<DriverTrip> start(String tripId, String pin) async =>
+      DriverTrip.fromJson(_map(await client.post('/driver/trips/$tripId/start', {'pin': pin})));
+
+  Future<DriverTrip> acceptStops(String tripId) async => DriverTrip.fromJson(_map(await client.post('/driver/trips/$tripId/stops/accept')));
+
+  Future<DriverTrip> declineStops(String tripId) async => DriverTrip.fromJson(_map(await client.post('/driver/trips/$tripId/stops/decline')));
+
+  Future<DriverTrip> reachStop(String tripId, int index) async =>
+      DriverTrip.fromJson(_map(await client.post('/driver/trips/$tripId/stops/$index/reached')));
 
   Future<DriverTrip> complete(String tripId, {double? lat, double? lng}) async => DriverTrip.fromJson(
       _map(await client.post('/driver/trips/$tripId/complete', {if (lat != null) 'lat': lat, if (lng != null) 'lng': lng})));

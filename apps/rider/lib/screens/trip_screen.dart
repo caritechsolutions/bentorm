@@ -8,6 +8,7 @@ import '../api/models.dart';
 import '../brand.dart';
 import '../state/scope.dart';
 import '../widgets/ride_map.dart';
+import 'stops_screen.dart';
 
 /// A ride from request to rating. Refreshes every few seconds while the ride is live.
 class TripScreen extends StatefulWidget {
@@ -60,10 +61,16 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
     try {
       final snap = await AppScope.of(context).api.trip(_trip.id);
       if (!mounted || snap.trip == null) return;
+      final before = _trip.stopChange?.status;
       setState(() {
         _trip = snap.trip!;
         _driver = snap.driverPosition;
       });
+      final after = _trip.stopChange?.status;
+      if (before == 'pending' && after != null && after != 'pending' && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(after == 'accepted' ? 'Your driver accepted the change to your stops.' : 'Your driver couldn\'t change the stops. The ride continues as before.')));
+      }
       if (!_trip.isActive) _timer?.cancel();
     } on ApiException {
       // Keep showing the last known state; the next tick retries.
@@ -143,6 +150,7 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
               child: RideMap(
                 pickup: t.status == 'in_progress' ? null : LatLngPoint(t.pickup.lat, t.pickup.lng),
                 dropoff: LatLngPoint(t.dropoff.lat, t.dropoff.lng),
+                stops: [for (final s in t.remainingStops) s.point],
                 driver: driverPt,
                 bottomPadding: 320,
                 showMyLocation: t.isActive,
@@ -190,6 +198,7 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
           const Text('Matching you with a nearby driver…', style: TextStyle(fontSize: 16)),
           const SizedBox(height: 8),
           _routeSummary(t),
+          _changeStopsButton(t),
           _cancelButton(t),
         ];
       case 'accepted':
@@ -204,8 +213,11 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
               child: const Text('Your driver is waiting at the pickup point.', style: TextStyle(fontWeight: FontWeight.w600)),
             ),
           _driverCard(t),
+          if (t.pin != null && (t.status == 'accepted' || t.status == 'arrived')) _pinCard(t.pin!),
+          _stopChangeBanner(t),
           const SizedBox(height: 12),
           _routeSummary(t),
+          _changeStopsButton(t),
           if (t.canCancel) _cancelButton(t),
         ];
       case 'completed':
@@ -264,6 +276,7 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
 
   Widget _routeSummary(Trip t) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _line(Icons.trip_origin, Brand.blue, t.pickup.address ?? 'Pickup'),
+        for (final s in t.stops) _line(s.reached ? Icons.check_circle : Icons.adjust, s.reached ? const Color(0xFF1E9E5A) : Colors.orange, s.address ?? 'Stop'),
         _line(Icons.place, Brand.red, t.dropoff.address ?? 'Drop-off'),
         const SizedBox(height: 6),
         Text(
@@ -280,6 +293,73 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
           Expanded(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis)),
         ]),
       );
+
+  /// The rider reads this to the driver, who can't start the trip without it.
+  Widget _pinCard(String pin) => Container(
+        key: const Key('pin-card'),
+        margin: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: Brand.blue.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: Brand.blue)),
+        child: Row(children: [
+          const Icon(Icons.lock_outline, color: Brand.blue),
+          const SizedBox(width: 12),
+          const Expanded(child: Text('Your ride PIN — tell it to your driver when you get in. Only share it with the driver in this car.')),
+          const SizedBox(width: 8),
+          Text(pin.split('').join(' '), key: const Key('pin'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: 2, color: Brand.blue)),
+        ]),
+      );
+
+  Widget _stopChangeBanner(Trip t) {
+    final c = t.stopChange;
+    if (c == null || !c.pending) return const SizedBox.shrink();
+    return Container(
+      key: const Key('stop-change-pending'),
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Brand.yellow.withValues(alpha: 0.25), borderRadius: BorderRadius.circular(12)),
+      child: Row(children: [
+        const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+        const SizedBox(width: 12),
+        Expanded(child: Text('Waiting for your driver to accept the new stops${c.estimatedFare != null ? ' (new estimate ${money(c.estimatedFare, t.currency)})' : ''}.')),
+        TextButton(key: const Key('withdraw-stops'), onPressed: _busy ? null : _withdrawStops, child: const Text('Withdraw')),
+      ]),
+    );
+  }
+
+  Widget _changeStopsButton(Trip t) => t.canChangeStops && !(t.stopChange?.pending ?? false)
+      ? Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: OutlinedButton.icon(
+            key: const Key('change-stops'),
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+            onPressed: _busy ? null : _changeStops,
+            icon: const Icon(Icons.add_location_alt_outlined),
+            label: Text(t.stops.isEmpty ? 'Add a stop' : 'Change stops'),
+          ),
+        )
+      : const SizedBox.shrink();
+
+  Future<void> _changeStops() async {
+    final updated = await Navigator.of(context).push<Trip>(MaterialPageRoute(builder: (_) => StopsScreen(trip: _trip)));
+    if (updated != null && mounted) {
+      setState(() => _trip = updated);
+      if (updated.stopChange?.pending ?? false) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sent to your driver to accept.')));
+      }
+    }
+  }
+
+  Future<void> _withdrawStops() async {
+    setState(() => _busy = true);
+    try {
+      final t = await AppScope.of(context).api.withdrawStopChange(_trip.id);
+      if (mounted) setState(() => _trip = t);
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   Widget _cancelButton(Trip t) => Padding(
         padding: const EdgeInsets.only(top: 12),

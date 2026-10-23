@@ -279,6 +279,7 @@ class _OfferCardState extends State<OfferCard> {
       Text('Fare ${money(t.estimatedFare, t.currency.isEmpty ? null : t.currency)} · ${t.isCash ? 'Cash' : 'Card'}', style: const TextStyle(color: Colors.black54)),
       const Divider(height: 20),
       _line(Icons.trip_origin, Brand.blue, t.pickup.address ?? 'Pickup', '${distanceText(o.distanceM)} away'),
+      for (var i = 0; i < t.stops.length; i++) _line(Icons.adjust, Colors.orange, t.stops[i].address ?? 'Stop', 'Stop ${i + 1}'),
       _line(Icons.place, Brand.red, t.dropoff.address ?? 'Drop-off',
           [if (t.estimatedDistanceM != null) distanceText(t.estimatedDistanceM), if (t.estimatedDurationS != null) durationText(t.estimatedDurationS)].join(' · ')),
       const SizedBox(height: 6),

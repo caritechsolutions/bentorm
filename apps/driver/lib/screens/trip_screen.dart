@@ -49,7 +49,15 @@ class _TripScreenState extends State<TripScreen> {
     if (!mounted || !_trip.isActive) return;
     try {
       final t = await AppScope.of(context).api.trip(_trip.id);
-      if (mounted && (t.status != _trip.status)) _set(t);
+      if (!mounted || t.signature == _trip.signature) return;
+      final newRequest = t.hasPendingStopChange && !_trip.hasPendingStopChange;
+      final withdrawn = _trip.hasPendingStopChange && t.stopChange?.status == 'withdrawn';
+      _set(t);
+      if (newRequest) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.riderFirstName} wants to change the stops.')));
+      } else if (withdrawn) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.riderFirstName} withdrew the stop change.')));
+      }
     } on ApiException {
       // Try again next tick.
     }
@@ -70,6 +78,17 @@ class _TripScreenState extends State<TripScreen> {
   Future<void> _navigate(TripStop to) async {
     final url = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${to.lat},${to.lng}&travelmode=driving');
     await TripScreen.openUrl(url);
+  }
+
+  /// Asks for the rider's PIN and starts the trip. The dialog stays open on a wrong PIN.
+  Future<void> _start() async {
+    final api = AppScope.of(context).api;
+    final started = await showDialog<DriverTrip>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _PinDialog(riderName: _trip.riderFirstName, submit: (pin) => api.start(_trip.id, pin)),
+    );
+    if (started != null) _set(started);
   }
 
   Future<void> _complete() async {
@@ -122,6 +141,7 @@ class _TripScreenState extends State<TripScreen> {
               builder: (_, __) => DriverMap(
                 pickup: t.status == 'in_progress' ? null : t.pickup.point,
                 dropoff: t.status == 'accepted' ? null : t.dropoff.point,
+                stops: t.status == 'accepted' ? const [] : [for (final s in t.stops) if (!s.reached) s.point],
                 me: engine.position,
                 bottomPadding: 300,
               ),
@@ -176,11 +196,15 @@ class _TripScreenState extends State<TripScreen> {
       const Divider(height: 20),
     ];
 
+    final change = t.hasPendingStopChange ? [_stopChangeCard(t)] : const <Widget>[];
+
     switch (t.status) {
       case 'accepted':
         return [
+          ...change,
           ...riderInfo,
           _stop(Icons.trip_origin, Brand.blue, 'Pickup', t.pickup.address),
+          ..._onward(t),
           const SizedBox(height: 12),
           OutlinedButton.icon(key: const Key('navigate'), onPressed: () => _navigate(t.pickup), icon: const Icon(Icons.navigation), label: const Text('Navigate to pickup')),
           const SizedBox(height: 8),
@@ -189,20 +213,51 @@ class _TripScreenState extends State<TripScreen> {
         ];
       case 'arrived':
         return [
+          ...change,
           ...riderInfo,
-          _stop(Icons.place, Brand.red, 'Drop-off', t.dropoff.address),
+          ..._onward(t),
           const SizedBox(height: 12),
-          FilledButton(key: const Key('start'), onPressed: _busy ? null : () => _act(() => AppScope.of(context).api.start(t.id)), child: Text('Start trip with ${t.riderFirstName}')),
+          FilledButton.icon(
+            key: const Key('start'),
+            onPressed: _busy ? null : _start,
+            icon: const Icon(Icons.lock_open),
+            label: const Text('Enter PIN and start'),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text('Ask ${t.riderFirstName} for their 4-digit ride PIN.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54)),
+          ),
           _cancelButton(),
         ];
       case 'in_progress':
+        final next = t.nextStopIndex;
         return [
+          ...change,
           ...riderInfo,
-          _stop(Icons.place, Brand.red, 'Drop-off', t.dropoff.address),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(key: const Key('navigate'), onPressed: () => _navigate(t.dropoff), icon: const Icon(Icons.navigation), label: const Text('Navigate to drop-off')),
-          const SizedBox(height: 8),
-          FilledButton(key: const Key('complete'), onPressed: _busy ? null : _complete, child: const Text('Complete trip')),
+          if (next != null) ...[
+            _stop(Icons.adjust, Colors.orange, 'Stop ${next + 1} of ${t.stops.length}', t.stops[next].address, key: const Key('next-stop')),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(key: const Key('navigate'), onPressed: () => _navigate(t.stops[next]), icon: const Icon(Icons.navigation), label: Text('Navigate to stop ${next + 1}')),
+            const SizedBox(height: 8),
+            FilledButton(
+              key: const Key('reached-stop'),
+              onPressed: _busy ? null : () => _act(() => AppScope.of(context).api.reachStop(t.id, next)),
+              child: Text('Arrived at stop ${next + 1}'),
+            ),
+            const SizedBox(height: 12),
+            _stop(Icons.place, Brand.red, 'Then drop-off', t.dropoff.address),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: TextButton(key: const Key('complete'), onPressed: _busy ? null : _complete, child: const Text('Complete trip early')),
+            ),
+          ] else ...[
+            for (final s in t.stops) _stop(Icons.check_circle, const Color(0xFF1E9E5A), 'Stop done', s.address),
+            _stop(Icons.place, Brand.red, 'Drop-off', t.dropoff.address),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(key: const Key('navigate'), onPressed: () => _navigate(t.dropoff), icon: const Icon(Icons.navigation), label: const Text('Navigate to drop-off')),
+            const SizedBox(height: 8),
+            FilledButton(key: const Key('complete'), onPressed: _busy ? null : _complete, child: const Text('Complete trip')),
+          ],
         ];
       case 'completed':
         return [
@@ -236,7 +291,50 @@ class _TripScreenState extends State<TripScreen> {
     }
   }
 
-  Widget _stop(IconData icon, Color color, String label, String? address) => Row(children: [
+  /// Stops still to come, then the drop-off.
+  List<Widget> _onward(DriverTrip t) => [
+        for (var i = 0; i < t.stops.length; i++)
+          Padding(padding: const EdgeInsets.only(top: 8), child: _stop(Icons.adjust, Colors.orange, 'Stop ${i + 1}', t.stops[i].address)),
+        Padding(padding: const EdgeInsets.only(top: 8), child: _stop(Icons.place, Brand.red, 'Drop-off', t.dropoff.address)),
+      ];
+
+  Widget _stopChangeCard(DriverTrip t) {
+    final c = t.stopChange!;
+    final cur = t.currency.isEmpty ? null : t.currency;
+    return Container(
+      key: const Key('stop-change'),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Brand.yellow.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(14)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('${t.riderFirstName} wants to change the stops', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 6),
+        if (c.stops.isEmpty) const Text('Remove all stops and go straight to the drop-off.'),
+        for (var i = 0; i < c.stops.length; i++) Text('Stop ${i + 1}: ${c.stops[i].address ?? 'Stop'}'),
+        if (c.estimatedFare != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text('New fare estimate ${money(c.estimatedFare, cur)}', style: const TextStyle(color: Colors.black54))),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(
+            child: OutlinedButton(
+              key: const Key('decline-stops'),
+              onPressed: _busy ? null : () => _act(() => AppScope.of(context).api.declineStops(t.id)),
+              child: const Text('Decline'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: FilledButton(
+              key: const Key('accept-stops'),
+              onPressed: _busy ? null : () => _act(() => AppScope.of(context).api.acceptStops(t.id)),
+              child: const Text('Accept'),
+            ),
+          ),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _stop(IconData icon, Color color, String label, String? address, {Key? key}) => Row(key: key, children: [
         Icon(icon, color: color),
         const SizedBox(width: 10),
         Expanded(
@@ -250,5 +348,75 @@ class _TripScreenState extends State<TripScreen> {
   Widget _cancelButton() => Padding(
         padding: const EdgeInsets.only(top: 8),
         child: TextButton(key: const Key('cancel-ride'), onPressed: _busy ? null : _cancel, style: TextButton.styleFrom(foregroundColor: Brand.red), child: const Text('Cancel ride')),
+      );
+}
+
+/// Four-digit PIN entry. Calls [submit]; closes with the started trip, or shows the server's reason.
+class _PinDialog extends StatefulWidget {
+  const _PinDialog({required this.riderName, required this.submit});
+  final String riderName;
+  final Future<DriverTrip> Function(String pin) submit;
+
+  @override
+  State<_PinDialog> createState() => _PinDialogState();
+}
+
+class _PinDialogState extends State<_PinDialog> {
+  final _pin = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _pin.dispose();
+    super.dispose();
+  }
+
+  Future<void> _go() async {
+    final pin = _pin.text.trim();
+    if (!RegExp(r'^\d{4}$').hasMatch(pin)) {
+      setState(() => _error = 'The PIN is 4 digits.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final t = await widget.submit(pin);
+      if (mounted) Navigator.of(context).pop(t);
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() => _error = e.field('pin') ?? e.message);
+        _pin.clear();
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: Text('PIN from ${widget.riderName}'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('Ask the rider for the 4-digit PIN shown in their app. This makes sure you have the right person.'),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('pin-input'),
+            controller: _pin,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            maxLength: 4,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 28, letterSpacing: 12, fontWeight: FontWeight.bold),
+            decoration: const InputDecoration(counterText: '', hintText: '••••'),
+            onSubmitted: (_) => _go(),
+          ),
+          if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, key: const Key('pin-error'), style: const TextStyle(color: Brand.red))),
+        ]),
+        actions: [
+          TextButton(key: const Key('pin-cancel'), onPressed: _busy ? null : () => Navigator.of(context).pop(), child: const Text('Back')),
+          FilledButton(key: const Key('pin-submit'), onPressed: _busy ? null : _go, child: const Text('Start trip')),
+        ],
       );
 }

@@ -34,12 +34,15 @@ class RiderApi extends AuthApi {
   }
 
   // ---------------------------------------------------------------- fares + trips
-  Future<Estimate> estimate(Place pickup, Place dropoff, {int passengers = 1, int luggage = 0}) async =>
+  static Map<String, dynamic> _stop(Place p) => {'lat': p.lat, 'lng': p.lng, 'address': p.label};
+
+  Future<Estimate> estimate(Place pickup, Place dropoff, {int passengers = 1, int luggage = 0, List<Place> stops = const []}) async =>
       Estimate.fromJson(await client.post('/fares/estimate', {
         'pickup_lat': pickup.lat,
         'pickup_lng': pickup.lng,
         'dropoff_lat': dropoff.lat,
         'dropoff_lng': dropoff.lng,
+        if (stops.isNotEmpty) 'stops': stops.map(_stop).toList(),
         'passengers': passengers,
         'luggage': luggage,
       }) as Map<String, dynamic>);
@@ -54,6 +57,7 @@ class RiderApi extends AuthApi {
     int passengers = 1,
     int luggage = 0,
     List<String> features = const [],
+    List<Place> stops = const [],
     String? note,
   }) async =>
       Trip.fromJson(await client.post('/trips', {
@@ -69,12 +73,19 @@ class RiderApi extends AuthApi {
         'passengers': passengers,
         'luggage': luggage,
         if (features.isNotEmpty) 'features': features,
+        if (stops.isNotEmpty) 'stops': stops.map(_stop).toList(),
         if (note != null && note.trim().isNotEmpty) 'rider_note': note.trim(),
       }) as Map<String, dynamic>);
 
   Future<TripSnapshot> activeTrip() async => TripSnapshot.fromJson(await client.get('/trips/active') as Map<String, dynamic>);
 
   Future<TripSnapshot> trip(String id) async => TripSnapshot.fromJson(await client.get('/trips/$id') as Map<String, dynamic>);
+
+  /// Replace the stops not yet reached. After a driver accepted, the change waits for them (stopChange.pending).
+  Future<Trip> changeStops(String id, List<Place> stops) async =>
+      Trip.fromJson(await client.post('/trips/$id/stops', {'stops': stops.map(_stop).toList()}) as Map<String, dynamic>);
+
+  Future<Trip> withdrawStopChange(String id) async => Trip.fromJson(await client.delete('/trips/$id/stops/pending') as Map<String, dynamic>);
 
   Future<Trip> cancelTrip(String id, {String? reason}) async =>
       Trip.fromJson(await client.post('/trips/$id/cancel', {if (reason != null) 'reason': reason}) as Map<String, dynamic>);

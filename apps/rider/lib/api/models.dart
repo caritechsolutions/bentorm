@@ -158,12 +158,37 @@ class Vehicle {
 }
 
 class TripStop {
-  TripStop(this.lat, this.lng, this.address);
+  TripStop(this.lat, this.lng, this.address, [this.reachedAt]);
   final double lat;
   final double lng;
   final String? address;
 
-  factory TripStop.fromJson(Map<String, dynamic> j) => TripStop(_d(j['lat']), _d(j['lng']), _s(j['address']));
+  /// Extra stops only: when the driver got there.
+  final DateTime? reachedAt;
+
+  factory TripStop.fromJson(Map<String, dynamic> j) => TripStop(_d(j['lat']), _d(j['lng']), _s(j['address']), _dt(j['reached_at']));
+
+  bool get reached => reachedAt != null;
+  LatLngPoint get point => LatLngPoint(lat, lng);
+  Place toPlace() => Place(name: address ?? 'Stop', address: address, lat: lat, lng: lng);
+}
+
+/// A rider's change of stops during a ride: pending (the driver must confirm), accepted or declined.
+class StopChange {
+  StopChange({required this.status, required this.stops, this.estimatedFare, this.respondedAt});
+  final String status;
+  final List<TripStop> stops;
+  final double? estimatedFare;
+  final DateTime? respondedAt;
+
+  factory StopChange.fromJson(Map<String, dynamic> j) => StopChange(
+        status: _s(j['status']) ?? '',
+        stops: _l(j['stops']).map((e) => TripStop.fromJson(_m(e))).toList(),
+        estimatedFare: _dn(j['estimated_fare']),
+        respondedAt: _dt(j['responded_at']),
+      );
+
+  bool get pending => status == 'pending';
 }
 
 class Trip {
@@ -190,6 +215,10 @@ class Trip {
     this.requestedAt,
     this.completedAt,
     required this.rated,
+    this.stops = const [],
+    this.stopChange,
+    this.pin,
+    this.pinVerified = false,
   });
 
   final String id;
@@ -214,6 +243,14 @@ class Trip {
   final DateTime? requestedAt;
   final DateTime? completedAt;
   final bool rated;
+
+  /// Extra stops in order (reached ones have reachedAt).
+  final List<TripStop> stops;
+  final StopChange? stopChange;
+
+  /// The rider tells the driver this; the driver must enter it to start the trip.
+  final String? pin;
+  final bool pinVerified;
 
   factory Trip.fromJson(Map<String, dynamic> j) {
     final card = j['card'];
@@ -244,10 +281,19 @@ class Trip {
       requestedAt: _dt(ts['requested_at']),
       completedAt: _dt(ts['completed_at']),
       rated: _l(j['ratings']).isNotEmpty,
+      stops: _l(j['stops']).map((e) => TripStop.fromJson(_m(e))).toList(),
+      stopChange: j['stop_change'] is Map<String, dynamic> ? StopChange.fromJson(j['stop_change']) : null,
+      pin: _s(j['pin']),
+      pinVerified: j['pin_verified'] == true,
     );
   }
 
   bool get isActive => const ['pending_payment', 'requested', 'accepted', 'arrived', 'in_progress'].contains(status);
+
+  /// Stops can be changed until the ride ends.
+  bool get canChangeStops => isActive;
+
+  List<TripStop> get remainingStops => stops.where((s) => !s.reached).toList();
   bool get hasDriver => const ['accepted', 'arrived', 'in_progress'].contains(status);
   bool get canCancel => const ['pending_payment', 'requested', 'accepted', 'arrived'].contains(status);
 

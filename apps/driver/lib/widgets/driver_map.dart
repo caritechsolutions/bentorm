@@ -15,6 +15,7 @@ class DriverMap extends StatefulWidget {
     super.key,
     this.pickup,
     this.dropoff,
+    this.stops = const [],
     this.me,
     this.route,
     this.center,
@@ -27,6 +28,7 @@ class DriverMap extends StatefulWidget {
 
   final LatLngPoint? pickup;
   final LatLngPoint? dropoff;
+  final List<LatLngPoint> stops;
   final LatLngPoint? me;
   final List<LatLngPoint>? route;
   final LatLngPoint? center;
@@ -45,11 +47,12 @@ class _DriverMapState extends State<DriverMap> {
   List<LatLngPoint> get _points => [
         if (widget.pickup != null) widget.pickup!,
         if (widget.dropoff != null) widget.dropoff!,
+        ...widget.stops,
         if (widget.me != null) widget.me!,
       ];
 
   String _signature(DriverMap w) =>
-      [w.pickup, w.dropoff, w.me, w.center].map((p) => p is LatLngPoint ? '${p.lat},${p.lng}' : '$p').join('|');
+      [w.pickup, w.dropoff, ...w.stops, w.me, w.center].map((p) => p is LatLngPoint ? '${p.lat},${p.lng}' : '$p').join('|');
 
   @override
   void didUpdateWidget(DriverMap old) {
@@ -104,6 +107,13 @@ class _DriverMapState extends State<DriverMap> {
           position: _ll(widget.dropoff!),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
           infoWindow: const InfoWindow(title: 'Drop-off'),
+        ),
+      for (var i = 0; i < widget.stops.length; i++)
+        Marker(
+          markerId: MarkerId('stop-$i'),
+          position: _ll(widget.stops[i]),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+          infoWindow: InfoWindow(title: 'Stop ${i + 1}'),
         ),
     };
     final route = widget.route;

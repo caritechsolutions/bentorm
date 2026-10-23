@@ -23,6 +23,8 @@ class _HomeScreenState extends State<HomeScreen> {
   LatLngPoint? _me;
   Place? _pickup;
   Place? _dropoff;
+  final List<Place> _stops = [];
+  static const maxStops = 2;
   Estimate? _estimate;
   String? _estimateError;
   bool _estimating = false;
@@ -106,6 +108,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _addStop() async {
+    final place = await Navigator.of(context).push<Place>(MaterialPageRoute(
+      builder: (_) => SearchScreen(title: 'Add a stop', near: _me ?? (_pickup == null ? null : LatLngPoint(_pickup!.lat, _pickup!.lng))),
+    ));
+    if (place != null && mounted) {
+      setState(() => _stops.add(place));
+      _quote();
+    }
+  }
+
+  void _removeStop(int i) {
+    setState(() => _stops.removeAt(i));
+    _quote();
+  }
+
   Future<void> _quote() async {
     if (_pickup == null || _dropoff == null) return;
     setState(() {
@@ -113,7 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _estimateError = null;
     });
     try {
-      final e = await AppScope.of(context).api.estimate(_pickup!, _dropoff!, passengers: _passengers, luggage: _luggage);
+      final e = await AppScope.of(context).api.estimate(_pickup!, _dropoff!, passengers: _passengers, luggage: _luggage, stops: _stops);
       if (!mounted) return;
       setState(() {
         _estimate = e;
@@ -124,7 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       setState(() {
         _estimate = null;
-        _estimateError = e.field('pickup') ?? e.field('dropoff') ?? e.message;
+        _estimateError = e.field('pickup') ?? e.field('dropoff') ?? e.field('stops') ?? e.field('stops.0') ?? e.field('stops.1') ?? e.message;
       });
     } finally {
       if (mounted) setState(() => _estimating = false);
@@ -148,6 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
         passengers: _passengers,
         luggage: _luggage,
         features: _features.toList(),
+        stops: _stops,
       );
       if (!mounted) return;
       await _openTrip(trip);
@@ -165,6 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // Back from the trip: start fresh from where the rider is.
     setState(() {
       _dropoff = null;
+      _stops.clear();
       _estimate = null;
       _estimateError = null;
     });
@@ -259,7 +278,14 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: RideMap(pickup: pickupPt, dropoff: dropPt, route: _estimate?.route?.polyline, center: _me, bottomPadding: _dropoff == null ? 220 : 420),
+            child: RideMap(
+              pickup: pickupPt,
+              dropoff: dropPt,
+              stops: [for (final s in _stops) LatLngPoint(s.lat, s.lng)],
+              route: _estimate?.route?.polyline,
+              center: _me,
+              bottomPadding: _dropoff == null ? 220 : 420,
+            ),
           ),
           SafeArea(
             child: Padding(
@@ -329,7 +355,28 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         _StopRow(icon: Icons.trip_origin, color: Brand.blue, label: _pickup?.label ?? '', onTap: _choosePickup),
         const SizedBox(height: 6),
+        for (var i = 0; i < _stops.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Row(children: [
+              const Icon(Icons.adjust, color: Colors.orange, size: 20),
+              const SizedBox(width: 12),
+              Expanded(child: Text('Stop ${i + 1}: ${_stops[i].label}', key: Key('stop-$i'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15))),
+              IconButton(key: Key('remove-stop-$i'), visualDensity: VisualDensity.compact, tooltip: 'Remove stop', icon: const Icon(Icons.close, size: 18), onPressed: () => _removeStop(i)),
+            ]),
+          ),
+        const SizedBox(height: 6),
         _StopRow(icon: Icons.place, color: Brand.red, label: _dropoff!.label, onTap: _chooseDropoff),
+        if (_stops.length < maxStops)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const Key('add-stop'),
+              onPressed: _addStop,
+              icon: const Icon(Icons.add_location_alt_outlined, size: 18),
+              label: Text(_stops.isEmpty ? 'Add a stop' : 'Add another stop'),
+            ),
+          ),
         if (route != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -377,6 +424,7 @@ class _HomeScreenState extends State<HomeScreen> {
         TextButton(
           onPressed: () => setState(() {
             _dropoff = null;
+            _stops.clear();
             _estimate = null;
             _estimateError = null;
           }),

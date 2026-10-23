@@ -50,6 +50,10 @@ void main() {
     await tapKey(tester, 'arrived');
     expect(find.text('Waiting for Rita'), findsOneWidget);
     await tapKey(tester, 'start');
+    expect(find.text('PIN from Rita'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('pin-input')), '4821');
+    await tapKey(tester, 'pin-submit');
+    expect(jsonDecode(server.calls('POST /driver/trips/$tripId/start').single.body), {'pin': '4821'});
     expect(find.text('Taking Rita'), findsOneWidget);
     await tapKey(tester, 'complete');
     await tapKey(tester, 'confirm-complete');

@@ -52,8 +52,8 @@ class FakeServer {
 }
 
 /// Offers captured earlier have expired; push their deadline into the future.
-Map<String, dynamic> freshOffers() {
-  final o = fixture('offers') as Map<String, dynamic>;
+Map<String, dynamic> freshOffers([String name = 'offers']) {
+  final o = fixture(name) as Map<String, dynamic>;
   for (final offer in o['offers'] as List) {
     (offer as Map<String, dynamic>)['expires_at'] = DateTime.now().toUtc().add(const Duration(seconds: 20)).toIso8601String();
   }

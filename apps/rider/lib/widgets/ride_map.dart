@@ -13,6 +13,7 @@ class RideMap extends StatefulWidget {
     super.key,
     this.pickup,
     this.dropoff,
+    this.stops = const [],
     this.driver,
     this.route,
     this.center,
@@ -25,6 +26,7 @@ class RideMap extends StatefulWidget {
 
   final LatLngPoint? pickup;
   final LatLngPoint? dropoff;
+  final List<LatLngPoint> stops;
   final LatLngPoint? driver;
   final List<LatLngPoint>? route;
   final LatLngPoint? center;
@@ -42,12 +44,13 @@ class _RideMapState extends State<RideMap> {
 
   List<LatLngPoint> get _points => [
         if (widget.pickup != null) widget.pickup!,
+        ...widget.stops,
         if (widget.dropoff != null) widget.dropoff!,
         if (widget.driver != null) widget.driver!,
       ];
 
   String _signature(RideMap w) =>
-      [w.pickup, w.dropoff, w.driver != null, w.center].map((p) => p is LatLngPoint ? '${p.lat},${p.lng}' : '$p').join('|');
+      [w.pickup, w.dropoff, ...w.stops, w.driver != null, w.center].map((p) => p is LatLngPoint ? '${p.lat},${p.lng}' : '$p').join('|');
 
   @override
   void didUpdateWidget(RideMap old) {
@@ -102,6 +105,13 @@ class _RideMapState extends State<RideMap> {
           position: _ll(widget.dropoff!),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
           infoWindow: const InfoWindow(title: 'Drop-off'),
+        ),
+      for (var i = 0; i < widget.stops.length; i++)
+        Marker(
+          markerId: MarkerId('stop-$i'),
+          position: _ll(widget.stops[i]),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+          infoWindow: InfoWindow(title: 'Stop ${i + 1}'),
         ),
       if (widget.driver != null)
         Marker(

@@ -201,12 +201,31 @@ class DocItem {
 }
 
 class TripStop {
-  TripStop(this.lat, this.lng, this.address);
+  TripStop(this.lat, this.lng, this.address, [this.reachedAt]);
   final double lat;
   final double lng;
   final String? address;
-  factory TripStop.fromJson(Map<String, dynamic> j) => TripStop(_d(j['lat']), _d(j['lng']), _s(j['address']));
+  final DateTime? reachedAt;
+  factory TripStop.fromJson(Map<String, dynamic> j) => TripStop(_d(j['lat']), _d(j['lng']), _s(j['address']), _dt(j['reached_at']));
   LatLngPoint get point => LatLngPoint(lat, lng);
+  bool get reached => reachedAt != null;
+}
+
+/// A rider's mid-ride request to change the stops; the driver accepts or declines it.
+class StopChange {
+  StopChange({required this.status, required this.stops, this.estimatedFare});
+  final String status; // pending | accepted | declined | withdrawn
+  final List<TripStop> stops;
+  final double? estimatedFare;
+  bool get pending => status == 'pending';
+  static StopChange? fromJson(dynamic v) {
+    if (v is! Map<String, dynamic>) return null;
+    return StopChange(
+      status: _s(v['status']) ?? '',
+      stops: _l(v['stops']).map((e) => TripStop.fromJson(_m(e))).toList(),
+      estimatedFare: _dn(v['estimated_fare']),
+    );
+  }
 }
 
 /// A trip as the driver sees it.
@@ -233,6 +252,9 @@ class DriverTrip {
     this.cancellationReason,
     this.requestedAt,
     this.completedAt,
+    this.stops = const [],
+    this.stopChange,
+    this.pinVerified = false,
   });
 
   final String id;
@@ -256,6 +278,9 @@ class DriverTrip {
   final String? cancellationReason;
   final DateTime? requestedAt;
   final DateTime? completedAt;
+  final List<TripStop> stops;
+  final StopChange? stopChange;
+  final bool pinVerified;
 
   factory DriverTrip.fromJson(Map<String, dynamic> j) {
     final est = _m(j['estimate']);
@@ -283,8 +308,24 @@ class DriverTrip {
       cancellationReason: _s(j['cancellation_reason']),
       requestedAt: _dt(ts['requested_at']),
       completedAt: _dt(ts['completed_at']),
+      stops: _l(j['stops']).map((e) => TripStop.fromJson(_m(e))).toList(),
+      stopChange: StopChange.fromJson(j['stop_change']),
+      pinVerified: j['pin_verified'] == true,
     );
   }
+
+  /// Index (in [stops]) of the next stop to drive to, or null when only the drop-off is left.
+  int? get nextStopIndex {
+    for (var i = 0; i < stops.length; i++) {
+      if (!stops[i].reached) return i;
+    }
+    return null;
+  }
+
+  bool get hasPendingStopChange => stopChange?.pending ?? false;
+
+  /// Changes when anything the trip screen shows changes (used to decide whether a poll result is new).
+  String get signature => [status, for (final s in stops) '${s.lat},${s.lng},${s.reached}', stopChange?.status, stopChange?.stops.length].join('|');
 
   bool get isActive => const ['accepted', 'arrived', 'in_progress'].contains(status);
   bool get canCancel => const ['accepted', 'arrived'].contains(status);
