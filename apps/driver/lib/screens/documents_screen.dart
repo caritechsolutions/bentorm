@@ -72,7 +72,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     final items = _items;
     return Scaffold(
       appBar: AppBar(title: Text(widget.vehicle == null ? 'Your documents' : 'Vehicle ${widget.vehicle!.plate}')),
-      body: ListView(padding: const EdgeInsets.all(16), children: [
+      body: SingleChildScrollView(padding: const EdgeInsets.all(16), physics: const AlwaysScrollableScrollPhysics(), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const Text('Take clear, well-lit photos with all four corners showing. We review them, usually within a day.', style: TextStyle(color: Colors.black54)),
         const SizedBox(height: 12),
         if (_error != null) Text(_error!, style: const TextStyle(color: Brand.red)),
@@ -94,7 +94,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                 onTap: () => _open(d),
               ),
             ),
-      ]),
+      ])),
     );
   }
 }

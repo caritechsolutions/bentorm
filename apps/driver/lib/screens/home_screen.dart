@@ -352,11 +352,11 @@ class _Menu extends StatelessWidget {
               const SizedBox(width: 16),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(user?.name ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text(user?.name ?? '', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   if (profile != null)
                     Row(children: [
                       const Icon(Icons.star, size: 16, color: Brand.yellow),
-                      Text(' ${profile.rating.toStringAsFixed(1)} · ${profile.completedTrips} trips'),
+                      Flexible(child: Text(' ${profile.rating.toStringAsFixed(1)} · ${profile.completedTrips} trips', overflow: TextOverflow.ellipsis)),
                     ]),
                 ]),
               ),

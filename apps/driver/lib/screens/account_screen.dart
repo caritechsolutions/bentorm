@@ -58,7 +58,7 @@ class _AccountScreenState extends State<AccountScreen> {
       appBar: AppBar(title: const Text('Your account')),
       body: RefreshIndicator(
         onRefresh: _load,
-        child: ListView(padding: const EdgeInsets.all(16), children: [
+        child: SingleChildScrollView(padding: const EdgeInsets.all(16), physics: const AlwaysScrollableScrollPhysics(), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (_error != null) Text(_error!, style: const TextStyle(color: Brand.red)),
           if (s == null && _error == null) const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator())),
           if (s != null) ...[
@@ -99,7 +99,7 @@ class _AccountScreenState extends State<AccountScreen> {
               onTap: s.profile.currentVehicle == null ? null : () => _push(DocumentsScreen(vehicle: s.profile.currentVehicle)),
             ),
           ],
-        ]),
+        ])),
       ),
     );
   }

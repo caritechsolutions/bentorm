@@ -109,7 +109,7 @@ class _VehicleFormState extends State<VehicleForm> {
     final editingApproved = widget.vehicle?.status == 'approved';
     return Scaffold(
       appBar: AppBar(title: Text(widget.vehicle == null ? 'Add your vehicle' : 'Your vehicle')),
-      body: ListView(padding: const EdgeInsets.all(16), children: [
+      body: SingleChildScrollView(padding: const EdgeInsets.all(16), physics: const AlwaysScrollableScrollPhysics(), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (editingApproved)
           Container(
             padding: const EdgeInsets.all(12),
@@ -160,7 +160,7 @@ class _VehicleFormState extends State<VehicleForm> {
         if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, key: const Key('error'), style: const TextStyle(color: Brand.red))),
         const SizedBox(height: 24),
         FilledButton(key: const Key('save'), onPressed: _busy ? null : _save, child: Text(widget.vehicle == null ? 'Add vehicle' : 'Save changes')),
-      ]),
+      ])),
     );
   }
 }

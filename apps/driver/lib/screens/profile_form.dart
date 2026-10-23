@@ -83,7 +83,7 @@ class _ProfileFormState extends State<ProfileForm> {
     final areas = _areas;
     return Scaffold(
       appBar: AppBar(title: const Text('Your details')),
-      body: ListView(padding: const EdgeInsets.all(16), children: [
+      body: SingleChildScrollView(padding: const EdgeInsets.all(16), physics: const AlwaysScrollableScrollPhysics(), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const Text('Where will you drive?', style: TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         if (areas == null)
@@ -112,7 +112,7 @@ class _ProfileFormState extends State<ProfileForm> {
         if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, key: const Key('error'), style: const TextStyle(color: Brand.red))),
         const SizedBox(height: 24),
         FilledButton(key: const Key('save'), onPressed: _busy ? null : _save, child: const Text('Save')),
-      ]),
+      ])),
     );
   }
 }

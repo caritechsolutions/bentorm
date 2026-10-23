@@ -9,14 +9,17 @@ void main() {
   testWidgets('online → offer with earnings → accept → arrive → start → complete → collect cash', (tester) async {
     final tripId = fixture('trip_accepted')['id'] as String;
     var offers = fixture('offers_none');
+    // Like the real server: every action moves the trip on, and GET returns where it is now.
+    dynamic current = fixture('trip_accepted');
+    Handler step(String name) => (_) => current = fixture(name);
     final server = driverServer()
       ..on('POST /driver/online', fixture('online'))
       ..handle('GET /driver/offers', (_) => offers)
-      ..on('POST /driver/trips/$tripId/accept', fixture('trip_accepted'))
-      ..on('GET /driver/trips/$tripId', fixture('trip_accepted'))
-      ..on('POST /driver/trips/$tripId/arrive', fixture('trip_arrived'))
-      ..on('POST /driver/trips/$tripId/start', fixture('trip_started'))
-      ..on('POST /driver/trips/$tripId/complete', fixture('trip_completed'));
+      ..handle('POST /driver/trips/$tripId/accept', step('trip_accepted'))
+      ..handle('GET /driver/trips/$tripId', (_) => current)
+      ..handle('POST /driver/trips/$tripId/arrive', step('trip_arrived'))
+      ..handle('POST /driver/trips/$tripId/start', step('trip_started'))
+      ..handle('POST /driver/trips/$tripId/complete', step('trip_completed'));
     final app = await pumpDriverApp(tester, server);
 
     expect(find.text('OFFLINE'), findsOneWidget);

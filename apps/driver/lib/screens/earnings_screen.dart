@@ -33,7 +33,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
     final e = _e;
     return Scaffold(
       appBar: AppBar(title: const Text('Earnings')),
-      body: ListView(padding: const EdgeInsets.all(16), children: [
+      body: SingleChildScrollView(padding: const EdgeInsets.all(16), physics: const AlwaysScrollableScrollPhysics(), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (_error != null) Text(_error!, style: const TextStyle(color: Brand.red)),
         if (e == null && _error == null) const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator())),
         if (e != null) ...[
@@ -53,7 +53,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
           const Text('Earnings are your share after the Ride Coop fee, before tax. Cash you collected is already in your pocket.',
               style: TextStyle(color: Colors.black54, fontSize: 13)),
         ],
-      ]),
+      ])),
     );
   }
 }
