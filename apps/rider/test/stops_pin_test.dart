@@ -102,7 +102,7 @@ void main() {
     expect(find.textContaining('BBD 77.50'), findsOneWidget);
     expect(find.byKey(const Key('change-stops')), findsNothing);
 
-    current = {'trip': fixture('stop_change_declined'), 'driver_position': null};
+    current = fixture('stop_change_declined') as Map<String, dynamic>;
     await tester.pump(const Duration(seconds: 5));
     await settle(tester);
     expect(find.byKey(const Key('stop-change-pending')), findsNothing);
@@ -113,18 +113,14 @@ void main() {
 
   testWidgets('driver accepts the new stop', (tester) async {
     final server = signedInServer()..on('GET /trips/active', {'trip': fixture('stop_change_pending'), 'driver_position': null});
-    var current = {'trip': fixture('stop_change_pending'), 'driver_position': null};
+    Map<String, dynamic> current = {'trip': fixture('stop_change_pending'), 'driver_position': null};
     server.handle('GET /trips/$tripId', (_) => current);
     await pumpApp(tester, server);
     expect(find.byKey(const Key('stop-change-pending')), findsOneWidget);
 
-    current = {'trip': fixture('stop_change_accepted'), 'driver_position': null};
+    current = fixture('stop_change_accepted') as Map<String, dynamic>;
     await tester.pump(const Duration(seconds: 5));
     await settle(tester);
-    for (final w in tester.widgetList<Text>(find.byType(Text))) {
-      // ignore: avoid_print
-      print('TEXT: ${w.data}');
-    }
     expect(find.textContaining('accepted the change'), findsOneWidget);
     expect(find.text('Welches'), findsOneWidget);
     await unmount(tester);
