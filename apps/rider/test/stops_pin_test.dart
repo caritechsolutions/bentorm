@@ -121,6 +121,10 @@ void main() {
     current = {'trip': fixture('stop_change_accepted'), 'driver_position': null};
     await tester.pump(const Duration(seconds: 5));
     await settle(tester);
+    for (final w in tester.widgetList<Text>(find.byType(Text))) {
+      // ignore: avoid_print
+      print('TEXT: ${w.data}');
+    }
     expect(find.textContaining('accepted the change'), findsOneWidget);
     expect(find.text('Welches'), findsOneWidget);
     await unmount(tester);

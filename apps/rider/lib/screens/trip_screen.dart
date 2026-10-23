@@ -30,6 +30,7 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
   int _stars = 0;
   final _comment = TextEditingController();
   bool _rated = false;
+  String? _stopNotice; // the driver's answer to a stop change, until the rider closes it
 
   @override
   void initState() {
@@ -68,8 +69,11 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
       });
       final after = _trip.stopChange?.status;
       if (before == 'pending' && after != null && after != 'pending' && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(after == 'accepted' ? 'Your driver accepted the change to your stops.' : 'Your driver couldn\'t change the stops. The ride continues as before.')));
+        setState(() => _stopNotice = after == 'accepted'
+            ? 'Your driver accepted the change to your stops.'
+            : after == 'declined'
+                ? 'Your driver couldn\'t change the stops. The ride continues as before.'
+                : null);
       }
       if (!_trip.isActive) _timer?.cancel();
     } on ApiException {
@@ -215,6 +219,17 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
           _driverCard(t),
           if (t.pin != null && (t.status == 'accepted' || t.status == 'arrived')) _pinCard(t.pin!),
           _stopChangeBanner(t),
+          if (_stopNotice != null)
+            Container(
+              key: const Key('stop-change-result'),
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.only(left: 12),
+              decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12)),
+              child: Row(children: [
+                Expanded(child: Text(_stopNotice!)),
+                IconButton(key: const Key('close-stop-result'), icon: const Icon(Icons.close, size: 18), onPressed: () => setState(() => _stopNotice = null)),
+              ]),
+            ),
           const SizedBox(height: 12),
           _routeSummary(t),
           _changeStopsButton(t),
@@ -342,10 +357,10 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
   Future<void> _changeStops() async {
     final updated = await Navigator.of(context).push<Trip>(MaterialPageRoute(builder: (_) => StopsScreen(trip: _trip)));
     if (updated != null && mounted) {
-      setState(() => _trip = updated);
-      if (updated.stopChange?.pending ?? false) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sent to your driver to accept.')));
-      }
+      setState(() {
+        _trip = updated;
+        _stopNotice = null;
+      });
     }
   }
 

@@ -39,6 +39,7 @@ void main() {
     expect(find.text('Note: By the blue gate'), findsOneWidget);
     expect(find.byKey(const Key('offer-countdown')), findsOneWidget);
 
+    offers = fixture('offers_none'); // like the server: an accepted ride is no longer offered
     await tapKey(tester, 'accept');
     expect(server.calls('POST /driver/trips/$tripId/accept'), hasLength(1));
     expect(find.text('Pick up Rita'), findsOneWidget);
