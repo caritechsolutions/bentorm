@@ -14,3 +14,6 @@ Schedule::call(fn () => app(App\Services\OrderService::class)->expireUnanswered(
 Schedule::call(fn () => app(App\Services\OrderService::class)->dispatchDue())->everyMinute()->name('orders:dispatch')->withoutOverlapping();
 // Rides booked for later: hold the card and start finding a driver shortly before pickup.
 Schedule::call(fn () => app(App\Services\TripService::class)->startDueScheduled())->everyMinute()->name('trips:scheduled')->withoutOverlapping();
+// Safety: calls nobody answered become "missed"; chat is kept 30 days.
+Schedule::call(fn () => app(App\Services\CallService::class)->expireRinging())->everyMinute()->name('calls:expire')->withoutOverlapping();
+Schedule::call(fn () => App\Models\TripMessage::query()->where('created_at', '<', now()->subDays(30))->delete())->daily()->name('chat:prune');

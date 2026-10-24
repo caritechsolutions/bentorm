@@ -15,6 +15,9 @@
 #   SMTP_HOST, SMTP_PORT (465), SMTP_ENCRYPTION (ssl|tls|none), SMTP_USER, SMTP_PASSWORD, SMTP_FROM, SMTP_FROM_NAME
 #                               email sender for sign-in codes and receipts (stored encrypted in the gateways table)
 #   TWILIO_SID, TWILIO_TOKEN [, TWILIO_FROM | TWILIO_MESSAGING_SID]  SMS sender for sign-in codes
+#   TURN_HOST=turn.ridecoop.net  install the call relay (coturn) here for in-app calls; the name must point at this
+#                               server's public IP. Forward UDP+TCP 3478 and UDP 49160-49200 to this server.
+#                               TURN_PUBLIC_IP=1.2.3.4 if the public IP can't be detected. Re-runs keep the secret.
 #   FIREBASE_CREDENTIALS=/root/firebase.json  Firebase service-account key file, for push notifications
 #                               (stored encrypted in the gateways table; delete the file afterwards)
 #                               (no FROM: the account's first SMS-capable number is used)
@@ -212,6 +215,46 @@ if [[ -n "${TWILIO_SID:-}" ]]; then
   php artisan bentorm:gateway twilio --name="SMS (Twilio)" "${TW_ARGS[@]}" --test 2>&1 | sed 's/^/    /' || warn "Twilio test failed - see above"
 fi
 
+# ---------------------------------------------------------------- call relay (optional)
+if [[ -n "${TURN_HOST:-}" ]] || dpkg -s coturn >/dev/null 2>&1; then
+  TURN_HOST="${TURN_HOST:-$(grep '^TURN_URLS=' "$ENV_FILE" | sed -E 's|^TURN_URLS=turn:([^:]+):.*|\1|' || true)}"
+  log "Configuring the call relay (coturn) for $TURN_HOST"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq coturn >/dev/null
+  TURN_SECRET=$(grep '^TURN_SECRET=' "$ENV_FILE" | cut -d= -f2 || true)
+  [[ -z "$TURN_SECRET" ]] && TURN_SECRET=$(rand 'A-Za-z0-9' 40)
+  PUBLIC_IP="${TURN_PUBLIC_IP:-$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)}"
+  PRIVATE_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+  EXTERNAL="${PUBLIC_IP:+external-ip=$PUBLIC_IP${PRIVATE_IP:+/$PRIVATE_IP}}"
+  cat > /etc/turnserver.conf <<TURN
+# Ride Coop call relay — written by scripts/install.sh. The API hands apps short-lived logins (use-auth-secret).
+listening-port=3478
+min-port=49160
+max-port=49200
+fingerprint
+use-auth-secret
+static-auth-secret=$TURN_SECRET
+realm=$TURN_HOST
+$EXTERNAL
+no-cli
+no-multicast-peers
+no-tlsv1
+no-tlsv1_1
+# Never relay into private networks (the server's own LAN).
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+total-quota=300
+TURN
+  sed -i 's/^#\?TURNSERVER_ENABLED=.*/TURNSERVER_ENABLED=1/' /etc/default/coturn 2>/dev/null || true
+  systemctl enable --now coturn >/dev/null 2>&1 || true
+  systemctl restart coturn
+  set_env TURN_URLS "turn:$TURN_HOST:3478?transport=udp,turn:$TURN_HOST:3478?transport=tcp"
+  set_env TURN_SECRET "$TURN_SECRET"
+  if [[ -z "$PUBLIC_IP" ]]; then
+    warn "Could not detect the public IP — set TURN_PUBLIC_IP=... and run again (calls behind NAT need it)."
+  fi
+fi
+
 log "Caching configuration and routes"
 php artisan config:cache --quiet
 php artisan route:cache --quiet
@@ -271,6 +314,7 @@ echo "  Google Maps : $(grep -q '^GOOGLE_MAPS_SERVER_KEY=.\+' "$ENV_FILE" && ech
 echo "  SMS         : $(php artisan tinker --execute='$g=app(App\Plugins\PluginManager::class)->gatewayFor(App\Enums\GatewayType::Sms); echo $g ? "{$g->name} ({$g->plugin})".($g->last_test_result ? " - last test {$g->last_test_result}" : "") : "none (codes only in the log)";' 2>/dev/null | tail -1)"
 echo "  Email       : $(php artisan tinker --execute='$g=app(App\Plugins\PluginManager::class)->gatewayFor(App\Enums\GatewayType::Email); echo $g ? "{$g->name} ({$g->plugin})".($g->last_test_result ? " - last test {$g->last_test_result}" : "") : "none";' 2>/dev/null | tail -1)"
 echo "  Push        : $(php artisan tinker --execute='$g=app(App\Plugins\PluginManager::class)->gatewayFor(App\Enums\GatewayType::Push); echo $g ? "{$g->name} ({$g->plugin})".($g->last_test_result ? " - last test {$g->last_test_result}" : "") : "none (apps must be open to see new rides)";' 2>/dev/null | tail -1)"
+echo "  Call relay  : $(systemctl is-active coturn 2>/dev/null | grep -qx active && echo "coturn active (turn:$(grep '^TURN_URLS=' "$ENV_FILE" | sed -E 's|^TURN_URLS=turn:([^:]+):.*|\1|'):3478) — forward UDP+TCP 3478 and UDP 49160-49200 to $IP" || echo "not installed — pass TURN_HOST=turn.yourdomain to add it (calls still work on most networks)")"
 echo "  Config      : $ENV_FILE"
 echo
 echo "$ADMIN_LOGIN" | sed 's/^/  /'

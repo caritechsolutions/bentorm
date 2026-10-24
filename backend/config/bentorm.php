@@ -4,6 +4,22 @@ return [
     // Name riders and drivers see (SMS codes, emails, payment pages).
     'brand_name' => env('BRAND_NAME', 'Ride Coop'),
 
+    // Shown on the SOS screen (Barbados: Police 211, Ambulance 511, Fire 311).
+    'emergency_numbers' => [
+        ['name' => 'Police', 'number' => env('EMERGENCY_POLICE', '211')],
+        ['name' => 'Ambulance', 'number' => env('EMERGENCY_AMBULANCE', '511')],
+        ['name' => 'Fire', 'number' => env('EMERGENCY_FIRE', '311')],
+    ],
+
+    // In-app calls (WebRTC). STUN finds a direct path; TURN relays when networks block it. TURN_SECRET is coturn's
+    // static-auth-secret: the apps get short-lived credentials (scripts/install-turn.sh sets both).
+    'calls' => [
+        'stun' => array_filter(explode(',', (string) env('STUN_URLS', 'stun:stun.l.google.com:19302'))),
+        'turn' => array_filter(explode(',', (string) env('TURN_URLS', ''))),
+        'turn_secret' => env('TURN_SECRET'),
+        'turn_ttl' => (int) env('TURN_TTL', 3600),
+    ],
+
     // Extra stops a rider may add between pickup and drop-off.
     'max_stops' => (int) env('MAX_STOPS', 2),
     // Wrong ride-PIN entries before the driver must wait pin_lock_minutes.

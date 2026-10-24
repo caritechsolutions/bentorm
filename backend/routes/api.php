@@ -45,6 +45,7 @@ Route::prefix('v1')->group(function () {
         'navigation' => ['in_app' => app(\App\Services\NavigationPolicy::class)->blockedReason() === null],
         // Feature switches (Settings → App features): the apps hide what is off, no new build needed.
         'features' => \App\Support\Features::forApps(),
+        'emergency_numbers' => \App\Services\SafetyService::emergencyNumbers(),
     ]);
     // Shop browsing is public (the app shows stores before sign-in).
     Route::get('shop/categories', [\App\Http\Controllers\Api\V1\Shop\ShopController::class, 'categories']);

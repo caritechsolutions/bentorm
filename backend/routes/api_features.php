@@ -72,3 +72,69 @@ Route::post('promo-codes/check', function (\Illuminate\Http\Request $request, \A
     return ['code' => $p->code, 'summary' => $p->summary(), 'description' => $p->description,
         'discount' => isset($d['amount']) ? $p->discountOn((float) $d['amount']) : null];
 })->middleware('throttle:20,1');
+
+// Safety: share my trip, SOS
+Route::post('trips/{trip}/share', function (\Illuminate\Http\Request $request, \App\Models\Trip $trip, \App\Services\SafetyService $safety) {
+    $url = $safety->shareLink($trip, $request->user());
+
+    return ['url' => $url, 'text' => sprintf('Follow my %s live on Ride Coop: %s', $trip->order_id ? 'delivery' : 'ride', $url)];
+})->middleware('throttle:20,1');
+Route::post('sos', function (\Illuminate\Http\Request $request, \App\Services\SafetyService $safety) {
+    $d = $request->validate(['trip_id' => ['nullable', 'string'], 'lat' => ['nullable', 'numeric', 'between:-90,90'], 'lng' => ['nullable', 'numeric', 'between:-180,180']]);
+    $trip = isset($d['trip_id']) ? \App\Models\Trip::query()->where('public_id', $d['trip_id'])->first() : $request->user()->activeTrip();
+    $alert = $safety->sos($request->user(), $trip, isset($d['lat']) ? (float) $d['lat'] : null, isset($d['lng']) ? (float) $d['lng'] : null);
+
+    return ['alert_id' => $alert->id, 'message' => 'Ride Coop has been alerted and can see where you are. If you are in danger, call the police now.',
+        'emergency_numbers' => \App\Services\SafetyService::emergencyNumbers(), 'share_url' => $trip?->share_token ? url('/t/'.$trip->share_token) : null];
+})->middleware('throttle:10,1');
+
+// Chat between rider (or customer) and driver
+Route::get('trips/{trip}/messages', fn (\Illuminate\Http\Request $request, \App\Models\Trip $trip, \App\Services\ChatService $chat) => [
+    'messages' => $chat->list($trip, $request->user(), (int) $request->query('after', 0)),
+    'open' => $chat->canChat($trip),
+]);
+Route::post('trips/{trip}/messages', function (\Illuminate\Http\Request $request, \App\Models\Trip $trip, \App\Services\ChatService $chat) {
+    $d = $request->validate(['body' => ['required', 'string', 'max:500']]);
+
+    return response()->json($chat->send($trip, $request->user(), $d['body'])->load('sender')->toApi($request->user()), 201);
+})->middleware('throttle:30,1');
+
+// In-app calls (WebRTC audio/video) with a phone-bridge fallback
+Route::post('trips/{trip}/calls', function (\Illuminate\Http\Request $request, \App\Models\Trip $trip, \App\Services\CallService $calls) {
+    $d = $request->validate(['video' => ['nullable', 'boolean']]);
+
+    return response()->json($calls->toApi($calls->start($trip, $request->user(), (bool) ($d['video'] ?? false)), $request->user()), 201);
+})->middleware('throttle:20,1');
+Route::get('calls/incoming', function (\Illuminate\Http\Request $request, \App\Services\CallService $calls) {
+    $calls->expireRinging();
+    $c = \App\Models\Call::query()->where('callee_id', $request->user()->id)->where('status', 'ringing')->latest('id')->first();
+
+    return ['call' => $c ? $calls->toApi($c, $request->user()) : null];
+});
+Route::get('calls/{call}', function (\Illuminate\Http\Request $request, \App\Models\Call $call, \App\Services\CallService $calls) {
+    abort_unless($call->involves($request->user()), 404);
+    $calls->expireRinging();
+
+    return $calls->toApi($call->fresh(), $request->user());
+});
+Route::post('calls/{call}/{action}', function (\Illuminate\Http\Request $request, \App\Models\Call $call, string $action, \App\Services\CallService $calls) {
+    $u = $request->user();
+    $call = match ($action) {
+        'accept' => $calls->answer($call, $u, true),
+        'decline' => $calls->answer($call, $u, false),
+        'end' => $calls->end($call, $u),
+        'phone' => $calls->phoneBridge($call, $u),
+    };
+
+    return $calls->toApi($call, $u);
+})->whereIn('action', ['accept', 'decline', 'end', 'phone'])->middleware('throttle:30,1');
+Route::post('calls/{call}/signal', function (\Illuminate\Http\Request $request, \App\Models\Call $call, \App\Services\CallService $calls) {
+    $d = $request->validate(['type' => ['required', 'in:offer,answer,candidate'], 'payload' => ['required', 'array']]);
+    $calls->signal($call, $request->user(), $d['type'], $d['payload']);
+
+    return ['ok' => true];
+})->middleware('throttle:300,1');
+Route::get('calls/{call}/signals', fn (\Illuminate\Http\Request $request, \App\Models\Call $call, \App\Services\CallService $calls) => [
+    'signals' => $calls->signals($call, $request->user(), (int) $request->query('after', 0)),
+    'status' => $call->fresh()->status,
+]);

@@ -10,6 +10,31 @@ Route::get('/', fn () => match (request()->getHost()) {
     default => response()->json(['service' => 'bentorm-api', 'health' => '/api/v1/health']),
 });
 
+// Share my trip: a public live page (no login) while the trip runs and an hour after.
+Route::get('/t/{token}', function (string $token, App\Services\SafetyService $safety) {
+    $trip = $safety->sharedTrip($token);
+    abort_unless($trip, 404);
+
+    return view('share.trip', ['token' => $token, 'trip' => $trip]);
+})->where('token', '[A-Za-z0-9]+')->middleware('throttle:60,1');
+Route::get('/t/{token}.json', function (string $token, App\Services\SafetyService $safety, App\Services\DriverLocationService $locations) {
+    $t = $safety->sharedTrip($token);
+    abort_unless($t, 404);
+    $v = $t->vehicle;
+
+    return response()->json([
+        'status' => $t->status->value,
+        'kind' => $t->order_id ? 'delivery' : 'ride',
+        'rider' => $t->rider?->firstName(),
+        'driver' => $t->driver?->firstName(),
+        'vehicle' => $v ? trim("{$v->colour} {$v->make} {$v->model}").' · '.$v->plate : null,
+        'pickup' => ['lat' => (float) $t->pickup_lat, 'lng' => (float) $t->pickup_lng, 'address' => $t->pickup_address],
+        'dropoff' => ['lat' => (float) $t->dropoff_lat, 'lng' => (float) $t->dropoff_lng, 'address' => $t->dropoff_address],
+        'driver_position' => $t->isActive() && $t->driver_id && ($p = $locations->position($t->driver_id))
+            ? ['lat' => $p['lat'], 'lng' => $p['lng'], 'heading' => $p['heading']] : null,
+    ])->header('Cache-Control', 'no-store');
+})->where('token', '[A-Za-z0-9]+')->middleware('throttle:120,1');
+
 // Web pages inside the apps (help, support, statements…): routes/app.php
 Route::prefix('app')->group(base_path('routes/app.php'));
 

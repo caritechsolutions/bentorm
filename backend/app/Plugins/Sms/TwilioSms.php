@@ -27,6 +27,8 @@ class TwilioSms extends AbstractPlugin implements SmsPlugin
             ['key' => 'from', 'label' => 'From number / sender ID', 'type' => 'string',
                 'help' => 'Leave empty to use the first SMS-capable number on the Twilio account (or set a Messaging Service)'],
             ['key' => 'messaging_service_sid', 'label' => 'Messaging Service SID', 'type' => 'string'],
+            ['key' => 'voice_from', 'label' => 'Voice number (phone-bridge calls)', 'type' => 'string',
+                'help' => 'Leave empty to use the first voice-capable number on the account. Used when an in-app call can\'t connect.'],
         ];
     }
 
@@ -89,6 +91,43 @@ class TwilioSms extends AbstractPlugin implements SmsPlugin
         } catch (\Throwable $e) {
             return ['ok' => false, 'message' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Phone-bridge call (fallback when the in-app call can't connect): Twilio rings $first, then connects them to
+     * $second, showing the Twilio number to both — neither sees the other's real number.
+     */
+    public function bridge(string $first, string $second): string
+    {
+        $sid = $this->cfg('account_sid');
+        $from = $this->voiceNumber();
+        $twiml = '<Response><Say>Connecting your '.e(config('bentorm.brand_name', 'Ride Coop')).' call.</Say><Dial callerId="'.e($from).'" timeout="30">'
+            .e($second).'</Dial></Response>';
+        $res = $this->http()->asForm()->post("https://api.twilio.com/2010-04-01/Accounts/{$sid}/Calls.json", ['To' => $first, 'From' => $from, 'Twiml' => $twiml]);
+        if (! $res->successful()) {
+            throw new RuntimeException('Twilio '.$res->status().': '.($res->json('message') ?? mb_substr($res->body(), 0, 300)));
+        }
+
+        return (string) $res->json('sid');
+    }
+
+    /** The configured voice number, else the first voice-capable number on the account (looked up once a day). */
+    public function voiceNumber(): string
+    {
+        if ($from = $this->cfg('voice_from')) {
+            return (string) $from;
+        }
+        $sid = (string) $this->cfg('account_sid');
+
+        return Cache::remember('twilio:voice:'.$sid, now()->addDay(), function () use ($sid) {
+            $res = $this->http()->get("https://api.twilio.com/2010-04-01/Accounts/{$sid}/IncomingPhoneNumbers.json", ['PageSize' => 50]);
+            $number = collect($res->json('incoming_phone_numbers', []))->first(fn ($n) => ($n['capabilities']['voice'] ?? false) === true);
+            if (! $res->successful() || ! $number) {
+                throw new RuntimeException('No voice-capable Twilio number. Buy one in Twilio (Phone Numbers → Buy a number, with Voice).');
+            }
+
+            return (string) $number['phone_number'];
+        });
     }
 
     private function http()

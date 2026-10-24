@@ -57,6 +57,11 @@ class TripResource extends Resource
             'payable' => $this->final_fare !== null ? $this->resource->payable() : null,
             'promo_code' => $this->promo_code_id ? \App\Models\PromoCode::query()->whereKey($this->promo_code_id)->value('code') : null,
             'use_credit' => (bool) $this->use_credit,
+            // Safety: chat and in-app calls while a driver is on the way / on the trip (no phone numbers shared).
+            'can_chat' => ($isRiderOrAdmin || $isDriverOrAdmin) && app(\App\Services\ChatService::class)->canChat($this->resource),
+            'can_call' => ($isRiderOrAdmin || $isDriverOrAdmin) && app(\App\Services\CallService::class)->canCall($this->resource),
+            'unread_messages' => $request->user() ? \App\Models\TripMessage::query()->where('trip_id', $this->id)
+                ->where('sender_id', '!=', $request->user()->id)->whereNull('read_at')->count() : 0,
             'can_tip' => $isRiderOrAdmin && app(\App\Services\TipService::class)->canTip($this->resource, $request->user()),
             'platform_fee' => $this->when($request->user()?->isAdmin() ?? false, $this->platform_fee),
             'currency' => $this->currency,

@@ -86,7 +86,8 @@ class OrderResource extends JsonResource
             'status' => $status,
             'driver' => $withDriver ? [
                 'name' => $trip->driver->firstName(),
-                'phone' => $trip->driver->phone,
+                // With in-app calls on, numbers stay private (call through the app).
+                'phone' => \App\Support\Features::on('masked_calls') ? null : $trip->driver->phone,
                 'vehicle' => $v ? ['make' => $v->make, 'model' => $v->model, 'colour' => $v->colour, 'plate' => $v->plate] : null,
             ] : null,
             'driver_position' => $withDriver ? app(DriverLocationService::class)->position($trip->driver_id) : null,
