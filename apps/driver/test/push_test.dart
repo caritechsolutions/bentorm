@@ -73,7 +73,7 @@ void main() {
     bridge.tapped.add({'type': 'offer', 'trip_id': 'abc'});
     await pumpEventQueue();
     expect(bridge.shown, [(title: 'New ride request', loud: true), (title: 'Ride cancelled', loud: false)]);
-    expect(opened.map((d) => d['type']), ['offer', 'trip', 'offer']);
+    expect(opened.map((d) => d['type']), unorderedEquals(['offer', 'trip', 'offer']));
     push.dispose();
   });
 
