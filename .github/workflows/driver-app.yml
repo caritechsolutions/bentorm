@@ -54,7 +54,8 @@ jobs:
         run: |
           set -o pipefail
           flutter test --reporter expanded 2>&1 | tee /tmp/test-output.txt
-      # Push notifications: google-services.json from the GOOGLE_SERVICES_JSON secret (never committed).
+      # Push notifications: google-services.json from the GOOGLE_SERVICES_JSON repository secret (never committed;
+      # without it the build still works, with push off).
       - name: Firebase config
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
