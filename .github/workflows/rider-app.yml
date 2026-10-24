@@ -69,17 +69,20 @@ jobs:
         run: |
           set -o pipefail
           flutter test --reporter expanded 2>&1 | tee /tmp/test-output.txt
+      - name: Build APK
+        run: |
+          set -o pipefail
+          flutter build apk --debug --dart-define=API_BASE=$API_BASE 2>&1 | tee /tmp/build.txt
       # Logs aren't reachable from the dev workspace; on failure publish them to the ci-logs branch.
       - name: Publish test log on failure
         if: failure()
         working-directory: .
         run: |
-          mkdir -p /tmp/ci && cp /tmp/test-output.txt /tmp/ci/ 2>/dev/null || true; cp /tmp/analyze.txt /tmp/ci/ 2>/dev/null || true
+          mkdir -p /tmp/ci && cp /tmp/test-output.txt /tmp/ci/ 2>/dev/null || true; cp /tmp/analyze.txt /tmp/ci/ 2>/dev/null || true; tail -c 200000 /tmp/build.txt > /tmp/ci/build.txt 2>/dev/null || true
           cd /tmp/ci && git init -q && git checkout -q -b ci-logs
           git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           echo "${GITHUB_SHA}" > sha.txt && git add -A && git commit -qm "Test log for ${GITHUB_SHA}"
           git push -qf "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" ci-logs
-      - run: flutter build apk --debug --dart-define=API_BASE=$API_BASE
       - name: Build web
         run: |
           flutter build web --release --dart-define=API_BASE=$API_BASE
