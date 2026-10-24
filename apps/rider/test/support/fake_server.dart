@@ -74,6 +74,12 @@ Future<void> settle(WidgetTester tester, [int frames = 12]) async {
 
 Future<void> tapKey(WidgetTester tester, String key) async {
   final f = find.byKey(Key(key));
+  if (f.evaluate().isEmpty) {
+    // Say what IS on screen, so a CI failure explains itself.
+    final keys = find.byWidgetPredicate((w) => w.key is ValueKey<String>).evaluate().map((e) => (e.widget.key as ValueKey<String>).value).toSet();
+    final texts = find.byType(Text).evaluate().map((e) => (e.widget as Text).data).whereType<String>().take(40).toList();
+    fail('No widget with key "$key". Keys on screen: $keys\nTexts on screen: $texts');
+  }
   await tester.ensureVisible(f);
   await tester.pump();
   await tester.tap(f);

@@ -171,9 +171,11 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
       appBar: AppBar(title: Text('Order ${o.number}')),
       body: RefreshIndicator(
         onRefresh: _refresh,
-        child: ListView(
+        // Not a lazy ListView: the whole order is built, so nothing (the PIN, the cancel button) depends on scrolling.
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          children: [
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text(o.headline, key: const Key('order-headline'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             if (o.status == 'placed')
@@ -299,7 +301,7 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
               const SizedBox(height: 24),
               OutlinedButton(key: const Key('cancel-order'), onPressed: _busy ? null : _cancel, child: const Text('Cancel order')),
             ],
-          ],
+          ]),
         ),
       ),
     );
