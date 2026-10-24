@@ -678,9 +678,11 @@ class _AccountDrawer extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.logout),
               title: const Text('Sign out'),
-              onTap: () {
+              onTap: () async {
+                final push = AppScope.of(context).push;
                 Navigator.pop(context);
-                session.signOut();
+                await push?.forget();
+                await session.signOut();
               },
             ),
           ],

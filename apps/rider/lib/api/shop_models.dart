@@ -234,6 +234,48 @@ class ChangeRequest {
       );
 }
 
+/// Where the delivery stands, the driver, and the hand-over PIN (only the customer gets it).
+class DeliveryState {
+  DeliveryState({this.status, this.driverName, this.driverPhone, this.vehicle, this.driverLat, this.driverLng, this.pin, required this.noDriverAlert, required this.canCancel});
+
+  /// searching · driver_assigned · at_store · on_the_way · delivered (null before a driver is asked for)
+  final String? status;
+  final String? driverName;
+  final String? driverPhone;
+  final String? vehicle; // "Blue Toyota Corolla · PB123"
+  final double? driverLat;
+  final double? driverLng;
+  final String? pin;
+  final bool noDriverAlert;
+  final bool canCancel;
+
+  bool get hasDriver => driverName != null;
+
+  static DeliveryState? fromJson(dynamic v) {
+    if (v is! Map<String, dynamic>) return null;
+    final d = _m(v['driver']);
+    final car = _m(d['vehicle']);
+    final pos = _m(v['driver_position']);
+    final carText = car.isEmpty
+        ? null
+        : [
+            [_s(car['colour']), _s(car['make']), _s(car['model'])].whereType<String>().where((x) => x.isNotEmpty).join(' '),
+            if (_s(car['plate']) != null) _s(car['plate'])!,
+          ].where((x) => x.isNotEmpty).join(' · ');
+    return DeliveryState(
+      status: _s(v['status']),
+      driverName: d.isEmpty ? null : _s(d['name']),
+      driverPhone: _s(d['phone']),
+      vehicle: carText,
+      driverLat: pos.isEmpty ? null : _d(pos['lat']),
+      driverLng: pos.isEmpty ? null : _d(pos['lng']),
+      pin: _s(v['pin']),
+      noDriverAlert: v['no_driver_alert'] == true,
+      canCancel: v['can_cancel'] == true,
+    );
+  }
+}
+
 class Order {
   Order({
     required this.id,
@@ -259,7 +301,18 @@ class Order {
     this.createdAt,
     this.expiresAt,
     this.readyBy,
+    this.delivery,
+    this.storeLat,
+    this.storeLng,
+    this.dropoffLat,
+    this.dropoffLng,
   });
+
+  final DeliveryState? delivery;
+  final double? storeLat;
+  final double? storeLng;
+  final double? dropoffLat;
+  final double? dropoffLng;
 
   final String id;
   final String number;
@@ -285,20 +338,27 @@ class Order {
   final DateTime? expiresAt;
   final DateTime? readyBy;
 
-  bool get isActive => const ['pending_payment', 'placed', 'accepted', 'ready'].contains(status);
-  bool get canCancel => status == 'pending_payment' || status == 'placed';
+  bool get isActive => const ['pending_payment', 'placed', 'accepted', 'ready', 'picked_up'].contains(status);
+  bool get canCancel => delivery?.canCancel ?? (status == 'pending_payment' || status == 'placed');
   bool get needsBank => status == 'pending_payment' && redirectUrl != null;
   bool get hasPendingChange => changeRequest?.pending == true;
 
-  /// Step on the progress bar: 0 sent, 1 store accepted, 2 ready (3 = on the way, phase 3).
-  int get step => switch (status) { 'accepted' => 1, 'ready' => 2, _ => 0 };
+  /// Step on the progress bar: 0 sent, 1 preparing, 2 ready, 3 on the way, 4 delivered.
+  int get step => switch (status) { 'accepted' => 1, 'ready' => 2, 'picked_up' => 3, 'delivered' => 4, _ => 0 };
+
+  String get _driver => delivery?.driverName ?? 'Your driver';
 
   /// One line for what's happening now.
   String get headline => switch (status) {
         'pending_payment' => 'Confirm the payment with your bank',
         'placed' => 'Waiting for $storeName to accept',
+        'accepted' || 'ready' when delivery?.status == 'at_store' => '$_driver is collecting your order',
+        'accepted' || 'ready' when delivery?.status == 'driver_assigned' => '$_driver will collect your order',
+        'accepted' || 'ready' when delivery?.noDriverAlert == true => 'Still looking for a driver',
         'accepted' => '$storeName is preparing your order',
         'ready' => 'Your order is packed and ready',
+        'picked_up' => '$_driver is on the way with your order',
+        'delivered' => 'Delivered — enjoy!',
         'declined' => '$storeName couldn\'t take your order',
         'expired' => '$storeName didn\'t answer in time',
         'cancelled' => cancelledBy == 'system' ? 'Your card wasn\'t accepted' : 'Order cancelled',
@@ -335,6 +395,11 @@ class Order {
       createdAt: _dt(ts['created_at']),
       expiresAt: _dt(ts['expires_at']),
       readyBy: _dt(ts['ready_by']),
+      delivery: DeliveryState.fromJson(j['delivery']),
+      storeLat: store['lat'] == null ? null : _d(store['lat']),
+      storeLng: store['lng'] == null ? null : _d(store['lng']),
+      dropoffLat: _m(j['dropoff'])['lat'] == null ? null : _d(_m(j['dropoff'])['lat']),
+      dropoffLng: _m(j['dropoff'])['lng'] == null ? null : _d(_m(j['dropoff'])['lng']),
     );
   }
 }

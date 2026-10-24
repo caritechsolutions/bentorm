@@ -9,4 +9,7 @@ class AppConfig {
   /// Where riders land when nothing else is known: Bridgetown, Barbados.
   static const defaultLat = 13.0969;
   static const defaultLng = -59.6145;
+
+  /// Push notifications: CI sets PUSH=true when it packaged google-services.json (Firebase starts natively from it).
+  static const pushConfigured = bool.fromEnvironment('PUSH');
 }

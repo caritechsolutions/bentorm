@@ -69,10 +69,23 @@ jobs:
         run: |
           set -o pipefail
           flutter test --reporter expanded 2>&1 | tee /tmp/test-output.txt
+      # Push notifications: google-services.json from the GOOGLE_SERVICES_JSON repository secret (the same file as the
+      # driver app — it lists both apps; never committed). Without it the build still works, with push off.
+      - name: Firebase config
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then echo "::warning::GOOGLE_SERVICES_JSON secret not set - push notifications off in this build"; exit 0; fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          if ! jq -e --arg p "$ANDROID_APP_ID" '.client[] | select(.client_info.android_client_info.package_name==$p)' android/app/google-services.json >/dev/null; then
+            echo "::warning::$ANDROID_APP_ID is not in google-services.json - push off"; rm android/app/google-services.json; exit 0
+          fi
+          echo "FIREBASE_DEFINES=--dart-define=PUSH=true" >> "$GITHUB_ENV"
+          echo "Push: configured for $ANDROID_APP_ID"
       - name: Build APK
         run: |
           set -o pipefail
-          flutter build apk --debug --dart-define=API_BASE=$API_BASE 2>&1 | tee /tmp/build.txt
+          flutter build apk --debug --dart-define=API_BASE=$API_BASE $FIREBASE_DEFINES 2>&1 | tee /tmp/build.txt
       # Logs aren't reachable from the dev workspace; on failure publish them to the ci-logs branch.
       - name: Publish test log on failure
         if: failure()

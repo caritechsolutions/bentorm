@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
+import '../../api/models.dart' show LatLngPoint;
 import '../../api/shop_models.dart';
 import '../../brand.dart';
 import '../../state/scope.dart';
+import '../../widgets/ride_map.dart';
 import 'checkout_screen.dart';
 
 /// Follow an order: progress, the store's questions, what was ordered and what it costs.
@@ -104,6 +106,62 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
     return '$h:${at.minute.toString().padLeft(2, '0')} ${at.hour < 12 ? 'am' : 'pm'}';
   }
 
+  /// The driver, their car, a call button, and where they are now.
+  List<Widget> _driverSection(Order o) {
+    final d = o.delivery!;
+    final driverPt = d.driverLat != null && d.driverLng != null ? LatLngPoint(d.driverLat!, d.driverLng!) : null;
+    return [
+      const SizedBox(height: 16),
+      Row(key: const Key('order-driver'), children: [
+        CircleAvatar(backgroundColor: Brand.yellow, child: Text(d.driverName!.isEmpty ? '?' : d.driverName![0].toUpperCase(), style: const TextStyle(color: Brand.charcoal))),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(d.driverName!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            if (d.vehicle != null) Text(d.vehicle!, style: const TextStyle(color: Colors.black54)),
+          ]),
+        ),
+        if (d.driverPhone != null)
+          IconButton.filledTonal(
+            key: const Key('call-driver'),
+            tooltip: 'Call ${d.driverName}',
+            onPressed: () => CheckoutScreen.openUrl(Uri.parse('tel:${d.driverPhone!.replaceAll(RegExp(r'[^0-9+]'), '')}')),
+            icon: const Icon(Icons.phone),
+          ),
+      ]),
+      if (RideMap.enabled && driverPt != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: SizedBox(
+              height: 220,
+              child: RideMap(
+                pickup: o.status == 'picked_up' || o.storeLat == null ? null : LatLngPoint(o.storeLat!, o.storeLng!),
+                dropoff: o.dropoffLat == null ? null : LatLngPoint(o.dropoffLat!, o.dropoffLng!),
+                driver: driverPt,
+              ),
+            ),
+          ),
+        ),
+    ];
+  }
+
+  /// The customer reads this to the driver at the door; the driver can't finish without it.
+  Widget _pinCard(String pin) => Container(
+        key: const Key('delivery-pin-card'),
+        margin: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: Brand.blue.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: Brand.blue)),
+        child: Row(children: [
+          const Icon(Icons.lock_outline, color: Brand.blue),
+          const SizedBox(width: 12),
+          const Expanded(child: Text('Your delivery PIN — tell it to the driver when they hand you the order. Don\'t share it before.')),
+          const SizedBox(width: 8),
+          Text(pin.split('').join(' '), key: const Key('delivery-pin'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: 2, color: Brand.blue)),
+        ]),
+      );
+
   @override
   Widget build(BuildContext context) {
     final o = _order;
@@ -127,8 +185,14 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
               ),
             if (o.status == 'accepted' && o.readyBy != null)
               Text('Ready around ${_clockText(o.readyBy)}', style: const TextStyle(color: Colors.black54)),
-            if (o.status == 'ready')
+            if (o.status == 'ready' && !(o.delivery?.hasDriver ?? false))
               const Text('A driver will bring it to you. We\'ll let you know when it\'s on the way.', style: TextStyle(color: Colors.black54)),
+            if (o.delivery?.noDriverAlert == true && o.isActive)
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Text('Drivers are busy right now and we keep trying. You can also cancel — nothing is charged.',
+                    key: Key('no-driver-note'), style: TextStyle(color: Brand.red)),
+              ),
             if ((o.status == 'declined' || o.status == 'cancelled' || o.status == 'expired'))
               Text(
                 [
@@ -138,7 +202,9 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
                 key: const Key('order-ended'),
                 style: const TextStyle(color: Colors.black54),
               ),
-            if (o.isActive && o.status != 'pending_payment') ...[const SizedBox(height: 16), _Progress(step: o.step)],
+            if ((o.isActive && o.status != 'pending_payment') || o.status == 'delivered') ...[const SizedBox(height: 16), _Progress(step: o.step)],
+            if (o.isActive && (o.delivery?.hasDriver ?? false)) ..._driverSection(o),
+            if (o.isActive && o.delivery?.pin != null && o.status != 'placed') _pinCard(o.delivery!.pin!),
             if (o.needsBank) ...[
               const SizedBox(height: 16),
               FilledButton.icon(
@@ -216,7 +282,7 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  '${o.cardLabel} · ${switch (o.paymentStatus) { 'paid' => 'charged', 'authorized' => 'held, charged when ready', 'released' => 'hold released', 'failed' => 'not accepted', _ => 'waiting' }}',
+                  '${o.cardLabel} · ${switch (o.paymentStatus) { 'paid' => 'charged', 'authorized' => 'held, charged on delivery', 'released' => 'hold released', 'failed' => 'not accepted', _ => 'waiting' }}',
                   style: const TextStyle(color: Colors.black54),
                 ),
               ),
@@ -244,7 +310,7 @@ class _Progress extends StatelessWidget {
   const _Progress({required this.step});
   final int step;
 
-  static const labels = ['Sent', 'Preparing', 'Ready', 'On the way'];
+  static const labels = ['Sent', 'Preparing', 'Ready', 'On the way', 'Delivered'];
 
   @override
   Widget build(BuildContext context) => Row(children: [

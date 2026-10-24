@@ -6,23 +6,42 @@ import 'brand.dart';
 import 'config.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/shop/order_screen.dart';
 import 'state/cart.dart';
 import 'state/location.dart';
+import 'state/push.dart';
 import 'state/scope.dart';
 import 'state/session.dart';
 
+/// Lets a tapped notification open the right screen from outside the widget tree.
+final navigatorKey = GlobalKey<NavigatorState>();
+
 void main() {
-  final session = Session(RiderApi(ApiClient(baseUrl: AppConfig.apiBase)), SecureTokenStore(), role: 'rider');
-  runApp(RideCoopApp(session: session, location: LocationService()));
+  final api = RiderApi(ApiClient(baseUrl: AppConfig.apiBase));
+  final session = Session(api, SecureTokenStore(), role: 'rider');
+  // A tapped order notification opens that order. (Open screens refresh themselves every few seconds.)
+  final push = PushRegistrar(api, session, onMessage: (data, {required tapped}) async {
+    final id = data['order_id'];
+    if (!tapped || id == null || id.isEmpty) return;
+    try {
+      final order = await api.order(id);
+      navigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => OrderScreen(initial: order)));
+    } on ApiException {
+      // Offline: the order is on the home screen when the app connects.
+    }
+  });
+  runApp(RideCoopApp(session: session, location: LocationService(), push: push));
   session.restore();
+  push.attach();
 }
 
 class RideCoopApp extends StatelessWidget {
-  RideCoopApp({super.key, required this.session, required this.location, Cart? cart}) : cart = cart ?? Cart();
+  RideCoopApp({super.key, required this.session, required this.location, Cart? cart, this.push}) : cart = cart ?? Cart();
 
   final Session session;
   final LocationService location;
   final Cart cart;
+  final PushRegistrar? push;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +49,9 @@ class RideCoopApp extends StatelessWidget {
       session: session,
       location: location,
       cart: cart,
+      push: push,
       child: MaterialApp(
+        navigatorKey: navigatorKey,
         title: Brand.name,
         debugShowCheckedModeBanner: false,
         theme: Brand.theme(),

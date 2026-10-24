@@ -177,4 +177,59 @@ void main() {
     expect(find.textContaining('Kitchen closing early'), findsOneWidget);
     await unmount(tester);
   });
+
+  testWidgets('delivery: driver assigned (PIN, call) → on the way → delivered', (tester) async {
+    final id = fixture('shop_order_searching')['id'] as String;
+    final pin = fixture('shop_order_driver_assigned')['delivery']['pin'] as String;
+    var stage = 'shop_order_searching';
+    final server = shopServer()
+      ..on('GET /shop/orders/active', [fixture('shop_order_searching')])
+      ..handle('GET /shop/orders/$id', (_) => fixture(stage));
+    await pumpApp(tester, server);
+    await tapKey(tester, 'active-order-$id');
+    expect(find.byKey(const Key('order-driver')), findsNothing, reason: 'still looking');
+    expect(find.byKey(const Key('delivery-pin')), findsOneWidget, reason: 'the PIN is known once the store accepted');
+
+    stage = 'shop_order_driver_assigned';
+    await tester.pump(const Duration(seconds: 5));
+    await settle(tester);
+    expect(find.text('Smoke will collect your order'), findsOneWidget);
+    expect(find.text('Toyota Corolla · ZR101'), findsOneWidget);
+    expect(find.text(pin.split('').join(' ')), findsOneWidget);
+    await tapKey(tester, 'call-driver');
+    expect(opened.single.toString(), 'tel:+12465550202');
+    expect(find.byKey(const Key('cancel-order')), findsNothing);
+
+    stage = 'shop_order_on_the_way';
+    await tester.pump(const Duration(seconds: 5));
+    await settle(tester);
+    expect(find.text('Smoke is on the way with your order'), findsOneWidget);
+    expect(find.byKey(const Key('delivery-pin-card')), findsOneWidget);
+
+    stage = 'shop_order_delivered';
+    await tester.pump(const Duration(seconds: 5));
+    await settle(tester);
+    expect(find.text('Delivered — enjoy!'), findsOneWidget);
+    expect(find.byKey(const Key('delivery-pin-card')), findsNothing);
+    expect(find.textContaining('charged'), findsOneWidget);
+    await unmount(tester);
+  });
+
+  testWidgets('no driver for a long time: the customer is told and may cancel', (tester) async {
+    final o = fixture('shop_order_no_driver') as Map<String, dynamic>;
+    final server = shopServer()
+      ..on('GET /shop/orders/active', [o])
+      ..on('GET /shop/orders/${o['id']}', o)
+      ..on('POST /shop/orders/${o['id']}/cancel', fixture('shop_order_cancelled_no_driver'));
+    await pumpApp(tester, server);
+    await tapKey(tester, 'active-order-${o['id']}');
+    expect(find.text('Still looking for a driver'), findsOneWidget);
+    expect(find.byKey(const Key('no-driver-note')), findsOneWidget);
+    await tapKey(tester, 'cancel-order');
+    await tester.tap(find.byKey(const Key('confirm-cancel-order')));
+    await settle(tester);
+    expect(server.calls('POST /shop/orders/${o['id']}/cancel'), hasLength(1));
+    expect(find.text('Order cancelled'), findsOneWidget);
+    await unmount(tester);
+  });
 }

@@ -271,7 +271,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.credit_card),
                     title: Text(card?.label ?? 'Add a card'),
-                    subtitle: const Text('Card only. We hold the total now and charge it when your order is ready.'),
+                    subtitle: const Text('Card only. We hold the total now and charge it when your order is delivered.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: _chooseCard,
                   ),

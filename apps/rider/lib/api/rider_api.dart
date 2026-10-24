@@ -8,6 +8,15 @@ import 'shop_models.dart';
 class RiderApi extends AuthApi {
   RiderApi(super.client);
 
+  // ---------------------------------------------------------------- push notifications
+  Future<void> registerDevice(String token, {String platform = 'android'}) async {
+    await client.post('/devices', {'token': token, 'platform': platform});
+  }
+
+  Future<void> forgetDevice(String token) async {
+    await client.delete('/devices', {'token': token});
+  }
+
   Future<User> updateMe({String? name, String? email}) async =>
       User.fromJson(await client.patch('/me', {if (name != null) 'name': name, if (email != null) 'email': email}) as Map<String, dynamic>);
 
