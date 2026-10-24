@@ -14,6 +14,15 @@ Route::get('signed-out', fn () => view('app.message', [
     'body' => 'This page opens from inside the Ride Coop app. Go back to the app and tap the menu item again.',
 ]));
 
-Route::middleware('auth')->group(function () {
+// auth:web pins these pages to the web session the app link opened (never an API token).
+Route::middleware('auth:web')->group(function () {
     Route::get('about', fn () => view('app.about', ['user' => auth()->user()]));
+    // Help & support
+    Route::get('help', [\App\Http\Controllers\AppPages\SupportPagesController::class, 'help']);
+    Route::get('help/{slug}', [\App\Http\Controllers\AppPages\SupportPagesController::class, 'article']);
+    Route::get('support/new', [\App\Http\Controllers\AppPages\SupportPagesController::class, 'create']);
+    Route::post('support', [\App\Http\Controllers\AppPages\SupportPagesController::class, 'store'])->middleware('throttle:10,1');
+    Route::get('support/tickets', [\App\Http\Controllers\AppPages\SupportPagesController::class, 'tickets']);
+    Route::get('support/tickets/{ticket}', [\App\Http\Controllers\AppPages\SupportPagesController::class, 'ticket']);
+    Route::post('support/tickets/{ticket}', [\App\Http\Controllers\AppPages\SupportPagesController::class, 'reply'])->middleware('throttle:20,1');
 });

@@ -124,5 +124,27 @@ class ReferenceDataSeeder extends Seeder
         Gateway::query()->firstOrCreate(['plugin' => 'log_sms'], ['type' => 'sms', 'name' => 'Log SMS (dev)', 'config' => [], 'is_active' => true, 'priority' => -100]);
         Gateway::query()->firstOrCreate(['plugin' => 'log_email'], ['type' => 'email', 'name' => 'Log email (dev)', 'config' => [], 'is_active' => true, 'priority' => -100]);
         Gateway::query()->firstOrCreate(['plugin' => 'test_payment'], ['type' => 'payment', 'name' => 'Test card gateway', 'config' => ['mode' => 'hosted_page'], 'service_area_id' => $bb->id, 'is_active' => true, 'priority' => -100]);
+
+        // ---------------------------------------------------------------- starter help pages (only on a fresh install;
+        // after that they're edited in admin → Support → Help pages, and deleted ones stay deleted)
+        if (! \App\Models\HelpArticle::query()->exists()) {
+            $articles = [
+                ['rider', 'Rides', 'How do I book a ride?', "Tap **Where to?**, pick your destination, choose a vehicle and tap **Request**.\n\nYou'll see the fare before you book. Your driver's name, car and plate show once someone accepts."],
+                ['rider', 'Rides', 'What is my ride PIN?', "When a driver accepts, your app shows a 4-digit **PIN**. Tell it to the driver when you get in — they can't start the trip without it. It makes sure you're in the right car.\n\nNever share your PIN before you're at the car."],
+                ['rider', 'Rides', 'Booking a ride for later', "On the booking screen tap **Later**, choose the day and time (from 30 minutes to 7 days ahead). We start finding your driver about 15 minutes before pickup. Cancelling before then is free."],
+                ['all', 'Payments', 'How do card payments work?', "When you book with a card we **hold** an amount a little above the estimate. At the end of the ride we charge the actual fare and release the rest of the hold. Holds usually drop off your statement within a few days."],
+                ['all', 'Payments', 'Promo codes and ride credit', "Enter a promo code when you book or check out. Ride credit (from inviting friends, or from us) can pay part of a ride or order — switch on **Use credit**."],
+                ['rider', 'Safety', 'Share my trip', "During a ride tap **Share** to send family or friends a live link. They can follow your car on a map without the app. The link stops an hour after the trip ends."],
+                ['all', 'Safety', 'What does the SOS button do?', "**SOS** alerts the Ride Coop team straight away with where you are and your trip details, and shows the emergency numbers: **Police 211, Ambulance 511, Fire 311**.\n\nIf you are in danger, call the police first."],
+                ['all', 'Safety', 'Calling and messaging', "You can message or call your driver (or rider) inside the app — neither of you sees the other's phone number."],
+                ['rider', 'Lost items', 'I left something in the car', "Go to **Help → I lost something**, choose the trip and describe the item. We let the driver know and put you in touch."],
+                ['rider', 'Shop', 'Ordering from a store', "Tap **Shop**, pick a store, add items and check out with your card. You can follow your order and your driver, and you'll get a PIN to give the driver at the door."],
+                ['driver', 'Driving', 'Taking deliveries as well as rides', "Turn on **Shop deliveries** on your home screen to get delivery jobs as well as rides. Go to the store, the store taps **Picked up** when they hand it over, then the customer gives you their PIN at the door."],
+                ['driver', 'Earnings', 'How and when am I paid?', "Your earnings and tips are in **Earnings**. Your **Statement** shows what Ride Coop owes you (card rides, deliveries, tips) and what you owe (commission on cash rides). Payouts are made by bank transfer."],
+            ];
+            foreach ($articles as $n => [$aud, $cat, $title, $body]) {
+                \App\Models\HelpArticle::query()->create(['audience' => $aud, 'category' => $cat, 'title' => $title, 'body' => $body, 'sort_order' => $n]);
+            }
+        }
     }
 }

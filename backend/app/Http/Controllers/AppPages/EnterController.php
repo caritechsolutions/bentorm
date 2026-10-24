@@ -19,6 +19,9 @@ class EnterController extends Controller
         if (! $user) {
             return redirect('/app/signed-out');
         }
+        // A phone may be shared: drop whoever was signed in to these pages before.
+        Auth::guard('web')->logout();
+        $request->session()->invalidate();
         Auth::guard('web')->login($user);
         $request->session()->regenerate();
         $request->session()->put('in_app', true);
