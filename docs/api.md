@@ -248,3 +248,23 @@ curl -fsSL "https://raw.githubusercontent.com/caritechsolutions/bentorm/main/scr
 - **Stores** start `pending`; an admin approves / rejects / suspends them (Shop → Stores). Store documents use the document system (`applies_to = store`, optionally only for one shop category, e.g. the food permit). Customers will only see approved stores that are switched open and within their hours.
 - **Catalogue:** menu sections, products (price, photo, size small/medium/large, options groups with priced choices, sold-out switch). **Staff:** owners add people by mobile; staff manage the catalogue but not settings or staff.
 - **Money settings** (Shop → Fees & commission): commission on items (per-store override), Ride Coop share of the delivery fee, service fee (flat and/or %). Delivery fees come from each area's **Delivery** rate card (vehicle type `delivery`, `service = delivery`, never offered as a ride).
+
+## Shop (phase 2: customer orders)
+
+Public (no login): `GET /shop/categories?lat&lng`, `GET /shop/stores?category&q&lat&lng` (approved stores near the point; `is_open` tells you if they take orders now), `GET /shop/stores/{slug}` (store + menu sections → products with options), `POST /shop/quote`.
+
+Signed in:
+
+| Call | Notes |
+|---|---|
+| `POST /shop/orders` | Body: `store` (slug), `lat`, `lng`, `items[{product_id, quantity, options[{group, choices[]}], note}]`, `address`, `note`, `payment_method_id`. Card only. 201 → order; if the card needs 3-D Secure, `payment.redirect_url` is set and the order stays `pending_payment` until it's done. |
+| `GET /shop/orders` | Paginated history (wrapped in `data`). |
+| `GET /shop/orders/active` | Plain list of orders still in progress. |
+| `GET /shop/orders/{id}` | One order (by `public_id`). |
+| `POST /shop/orders/{id}/cancel` | Only before the store accepts; the card hold is released. |
+| `POST /shop/orders/{id}/change` | `{accept: true|false}` answers a store's "out of stock" removal request. Declining cancels the order and releases the hold. |
+
+- **Totals** = items (+ VAT on items when the store is VAT-registered and prices exclude VAT) + delivery fee (the area's Delivery rate card, store → customer) + service fee (Fees & commission). One card hold covers the total.
+- **Statuses:** `pending_payment` → `placed` (the store has 5 minutes to answer, else `expired` and the hold is released) → `accepted` (with prep time) → `ready` (card captured for now; phase 3 moves capture to delivery). Also `declined`, `cancelled`.
+- **Money split:** store receives items − commission; Ride Coop keeps commission + service fee + its share of the delivery fee; the rest of the delivery fee goes to the driver (phase 3).
+- **Store portal → Orders:** tabs New / Preparing / Ready / Past. A new order rings (after "Turn on sound" is tapped once) and shows a red banner on every page; the store also gets an SMS. Actions: Accept (prep minutes), Decline (reason), Out of stock (remove items → customer approves), Mark ready.

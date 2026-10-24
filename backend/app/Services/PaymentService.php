@@ -204,6 +204,54 @@ class PaymentService
         return $this->updateTripBalance($trip, $fee, $collected);
     }
 
+    // ================================================================= shop order holds
+
+    /** Hold an order's total on the card. Authorised → the order goes to the store (OrderService::onPaymentAuthorized). */
+    public function placeOrderHold(\App\Models\Order $order, PaymentMethod $pm): Payment
+    {
+        $hold = Payment::query()->create([
+            'order_id' => $order->id, 'user_id' => $order->customer_id, 'gateway_id' => $pm->gateway_id, 'payment_method_id' => $pm->id,
+            'purpose' => 'hold', 'method' => PayMethod::Card->value, 'amount' => $order->total, 'currency' => $order->currency, 'status' => 'pending',
+        ]);
+
+        $result = $this->call($hold->gateway, fn (PaymentPlugin $p) => $p->authorize($hold, $pm, [
+            'return_url' => route('payments.return', ['payment' => $hold->public_id]),
+            'webhook_url' => route('payments.webhook', ['gateway' => $hold->gateway_id]),
+            'description' => "Ride Coop order {$order->number()} (hold)",
+            'customer' => $this->customer($order->customer),
+        ]));
+
+        return $this->apply($hold, $result);
+    }
+
+    /** Take the order total from the hold (the rest of the hold, if items were removed, is released). */
+    public function captureOrder(\App\Models\Order $order): void
+    {
+        $hold = $order->hold();
+        if (! $hold || $hold->status !== 'authorized') {
+            $order->forceFill(['payment_status' => 'failed'])->save();
+
+            return;
+        }
+        $hold = $this->apply($hold, $this->call($hold->gateway, fn (PaymentPlugin $p) => $p->capture($hold, round(min($order->total, (float) $hold->authorized_amount), 2))));
+        $order->forceFill(['payment_status' => $hold->status === 'captured' ? 'paid' : 'failed'])->save();
+    }
+
+    public function releaseOrderHold(\App\Models\Order $order): void
+    {
+        $hold = $order->hold();
+        if ($hold && ! $hold->isFinal()) {
+            if ($hold->status === 'authorized') {
+                $this->apply($hold, $this->call($hold->gateway, fn (PaymentPlugin $p) => $p->void($hold)));
+            } else {
+                $hold->forceFill(['status' => 'cancelled', 'redirect_url' => null])->save();
+            }
+        }
+        if ($order->payment_status !== 'paid') {
+            $order->forceFill(['payment_status' => 'released'])->save();
+        }
+    }
+
     /** Release any hold (cancelled before acceptance, no drivers, driver/admin cancelled). */
     public function releaseHold(Trip $trip): void
     {
@@ -360,7 +408,9 @@ class PaymentService
                     break;
                 case PaymentResult::REFUNDED:
                     $p->status = 'refunded';
-                    Trip::query()->whereKey($p->trip_id)->update(['payment_status' => PaymentStatus::Refunded->value]);
+                    if ($p->trip_id) {
+                        Trip::query()->whereKey($p->trip_id)->update(['payment_status' => PaymentStatus::Refunded->value]);
+                    }
                     break;
             }
             $p->save();
@@ -382,6 +432,11 @@ class PaymentService
 
     private function onHoldAuthorized(Payment $hold): void
     {
+        if ($hold->order_id) {
+            app(OrderService::class)->onPaymentAuthorized($hold->order);
+
+            return;
+        }
         $trip = DB::transaction(function () use ($hold) {
             $t = Trip::query()->whereKey($hold->trip_id)->lockForUpdate()->first();
             if (! $t || $t->status !== TripStatus::PendingPayment) {
@@ -403,6 +458,11 @@ class PaymentService
 
     private function onHoldFailed(Payment $hold): void
     {
+        if ($hold->order_id) {
+            app(OrderService::class)->onPaymentFailed($hold->order, $hold->failure_reason);
+
+            return;
+        }
         $trip = Trip::query()->find($hold->trip_id);
         if ($trip && $trip->status === TripStatus::PendingPayment) {
             $trip->forceFill([

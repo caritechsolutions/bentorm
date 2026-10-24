@@ -11,7 +11,7 @@ class Payment extends Model
     use HasUlids;
 
     protected $fillable = [
-        'trip_id', 'user_id', 'gateway_id', 'payment_method_id', 'purpose', 'method', 'gateway_ref', 'amount', 'currency',
+        'trip_id', 'order_id', 'user_id', 'gateway_id', 'payment_method_id', 'purpose', 'method', 'gateway_ref', 'amount', 'currency',
         'authorized_amount', 'captured_amount', 'status',
         'redirect_url', 'failure_reason', 'payload', 'paid_at',
     ];
@@ -40,6 +40,11 @@ class Payment extends Model
     public function trip(): BelongsTo
     {
         return $this->belongsTo(Trip::class);
+    }
+
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
     }
 
     public function user(): BelongsTo

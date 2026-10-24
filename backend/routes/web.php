@@ -24,6 +24,13 @@ Route::middleware(['web', 'auth'])->get('/admin-files/documents/{document}', fun
     ]);
 })->name('admin.document.file');
 
+// Store portal: which orders are waiting for this store (polled by the new-order alert; members only).
+Route::middleware(['web', 'auth'])->get('/store-alerts/{store:slug}', function (App\Models\Store $store) {
+    abort_unless(auth()->user()?->canAccessTenant($store), 403);
+
+    return response()->json(['placed' => $store->orders()->where('status', 'placed')->orderBy('id')->pluck('public_id')]);
+})->name('store.order-alerts');
+
 // Live map data for the admin panel (session auth).
 Route::middleware(['web', 'auth'])->get('/admin-live.json', function (App\Services\DriverLocationService $locations) {
     abort_unless(auth()->user()?->isAdmin(), 403);

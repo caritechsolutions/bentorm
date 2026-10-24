@@ -8,3 +8,5 @@ Schedule::call(fn () => OtpCode::query()->where('expires_at', '<', now()->subDay
 Schedule::command('sanctum:prune-expired --hours=720')->daily();
 Schedule::command('trips:expire-stale')->everyMinute();
 Schedule::command('documents:expire')->hourly();
+// Shop: orders a store never answered are released after OrderService::ACCEPT_MINUTES.
+Schedule::call(fn () => app(App\Services\OrderService::class)->expireUnanswered())->everyMinute()->name('orders:expire')->withoutOverlapping();

@@ -98,6 +98,17 @@ class PricingService
             + ['route' => $route];
     }
 
+    /**
+     * Shop delivery fee, store → customer, from the area's "delivery" rate card (same engine as rides: multipliers,
+     * minimum, tax, rounding). Returns the quote plus the route used.
+     */
+    public function deliveryQuote(GeoContext $store, GeoContext $dropoff, ?CarbonInterface $at = null): array
+    {
+        $route = $this->distance->route([[$store->lat, $store->lng], [$dropoff->lat, $dropoff->lng]]);
+
+        return $this->calculate($store, $dropoff, 'delivery', $route->distanceM, $route->durationS, 0, $at ?? now()) + ['route' => $route];
+    }
+
     /** [[lat, lng], …] for pickup, stops…, drop-off. */
     public static function points(float $pLat, float $pLng, array $stops, float $dLat, float $dLng): array
     {

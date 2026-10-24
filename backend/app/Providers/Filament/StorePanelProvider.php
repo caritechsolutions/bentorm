@@ -53,6 +53,15 @@ class StorePanelProvider extends PanelProvider
                     ->visible(fn (): bool => ($t = \Filament\Facades\Filament::getTenant()) instanceof Store && (bool) \Filament\Facades\Filament::auth()->user()?->isStoreOwner($t)),
             ])
             ->databaseNotifications(false)
+            // New-order sound + banner on every page of a store.
+            ->renderHook(PanelsRenderHook::BODY_END, function (): string {
+                $store = \Filament\Facades\Filament::getTenant();
+
+                return $store instanceof Store ? view('filament.store.order-alerts', [
+                    'url' => route('store.order-alerts', $store),
+                    'ordersUrl' => \App\Filament\Store\Resources\Orders\OrderResource::getUrl('index', ['tab' => 'new']),
+                ])->render() : '';
+            })
             ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => implode('', [
                 '<link rel="stylesheet" href="'.asset('vendor/leaflet/leaflet.css').'">',
                 '<script src="'.asset('vendor/leaflet/leaflet.js').'"></script>',

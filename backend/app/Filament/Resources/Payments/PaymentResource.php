@@ -37,7 +37,7 @@ class PaymentResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->with(['trip', 'user', 'gateway', 'paymentMethod']))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['trip', 'order', 'user', 'gateway', 'paymentMethod']))
             ->defaultSort('id', 'desc')
             ->columns([
                 TextColumn::make('created_at')->label('When')->dateTime('d M H:i')->sortable(),
@@ -47,8 +47,10 @@ class PaymentResource extends Resource
                     ->description(fn (Payment $record) => $record->captured_amount !== null && $record->captured_amount != $record->amount ? 'captured '.number_format($record->captured_amount, 2) : null),
                 TextColumn::make('status')->badge()->color(fn ($state) => Ui::color($state))->formatStateUsing(fn ($state) => Ui::label($state)),
                 TextColumn::make('user.name')->label('Rider')->searchable(),
-                TextColumn::make('trip.public_id')->label('Trip')->formatStateUsing(fn ($state) => substr((string) $state, -8))->fontFamily('mono')
-                    ->url(fn (Payment $record) => $record->trip ? TripResource::getUrl('view', ['record' => $record->trip]) : null),
+                TextColumn::make('trip.public_id')->label('For')->fontFamily('mono')
+                    ->state(fn (Payment $record) => $record->trip ? 'Trip '.substr((string) $record->trip->public_id, -8) : ($record->order ? 'Order '.$record->order->number() : '—'))
+                    ->url(fn (Payment $record) => $record->trip ? TripResource::getUrl('view', ['record' => $record->trip])
+                        : ($record->order ? \App\Filament\Resources\Orders\OrderResource::getUrl('view', ['record' => $record->order]) : null)),
                 TextColumn::make('gateway.name')->label('Gateway')->placeholder('—')->toggleable(),
                 TextColumn::make('gateway_ref')->label('Gateway ref')->placeholder('—')->copyable()->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('failure_reason')->label('Failure')->placeholder('—')->wrap()->toggleable(),
