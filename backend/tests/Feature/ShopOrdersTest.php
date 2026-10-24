@@ -285,4 +285,27 @@ class ShopOrdersTest extends TestCase
         $this->get('/admin/payments')->assertOk()->assertSee('Order '.$order->number());
         $this->assertSame(0.15, ShopSettings::value('shop.commission_rate'));
     }
+
+    public function test_promo_code_and_ride_credit_at_checkout_and_returned_if_cancelled(): void
+    {
+        \App\Models\PromoCode::query()->create(['code' => 'EATS10', 'kind' => 'percent', 'value' => 10, 'applies_to' => 'shop']);
+        \App\Models\CreditEntry::query()->create(['user_id' => $this->customer->id, 'amount' => 5, 'reason' => 'admin']);
+        $card = $this->addCard();
+        $this->actingAs($this->customer, 'sanctum');
+        $q = $this->postJson('/api/v1/shop/quote', $this->cart(['promo_code' => 'eats10', 'use_credit' => true]))->assertOk();
+        $this->assertSame('EATS10', $q->json('promo.code'));
+        $gross = $q->json('totals.items') + $q->json('totals.items_tax') + $q->json('totals.delivery') + $q->json('totals.service_fee');
+        $this->assertEqualsWithDelta(round($gross * 0.10, 2), $q->json('totals.discount'), 0.01);
+        $this->assertEquals(5, $q->json('totals.credit'));
+        $this->assertEqualsWithDelta($gross - $q->json('totals.discount') - 5, $q->json('totals.total'), 0.01);
+
+        $id = $this->postJson('/api/v1/shop/orders', $this->cart(['promo_code' => 'eats10', 'use_credit' => true, 'payment_method_id' => $card]))->assertCreated()->json('id');
+        $order = Order::query()->where('public_id', $id)->first();
+        $this->assertSame([0.0, 'applied'], [\App\Models\CreditEntry::balance($this->customer->id), \App\Models\PromoRedemption::query()->value('status')]);
+        $this->assertEqualsWithDelta($order->total, $order->hold()->authorized_amount, 0.001);
+        $this->assertSame(51.0, $order->store_payout, 'the store is paid on the full price');
+
+        $this->postJson("/api/v1/shop/orders/{$id}/cancel")->assertOk();
+        $this->assertSame([5.0, 'released'], [\App\Models\CreditEntry::balance($this->customer->id), \App\Models\PromoRedemption::query()->value('status')]);
+    }
 }

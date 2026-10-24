@@ -71,12 +71,32 @@ class UserResource extends Resource
                     ->disabled(fn (User $record) => $record->id === auth()->id())
                     ->afterStateUpdated(fn (User $record, $state) => $state ? null : $record->tokens()->delete()),
                 TextColumn::make('ridesAsRider_count')->counts('ridesAsRider')->label('Rides')->sortable(),
+                TextColumn::make('credit')->label('Credit')->state(fn (User $record) => \App\Models\CreditEntry::balance($record->id))
+                    ->formatStateUsing(fn ($state) => $state ? 'BBD '.number_format($state, 2) : '—')->toggleable(),
                 TextColumn::make('last_seen_at')->label('Last seen')->since()->sortable()->placeholder('Never'),
                 TextColumn::make('created_at')->label('Joined')->since()->sortable(),
             ])
             ->filters([SelectFilter::make('role')->options(collect(UserRole::cases())->mapWithKeys(fn ($c) => [$c->value => ucfirst($c->value)]))])
             ->recordActions([
                 EditAction::make(),
+                Action::make('credit')->label('Ride credit')->icon(Heroicon::OutlinedGift)->color('gray')
+                    ->modalHeading(fn (User $record) => 'Ride credit for '.$record->name)
+                    ->modalDescription(fn (User $record) => 'Balance now: BBD '.number_format(\App\Models\CreditEntry::balance($record->id), 2).'. Use a minus amount to take credit away.')
+                    ->schema([
+                        TextInput::make('amount')->numeric()->required()->prefix('$')->rule('not_in:0'),
+                        TextInput::make('note')->label('Reason (the customer sees this)')->required()->maxLength(120)->placeholder('Sorry about your late driver'),
+                    ])
+                    ->action(function (User $record, array $data): void {
+                        $balance = \App\Models\CreditEntry::balance($record->id);
+                        $amount = round((float) $data['amount'], 2);
+                        if ($balance + $amount < 0) {
+                            Notification::make()->title('That would take the balance below zero.')->danger()->send();
+
+                            return;
+                        }
+                        \App\Models\CreditEntry::query()->create(['user_id' => $record->id, 'amount' => $amount, 'reason' => 'admin', 'note' => $data['note'], 'created_by' => auth()->id()]);
+                        Notification::make()->title('Credit updated')->body('New balance: BBD '.number_format($balance + $amount, 2))->success()->send();
+                    }),
                 Action::make('password')->label('Panel password')->icon(Heroicon::OutlinedKey)->color('gray')
                     ->visible(fn (User $record) => $record->isAdmin())
                     ->modalDescription('Sets a new password for this admin to sign in to this panel.')

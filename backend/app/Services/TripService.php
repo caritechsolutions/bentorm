@@ -59,6 +59,9 @@ class TripService
             $data['vehicle_type'], $scheduledAt, $passengers, $luggage, $stops,
         );
 
+        $promo = filled($data['promo_code'] ?? null)
+            ? app(PromoService::class)->check($data['promo_code'], $rider, 'rides', (float) $quote['fare'], $quote['service_area_id']) : null;
+
         $method = PaymentMethod::from($data['payment_method'] ?? PaymentMethod::Cash->value);
         $card = $method === PaymentMethod::Card
             ? $this->payments->cardForRide($rider, $data['payment_method_id'] ?? null, $quote['service_area_id'])
@@ -94,7 +97,12 @@ class TripService
             'required_features' => $features ?: null,
             'rider_note' => $data['rider_note'] ?? null,
             'requested_at' => $scheduledAt ? null : now(),
+            'promo_code_id' => $promo?->id,
+            'use_credit' => (bool) ($data['use_credit'] ?? false),
         ]);
+        if ($promo) {
+            app(PromoService::class)->reserve($promo, $rider, $trip);
+        }
 
         if ($scheduledAt) {
             event(new TripUpdated($trip));
@@ -574,6 +582,8 @@ class TripService
             $durationS = (int) max(0, ($t->started_at ?? now())->diffInSeconds(now(), true));
             $waitS = ($t->arrived_at && $t->started_at) ? (int) max(0, $t->arrived_at->diffInSeconds($t->started_at, true)) : 0;
             $quote = $this->pricing->finalFare($t, $distanceM, $durationS, $waitS);
+            [$discount, $credit] = app(PromoService::class)->settleRide($t, (float) $quote['fare']);
+            $payable = round(max(0, $quote['fare'] - $discount - $credit), 2);
 
             $isCash = $t->payment_method === PaymentMethod::Cash;
 
@@ -589,15 +599,17 @@ class TripService
                 'platform_fee' => $quote['platform_fee'],
                 'driver_earnings' => $quote['driver_earnings'],
                 'fare_breakdown' => $quote['breakdown'],
+                'discount_amount' => $discount,
+                'credit_amount' => $credit,
                 // Cash is settled in the car; card is captured from the hold right after commit.
                 'payment_status' => $isCash ? PaymentStatus::Paid : PaymentStatus::Pending,
-                'amount_due' => $isCash ? 0 : $quote['fare'],
+                'amount_due' => $isCash ? 0 : $payable,
             ])->save();
 
-            if ($isCash) {
+            if ($isCash && $payable > 0) {
                 Payment::query()->create([
                     'trip_id' => $t->id, 'user_id' => $t->rider_id, 'purpose' => 'trip_fare', 'method' => 'cash',
-                    'amount' => $quote['fare'], 'currency' => $t->currency, 'status' => 'captured', 'paid_at' => now(),
+                    'amount' => $payable, 'currency' => $t->currency, 'status' => 'captured', 'paid_at' => now(),
                 ]);
             }
 
@@ -613,6 +625,7 @@ class TripService
 
         event(new TripUpdated($t));
         SendTripReceiptJob::dispatch($t->id);
+        app(ReferralService::class)->onCompleted($t->rider);
 
         return $t;
     }

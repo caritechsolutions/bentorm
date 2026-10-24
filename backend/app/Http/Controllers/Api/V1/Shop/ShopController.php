@@ -88,6 +88,7 @@ class ShopController extends Controller
                 'service_fee' => $q['totals']['service_fee'], 'tip' => $q['totals']['tip'], 'discount' => $q['totals']['discount'],
                 'credit' => $q['totals']['credit'], 'total' => $q['totals']['total']],
             'prices_include_vat' => $q['breakdown']['prices_include_vat'],
+            'promo' => $q['promo'] ? ['code' => $q['promo']->code, 'summary' => $q['promo']->summary($q['totals']['currency'])] : null,
             'distance_m' => $q['route']->distanceM, 'prep_minutes' => $store->currentPrepMinutes(),
             'eta_minutes' => $store->currentPrepMinutes() + (int) ceil($q['route']->durationS / 60) + 10,
         ]);
@@ -143,7 +144,12 @@ class ShopController extends Controller
     /** Tip (and later promo / credit) asked for at checkout. */
     private function extras(Request $request, array $data): array
     {
-        return array_filter(['tip' => isset($data['tip']) ? (float) $data['tip'] : null], fn ($v) => $v !== null);
+        return array_filter([
+            'tip' => isset($data['tip']) ? (float) $data['tip'] : null,
+            'promo_code' => $data['promo_code'] ?? null,
+            'use_credit' => (bool) ($data['use_credit'] ?? false),
+            'user' => $request->user('sanctum'), // the quote is public; signed-in customers get their own checks and credit
+        ], fn ($v) => $v !== null && $v !== false);
     }
 
     /** Approved stores; with lat/lng given, only those in that service area. */
@@ -186,6 +192,8 @@ class ShopController extends Controller
             'items.*.options.*.choices' => ['required', 'array'],
             'items.*.note' => ['nullable', 'string', 'max:200'],
             'tip' => ['nullable', 'numeric', 'min:0'],
+            'promo_code' => ['nullable', 'string', 'max:32'],
+            'use_credit' => ['nullable', 'boolean'],
         ] + ($placing ? [
             'address' => ['nullable', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:500'],

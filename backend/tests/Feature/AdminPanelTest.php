@@ -69,6 +69,7 @@ class AdminPanelTest extends TestCase
             '/admin/service-areas', "/admin/service-areas/{$bb->id}/edit", '/admin/service-areas/create',
             '/admin/vehicle-types', '/admin/document-types', '/admin/gateways', '/admin/gateways/create', '/admin/gateways/'.\App\Models\Gateway::query()->value('id').'/edit',
             '/admin/navigation-settings', '/admin/dispatch-settings', '/admin/dispatch-settings/create', '/admin/dispatch-settings/'.\App\Models\DispatchSetting::query()->whereNull('service_area_id')->value('id').'/edit',
+            '/admin/app-features', '/admin/promo-codes',
         ] as $url) {
             $this->get($url)->assertOk();
         }
@@ -88,5 +89,22 @@ class AdminPanelTest extends TestCase
         ]);
         $this->actingAs($driver)->get(route('admin.document.file', $doc))->assertForbidden();
         $this->actingAs($driver)->get(route('admin.live'))->assertForbidden();
+    }
+
+    public function test_admin_makes_a_promo_code_and_gives_credit(): void
+    {
+        $this->seedReference();
+        $admin = $this->makeUser('admin');
+        $rider = $this->makeUser('rider');
+        $this->actingAs($admin, 'web');
+        \Livewire\Livewire::test(\App\Filament\Resources\PromoCodes\Pages\ManagePromoCodes::class)
+            ->callAction('create', ['code' => 'summer15', 'kind' => 'percent', 'value' => 15, 'applies_to' => 'both', 'min_spend' => 0, 'max_uses_per_user' => 1, 'is_active' => true])
+            ->assertHasNoActionErrors();
+        $this->assertSame('SUMMER15', \App\Models\PromoCode::query()->value('code'));
+        \Livewire\Livewire::test(\App\Filament\Resources\Users\Pages\ListUsers::class)
+            ->callTableAction('credit', $rider, ['amount' => 12.5, 'note' => 'Sorry about the wait'])->assertHasNoTableActionErrors()
+            ->callTableAction('credit', $rider, ['amount' => -20, 'note' => 'Too much'])->assertHasNoTableActionErrors();
+        $this->assertSame(12.5, \App\Models\CreditEntry::balance($rider->id), 'cannot go below zero');
+        $this->actingAs($rider, 'sanctum')->getJson('/api/v1/me/credit')->assertJsonPath('entries.0.label', 'Sorry about the wait');
     }
 }

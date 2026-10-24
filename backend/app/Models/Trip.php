@@ -24,7 +24,7 @@ class Trip extends Model
         'payment_method', 'payment_status', 'amount_due', 'payment_method_id', 'hold_amount',
         'passengers', 'luggage', 'required_features', 'rider_note',
         'requested_at', 'scheduled_at', 'accepted_at', 'arrived_at', 'started_at', 'completed_at', 'cancelled_at',
-        'cancelled_by', 'cancellation_reason', 'cancellation_fee',
+        'cancelled_by', 'cancellation_reason', 'cancellation_fee', 'promo_code_id', 'use_credit',
     ];
 
     /** Only public_id is a ULID; the primary key stays an auto-increment integer. */
@@ -71,6 +71,9 @@ class Trip extends Model
             'scheduled_at' => 'datetime',
             'tipped_at' => 'datetime',
             'tip_amount' => 'float',
+            'discount_amount' => 'float',
+            'credit_amount' => 'float',
+            'use_credit' => 'boolean',
             'accepted_at' => 'datetime',
             'arrived_at' => 'datetime',
             'started_at' => 'datetime',
@@ -138,6 +141,12 @@ class Trip extends Model
     public function involves(User $user): bool
     {
         return $this->rider_id === $user->id || $this->driver_id === $user->id;
+    }
+
+    /** What the rider pays: the fare less promo discount and ride credit (Ride Coop covers those). */
+    public function payable(): float
+    {
+        return round(max(0, (float) $this->final_fare - (float) $this->discount_amount - (float) $this->credit_amount), 2);
     }
 
     /** The shop order this trip delivers (null for rides). */

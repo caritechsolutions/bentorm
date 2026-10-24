@@ -162,8 +162,13 @@ class PaymentService
      */
     public function settleTrip(Trip $trip): Trip
     {
-        $final = (float) $trip->final_fare;
+        $final = $trip->payable(); // fare less promo and credit
         $hold = $trip->hold();
+        if ($final <= 0) {
+            $this->releaseHold($trip); // all covered by promo / credit
+
+            return $this->updateTripBalance($trip, 0, 0);
+        }
         $collected = 0.0;
 
         if ($hold && $hold->status === 'authorized') {

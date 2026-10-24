@@ -40,7 +40,7 @@ class TipsTest extends TestCase
     private function completedTrip(string $method = 'cash'): Trip
     {
         $trip = Trip::query()->create([
-            'rider_id' => $this->rider->id, 'driver_id' => $this->driver->id, 'service_area_id' => 1, 'vehicle_type' => 'standard',
+            'rider_id' => $this->rider->id, 'driver_id' => $this->driver->id, 'service_area_id' => \App\Models\ServiceArea::query()->where('code', 'BB')->value('id'), 'vehicle_type' => 'standard',
             'status' => TripStatus::Completed, 'pickup_lat' => 13.1, 'pickup_lng' => -59.6, 'dropoff_lat' => 13.07, 'dropoff_lng' => -59.53,
             'currency' => 'BBD', 'final_fare' => 40, 'driver_earnings' => 30, 'payment_method' => $method, 'payment_status' => 'paid',
             'completed_at' => now(), 'requested_at' => now()->subHour(),

@@ -51,6 +51,12 @@ class TripResource extends Resource
             ],
             'driver_earnings' => $this->when($isDriverOrAdmin, $this->driver_earnings),
             'tip' => (float) $this->tip_amount,
+            // Promo discount and ride credit (paid by Ride Coop): the rider pays `payable`; cash drivers collect it.
+            'discount' => (float) $this->discount_amount,
+            'credit' => (float) $this->credit_amount,
+            'payable' => $this->final_fare !== null ? $this->resource->payable() : null,
+            'promo_code' => $this->promo_code_id ? \App\Models\PromoCode::query()->whereKey($this->promo_code_id)->value('code') : null,
+            'use_credit' => (bool) $this->use_credit,
             'can_tip' => $isRiderOrAdmin && app(\App\Services\TipService::class)->canTip($this->resource, $request->user()),
             'platform_fee' => $this->when($request->user()?->isAdmin() ?? false, $this->platform_fee),
             'currency' => $this->currency,

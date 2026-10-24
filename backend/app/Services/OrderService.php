@@ -100,8 +100,30 @@ class OrderService
 
         $delivery = $this->pricing->deliveryQuote($from, $to);
 
-        return ['store' => $store, 'lines' => $priced, 'route' => $delivery['route'], 'dropoff' => $to]
-            + $this->totals($store, $subtotal, $delivery, $this->checkTip($extras));
+        $x = $this->withPromoAndCredit($store, $subtotal, $this->checkTip($extras));
+
+        return ['store' => $store, 'lines' => $priced, 'route' => $delivery['route'], 'dropoff' => $to, 'promo' => $x['promo'] ?? null]
+            + $this->totals($store, $subtotal, $delivery, $x);
+    }
+
+    /**
+     * extras.promo_code (+ extras.user) → a checked code; extras.use_credit → the customer's credit balance. The amounts
+     * themselves are worked out in totals() once the full price is known.
+     */
+    private function withPromoAndCredit(Store $store, float $subtotal, array $extras): array
+    {
+        $user = $extras['user'] ?? null;
+        if (filled($extras['promo_code'] ?? null)) {
+            $extras['promo'] = app(PromoService::class)->check($extras['promo_code'], $user, 'shop', $subtotal, $store->service_area_id);
+            $extras['promo_code'] = $extras['promo']->code;
+        } else {
+            unset($extras['promo_code']);
+        }
+        if (($extras['use_credit'] ?? false) && $user) {
+            $extras['credit_balance'] = \App\Models\CreditEntry::balance($user->id);
+        }
+
+        return $extras;
     }
 
     /** A checkout tip: allowed when tips are on, up to the maximum. */
@@ -180,8 +202,11 @@ class OrderService
         $deliveryEx = round((float) $delivery['subtotal'], 2);
         $tip = round(max(0, (float) ($extras['tip'] ?? 0)), 2);
         $gross = round($subtotal + $itemsTax + $deliveryFee + $serviceFee + $tip, 2);
-        $discount = round(min(max(0, (float) ($extras['discount'] ?? 0)), max(0, $gross - 1)), 2);
-        $credit = round(min(max(0, (float) ($extras['credit'] ?? 0)), max(0, $gross - $discount - 1)), 2);
+        $wanted = isset($extras['promo']) ? $extras['promo']->discountOn($gross - $tip) : (float) ($extras['discount'] ?? 0);
+        $discount = round(min(max(0, $wanted), max(0, $gross - 1)), 2);
+        $wantedCredit = isset($extras['credit_balance'])
+            ? min($extras['credit_balance'], ($gross - $discount) * \App\Support\Features::number('credit.max_share')) : (float) ($extras['credit'] ?? 0);
+        $credit = round(min(max(0, $wantedCredit), max(0, $gross - $discount - 1)), 2);
         $total = round($gross - $discount - $credit, 2);
 
         $commissionRate = $store->commission_rate ?? ShopSettings::value('shop.commission_rate');
@@ -222,7 +247,7 @@ class OrderService
     /** Place an order: price it, hold the total on the card. 3-D Secure leaves it pending_payment. */
     public function place(User $customer, Store $store, array $lines, float $lat, float $lng, ?string $address, ?string $note, ?string $cardId, array $extras = []): Order
     {
-        $q = $this->quote($store, $lines, $lat, $lng, $extras);
+        $q = $this->quote($store, $lines, $lat, $lng, ['user' => $customer] + $extras);
         $card = $this->payments->cardForRide($customer, $cardId, $store->service_area_id);
 
         $order = DB::transaction(function () use ($customer, $store, $q, $lat, $lng, $address, $note, $card) {
@@ -235,6 +260,10 @@ class OrderService
                 'note' => $note ? mb_substr(trim($note), 0, 500) : null,
             ]);
             $o->items()->createMany($q['lines']);
+            if ($q['promo']) {
+                $o->forceFill(['promo_code_id' => $q['promo']->id])->save();
+            }
+            app(PromoService::class)->onOrderPlaced($o->setRelation('customer', $customer), $q['promo']);
 
             return $o;
         });
@@ -266,10 +295,13 @@ class OrderService
 
     public function onPaymentFailed(Order $order, ?string $reason): void
     {
-        Order::query()->whereKey($order->id)->where('status', OrderStatus::PendingPayment->value)->update([
+        $done = Order::query()->whereKey($order->id)->where('status', OrderStatus::PendingPayment->value)->update([
             'status' => OrderStatus::Cancelled->value, 'cancelled_by' => 'system', 'cancelled_at' => now(), 'payment_status' => 'failed',
             'decline_reason' => 'Card not accepted'.($reason ? ': '.$reason : ''),
         ]);
+        if ($done) {
+            app(PromoService::class)->onOrderEnded($order->fresh());
+        }
     }
 
     /**
@@ -538,6 +570,7 @@ class OrderService
                 ->update(['status' => OrderStatus::Expired->value, 'cancelled_by' => 'system', 'cancelled_at' => now(), 'expires_at' => null]);
             if ($done) {
                 $o->refresh();
+                app(PromoService::class)->onOrderEnded($o);
                 $this->payments->releaseOrderHold($o);
                 $this->notifyCustomer($o, 'Order not accepted', "{$o->store->name} didn't respond in time. Your card has not been charged.");
                 $n++;

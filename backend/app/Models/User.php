@@ -120,6 +120,11 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         return $this->hasMany(Trip::class, 'driver_id');
     }
 
+    public function referredBy(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'referred_by_id');
+    }
+
     public function paymentMethods(): HasMany
     {
         return $this->hasMany(PaymentMethod::class);

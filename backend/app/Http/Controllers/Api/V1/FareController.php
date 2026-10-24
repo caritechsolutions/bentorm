@@ -40,6 +40,7 @@ class FareController extends Controller
             'stops.*.lng' => ['required', 'numeric', 'between:-180,180'],
             'stops.*.address' => ['nullable', 'string', 'max:255'],
             'scheduled_at' => ['nullable', 'date'], // price a booking for later (time-of-day rates apply then)
+            'promo_code' => ['nullable', 'string', 'max:32'], // preview the discount (checked again at booking)
         ]);
         $at = isset($data['scheduled_at']) ? \Carbon\CarbonImmutable::parse($data['scheduled_at']) : null;
         $stops = array_values($data['stops'] ?? []);
@@ -53,6 +54,11 @@ class FareController extends Controller
             $quotes = [$q];
         } else {
             $quotes = $pricing->estimateAll($pLat, $pLng, $dLat, $dLng, $at, $pax, $bags, $stops);
+        }
+
+        if (filled($data['promo_code'] ?? null)) {
+            $promo = app(\App\Services\PromoService::class)->check($data['promo_code'], $request->user('sanctum'), 'rides', (float) ($quotes[0]['fare'] ?? 0), $quotes[0]['service_area_id'] ?? null);
+            $quotes = array_map(fn ($q) => $q + ['discount' => $promo->discountOn((float) $q['fare']), 'promo' => $promo->summary($q['currency'] ?? 'BBD')], $quotes);
         }
 
         $quotes = array_map(function ($q) use ($request) {

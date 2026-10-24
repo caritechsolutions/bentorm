@@ -59,6 +59,8 @@ class TripController extends Controller
             'features' => ['nullable', 'array'],
             'features.*' => ['string', \Illuminate\Validation\Rule::in(array_keys(config('bentorm.vehicle_features')))],
             'rider_note' => ['nullable', 'string', 'max:500'],
+            'promo_code' => ['nullable', 'string', 'max:32'],
+            'use_credit' => ['nullable', 'boolean'],
             'scheduled_at' => ['nullable', 'date'], // book for later (ISO 8601); see App features for the window
             'stops' => ['nullable', 'array', 'max:'.config('bentorm.max_stops', 2)],
             'stops.*.lat' => ['required', 'numeric', 'between:-90,90'],

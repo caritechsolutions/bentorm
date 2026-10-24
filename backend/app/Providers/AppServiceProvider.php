@@ -37,6 +37,25 @@ class AppServiceProvider extends ServiceProvider
         \App\Models\Trip::updated(fn (\App\Models\Trip $t) => app(\App\Observers\TripNotifications::class)->tripUpdated($t));
         \App\Models\TripOffer::created(fn (\App\Models\TripOffer $o) => app(\App\Observers\TripNotifications::class)->offerCreated($o));
 
+        // Promo codes held by a ride that didn't happen can be used again.
+        \App\Models\Trip::updated(function (\App\Models\Trip $t) {
+            if ($t->wasChanged('status') && in_array($t->status, [\App\Enums\TripStatus::Cancelled, \App\Enums\TripStatus::NoDrivers], true)) {
+                app(\App\Services\PromoService::class)->releaseTrip($t);
+            }
+        });
+        // Orders: release the code / return credit when one doesn't go ahead; mark used and reward invites on delivery.
+        \App\Models\Order::updated(function (\App\Models\Order $o) {
+            if (! $o->wasChanged('status')) {
+                return;
+            }
+            if (in_array($o->status, [\App\Enums\OrderStatus::Cancelled, \App\Enums\OrderStatus::Declined, \App\Enums\OrderStatus::Expired], true)) {
+                app(\App\Services\PromoService::class)->onOrderEnded($o);
+            } elseif ($o->status === \App\Enums\OrderStatus::Delivered) {
+                app(\App\Services\PromoService::class)->onOrderDelivered($o);
+                app(\App\Services\ReferralService::class)->onCompleted($o->customer);
+            }
+        });
+
         RateLimiter::for('otp-lookup', fn (Request $r) => [
             Limit::perMinute(10)->by('otp-lookup-phone:'.preg_replace('/\D+/', '', (string) $r->input('phone'))),
             Limit::perMinute(60)->by('otp-lookup-ip:'.$r->ip()),
