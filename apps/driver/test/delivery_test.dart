@@ -31,6 +31,9 @@ void main() {
     await tapKey(tester, 'deliveries-switch');
     expect(jsonDecode(server.calls('PATCH /driver/profile').single.body), {'accepts_deliveries': true});
     expect(tester.widget<SwitchListTile>(find.byKey(const Key('deliveries-switch'))).value, isTrue);
+    expect(find.text('You\'ll get shop deliveries too.'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5)); // let the message go before tapping below it
+    await settle(tester);
 
     await tapKey(tester, 'go-online');
     expect(find.text('Looking for rides and deliveries near you.'), findsOneWidget);
@@ -79,7 +82,7 @@ void main() {
     current = f('delivery_picked_up');
     await tester.pump(const Duration(seconds: 5));
     await settle(tester);
-    expect(find.text('Deliver to Rita'), findsOneWidget);
+    expect(tester.widget<Text>(find.byKey(const Key('trip-title'))).data, 'Deliver to Rita');
 
     await tapKey(tester, 'deliver');
     await tester.enterText(find.byKey(const Key('pin-input')), '12');
