@@ -41,6 +41,7 @@ class TipService
             abort(402, 'Your card was declined for the tip: '.($payment->failure_reason ?: 'try another card').'.');
         }
         $trip->forceFill(['tip_amount' => round((float) $trip->tip_amount + $amount, 2), 'tipped_at' => now()])->save();
+        app(LedgerService::class)->bookTip($trip, $amount);
         if ($trip->order_id) {
             Order::query()->whereKey($trip->order_id)->update(['tip' => round((float) $trip->order->tip + $amount, 2)]);
         }

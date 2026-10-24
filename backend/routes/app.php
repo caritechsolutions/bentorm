@@ -17,6 +17,10 @@ Route::get('signed-out', fn () => view('app.message', [
 // auth:web pins these pages to the web session the app link opened (never an API token).
 Route::middleware('auth:web')->group(function () {
     Route::get('about', fn () => view('app.about', ['user' => auth()->user()]));
+    // Driver statement and bank details for payouts
+    Route::get('statement', [\App\Http\Controllers\AppPages\StatementController::class, 'show']);
+    Route::get('statement/bank', [\App\Http\Controllers\AppPages\StatementController::class, 'bank']);
+    Route::post('statement/bank', [\App\Http\Controllers\AppPages\StatementController::class, 'saveBank'])->middleware('throttle:10,1');
     // Help & support
     Route::get('help', [\App\Http\Controllers\AppPages\SupportPagesController::class, 'help']);
     Route::get('help/{slug}', [\App\Http\Controllers\AppPages\SupportPagesController::class, 'article']);

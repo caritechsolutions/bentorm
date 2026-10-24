@@ -24,7 +24,7 @@ class Store extends Model
     protected $fillable = [
         'name', 'slug', 'shop_category_id', 'description', 'logo_path', 'cover_path', 'phone', 'email', 'address', 'lat', 'lng',
         'hours', 'is_open', 'is_busy', 'prep_minutes', 'busy_extra_minutes', 'delivery_radius_km', 'min_order',
-        'vat_registered', 'prices_include_vat',
+        'vat_registered', 'prices_include_vat', 'bank_name', 'bank_account_name', 'bank_account_number', 'bank_branch',
     ];
 
     protected $attributes = ['status' => 'pending'];
@@ -39,6 +39,7 @@ class Store extends Model
             'prep_minutes' => 'integer', 'busy_extra_minutes' => 'integer',
             'delivery_radius_km' => 'float', 'min_order' => 'float', 'commission_rate' => 'float',
             'approved_at' => 'datetime',
+            'bank_account_number' => 'encrypted',
         ];
     }
 

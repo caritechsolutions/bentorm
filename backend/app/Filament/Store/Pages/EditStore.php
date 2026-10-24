@@ -24,7 +24,7 @@ class EditStore extends EditTenantProfile
 
     public function form(Schema $schema): Schema
     {
-        return $schema->components([...StoreForm::details(), ...StoreForm::operations()]);
+        return $schema->components([...StoreForm::details(), ...StoreForm::operations(), StoreForm::payouts()]);
     }
 
     protected function mutateFormDataBeforeSave(array $data): array

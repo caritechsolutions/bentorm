@@ -42,6 +42,10 @@ class AppServiceProvider extends ServiceProvider
             if ($t->wasChanged('status') && in_array($t->status, [\App\Enums\TripStatus::Cancelled, \App\Enums\TripStatus::NoDrivers], true)) {
                 app(\App\Services\PromoService::class)->releaseTrip($t);
             }
+            // Driver payouts ledger: book finished rides, deliveries and cancellation fees.
+            if ($t->wasChanged('status') && in_array($t->status, [\App\Enums\TripStatus::Completed, \App\Enums\TripStatus::Cancelled], true)) {
+                app(\App\Services\LedgerService::class)->bookTrip($t);
+            }
         });
         // Orders: release the code / return credit when one doesn't go ahead; mark used and reward invites on delivery.
         \App\Models\Order::updated(function (\App\Models\Order $o) {
@@ -52,6 +56,7 @@ class AppServiceProvider extends ServiceProvider
                 app(\App\Services\PromoService::class)->onOrderEnded($o);
             } elseif ($o->status === \App\Enums\OrderStatus::Delivered) {
                 app(\App\Services\PromoService::class)->onOrderDelivered($o);
+                app(\App\Services\LedgerService::class)->bookOrder($o);
                 app(\App\Services\ReferralService::class)->onCompleted($o->customer);
             }
         });

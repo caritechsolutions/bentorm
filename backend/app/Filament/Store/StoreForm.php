@@ -96,6 +96,18 @@ final class StoreForm
         ];
     }
 
+    /** Where Ride Coop pays the store's share of orders (owners only, on Store settings). */
+    public static function payouts(): Section
+    {
+        return Section::make('Payouts')->description('Ride Coop pays your share of delivered orders to this account by bank transfer. See Statement for what is owed.')
+            ->columns(2)->collapsible()->schema([
+                TextInput::make('bank_name')->label('Bank')->maxLength(80),
+                TextInput::make('bank_branch')->label('Branch')->maxLength(80),
+                TextInput::make('bank_account_name')->label('Name on the account')->maxLength(120),
+                TextInput::make('bank_account_number')->label('Account number')->maxLength(40)->regex('/^[0-9 \-]{4,40}$/'),
+            ]);
+    }
+
     /** @return array<string, string> place id => "Name — area" */
     public static function placeOptions(string $search, ?string $session): array
     {

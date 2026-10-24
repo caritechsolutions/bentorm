@@ -69,7 +69,7 @@ class AdminPanelTest extends TestCase
             '/admin/service-areas', "/admin/service-areas/{$bb->id}/edit", '/admin/service-areas/create',
             '/admin/vehicle-types', '/admin/document-types', '/admin/gateways', '/admin/gateways/create', '/admin/gateways/'.\App\Models\Gateway::query()->value('id').'/edit',
             '/admin/navigation-settings', '/admin/dispatch-settings', '/admin/dispatch-settings/create', '/admin/dispatch-settings/'.\App\Models\DispatchSetting::query()->whereNull('service_area_id')->value('id').'/edit',
-            '/admin/app-features', '/admin/promo-codes', '/admin/safety-alerts', '/admin/support-tickets', '/admin/help-articles',
+            '/admin/app-features', '/admin/promo-codes', '/admin/safety-alerts', '/admin/support-tickets', '/admin/help-articles', '/admin/payouts',
         ] as $url) {
             $this->get($url)->assertOk();
         }

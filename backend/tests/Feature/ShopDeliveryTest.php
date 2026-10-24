@@ -187,6 +187,12 @@ class ShopDeliveryTest extends TestCase
         $this->actingAs($this->customer, 'sanctum')->getJson("/api/v1/shop/orders/{$order->public_id}")->assertJsonPath('delivery.status', 'delivered')
             ->assertJsonMissingPath('delivery.pin');
         $this->assertNotContains($no->id, $trip->offers()->pluck('driver_id')->all());
+
+        // Payouts ledger: the store's share and the driver's delivery earnings are booked; the store sees its statement.
+        $this->assertEqualsWithDelta($order->store_payout, \App\Models\LedgerEntry::balance('store', $this->store->id), 0.001);
+        $this->assertEqualsWithDelta($order->driver_earnings, \App\Models\LedgerEntry::balance('driver', $yes->id), 0.001);
+        $this->asStore();
+        $this->get("/store/{$this->store->slug}/statement")->assertOk()->assertSee('Order '.$order->number());
     }
 
     public function test_need_driver_now_and_ready_send_at_once_without_duplicates(): void
