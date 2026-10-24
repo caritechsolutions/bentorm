@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_navigation_flutter/google_navigation_flutter.dart' as nav;
 
 import 'package:ridecoop_core/ridecoop_core.dart' show Brand;
@@ -163,12 +162,11 @@ class _PinIcons {
   static Future<_PinIcons> load(double ratio) {
     if (_loading != null && _ratio == ratio) return _loading!;
     _ratio = ratio;
-    return _loading = () async => _PinIcons(
-          await _dot(Brand.blue, ratio),
-          await _dot(Colors.orange, ratio),
-          await _dot(Brand.red, ratio),
-        )();
+    return _loading = _build(ratio);
   }
+
+  static Future<_PinIcons> _build(double ratio) async =>
+      _PinIcons(await _dot(Brand.blue, ratio), await _dot(Colors.orange, ratio), await _dot(Brand.red, ratio));
 
   static Future<nav.ImageDescriptor> _dot(Color color, double ratio) async {
     const logical = 22.0;

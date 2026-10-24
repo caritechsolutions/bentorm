@@ -46,7 +46,10 @@ jobs:
       - name: Analyze shared core
         working-directory: apps/core
         run: flutter pub get && flutter analyze --no-fatal-infos
-      - run: flutter analyze --no-fatal-infos
+      - name: Analyze
+        run: |
+          set -o pipefail
+          flutter analyze --no-fatal-infos 2>&1 | tee /tmp/analyze.txt
       - name: Test
         run: |
           set -o pipefail
@@ -56,7 +59,7 @@ jobs:
         if: failure()
         working-directory: .
         run: |
-          mkdir -p /tmp/ci && cp /tmp/test-output.txt /tmp/ci/ 2>/dev/null || true
+          mkdir -p /tmp/ci && cp /tmp/test-output.txt /tmp/ci/ 2>/dev/null || true; cp /tmp/analyze.txt /tmp/ci/ 2>/dev/null || true
           cd /tmp/ci && git init -q && git checkout -q -b ci-logs-driver
           git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           echo "${GITHUB_SHA}" > sha.txt && git add -A && git commit -qm "Test log for ${GITHUB_SHA}"
