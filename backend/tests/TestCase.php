@@ -43,6 +43,18 @@ abstract class TestCase extends BaseTestCase
         return $driver->fresh();
     }
 
+    /** Saves a test-gateway card for $user through the real hosted-page flow; returns its public id. */
+    protected function addTestCard(User $user, string $number = '4242424242424242'): string
+    {
+        $res = $this->actingAs($user, 'sanctum')->postJson('/api/v1/me/payment-methods', ['lat' => self::BRIDGETOWN[0], 'lng' => self::BRIDGETOWN[1]])->assertCreated();
+        $form = $this->get($res->json('redirect_url'))->assertOk();
+        preg_match('/action="([^"]+)"/', $form->getContent(), $m);
+        $this->post(html_entity_decode($m[1]), ['number' => $number, 'exp_month' => 12, 'exp_year' => now()->year + 2])->assertRedirect();
+        $this->get(route('payment-methods.return', ['paymentMethod' => $res->json('payment_method.id')]))->assertOk();
+
+        return $res->json('payment_method.id');
+    }
+
     protected function tripPayload(array $from, array $to, array $extra = []): array
     {
         return $extra + ['pickup_lat' => $from[0], 'pickup_lng' => $from[1], 'dropoff_lat' => $to[0], 'dropoff_lng' => $to[1], 'vehicle_type' => 'standard'];

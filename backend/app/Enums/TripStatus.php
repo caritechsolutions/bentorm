@@ -4,6 +4,7 @@ namespace App\Enums;
 
 enum TripStatus: string
 {
+    case Scheduled = 'scheduled';            // booked for later; becomes requested (or pending_payment) near the time
     case PendingPayment = 'pending_payment'; // card hold awaiting authorisation (e.g. 3-D Secure)
     case Requested = 'requested';
     case Accepted = 'accepted';
@@ -33,6 +34,7 @@ enum TripStatus: string
     public function canTransitionTo(self $next): bool
     {
         return in_array($next, match ($this) {
+            self::Scheduled => [self::PendingPayment, self::Requested, self::Cancelled],
             self::PendingPayment => [self::Requested, self::Cancelled],
             self::Requested => [self::Accepted, self::Cancelled, self::NoDrivers],
             self::Accepted => [self::Arrived, self::Cancelled],

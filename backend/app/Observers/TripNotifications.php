@@ -65,6 +65,9 @@ class TripNotifications
                 "{$driverName} has arrived", 'Your driver is waiting at the pickup point.', $data, collapseKey: $key, urgent: true)),
             TripStatus::NoDrivers => $this->push->notify($t->rider_id, new PushMessage(
                 'No drivers available', 'Sorry, no driver could take your ride. Please try again in a few minutes.', $data, collapseKey: $key)),
+            TripStatus::Requested, TripStatus::PendingPayment => $t->scheduled_at && $t->getOriginal('status') === TripStatus::Scheduled
+                ? $this->push->notify($t->rider_id, new PushMessage('Finding your driver', 'Your ride booked for '.$this->localTime($t).' is starting — we\'re finding a driver now.', $data, collapseKey: $key))
+                : null,
             TripStatus::Cancelled => $this->cancelled($t, $data, $key),
             default => null,
         };
@@ -87,8 +90,18 @@ class TripNotifications
         }
     }
 
+    private function localTime(Trip $t): string
+    {
+        return $t->scheduled_at->copy()->setTimezone($t->serviceArea?->timezone ?? config('app.timezone'))->format('g:i a');
+    }
+
     private function cancelled(Trip $t, array $data, string $key): void
     {
+        if ($t->scheduled_at && $t->getOriginal('status') === TripStatus::Scheduled && $t->cancelled_by === 'system') {
+            $this->push->notify($t->rider_id, new PushMessage('Booked ride cancelled', "Your ride booked for {$this->localTime($t)} was cancelled: ".lcfirst($t->cancellation_reason ?? 'please book again').'.', $data, collapseKey: $key));
+
+            return;
+        }
         if ($t->cancelled_by === 'rider' && $t->driver_id) {
             $this->push->notify($t->driver_id, new PushMessage('Ride cancelled', ($t->rider?->firstName() ?? 'The rider').' cancelled the ride.', $data, collapseKey: $key, urgent: true));
         } elseif (in_array($t->cancelled_by, ['driver', 'admin', 'system'], true)) {

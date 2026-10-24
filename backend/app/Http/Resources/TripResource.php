@@ -68,6 +68,7 @@ class TripResource extends Resource
             'cancelled_by' => $this->cancelled_by,
             'cancellation_reason' => $this->cancellation_reason,
             'cancellation_fee' => (float) $this->cancellation_fee,
+            'scheduled_at' => $this->scheduled_at?->toIso8601String(),
             'timestamps' => [
                 'requested_at' => $this->requested_at?->toIso8601String(),
                 'accepted_at' => $this->accepted_at?->toIso8601String(),

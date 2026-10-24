@@ -39,18 +39,20 @@ class FareController extends Controller
             'stops.*.lat' => ['required', 'numeric', 'between:-90,90'],
             'stops.*.lng' => ['required', 'numeric', 'between:-180,180'],
             'stops.*.address' => ['nullable', 'string', 'max:255'],
+            'scheduled_at' => ['nullable', 'date'], // price a booking for later (time-of-day rates apply then)
         ]);
+        $at = isset($data['scheduled_at']) ? \Carbon\CarbonImmutable::parse($data['scheduled_at']) : null;
         $stops = array_values($data['stops'] ?? []);
         $pax = (int) ($data['passengers'] ?? 1);
         $bags = (int) ($data['luggage'] ?? 0);
         [$pLat, $pLng, $dLat, $dLng] = [(float) $data['pickup_lat'], (float) $data['pickup_lng'], (float) $data['dropoff_lat'], (float) $data['dropoff_lng']];
 
         if (! empty($data['vehicle_type'])) {
-            $q = $pricing->estimate($pLat, $pLng, $dLat, $dLng, $data['vehicle_type'], null, $pax, $bags, $stops);
+            $q = $pricing->estimate($pLat, $pLng, $dLat, $dLng, $data['vehicle_type'], $at, $pax, $bags, $stops);
             unset($q['pickup_context'], $q['dropoff_context']);
             $quotes = [$q];
         } else {
-            $quotes = $pricing->estimateAll($pLat, $pLng, $dLat, $dLng, null, $pax, $bags, $stops);
+            $quotes = $pricing->estimateAll($pLat, $pLng, $dLat, $dLng, $at, $pax, $bags, $stops);
         }
 
         $quotes = array_map(function ($q) use ($request) {

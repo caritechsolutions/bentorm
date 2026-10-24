@@ -59,6 +59,7 @@ class TripController extends Controller
             'features' => ['nullable', 'array'],
             'features.*' => ['string', \Illuminate\Validation\Rule::in(array_keys(config('bentorm.vehicle_features')))],
             'rider_note' => ['nullable', 'string', 'max:500'],
+            'scheduled_at' => ['nullable', 'date'], // book for later (ISO 8601); see App features for the window
             'stops' => ['nullable', 'array', 'max:'.config('bentorm.max_stops', 2)],
             'stops.*.lat' => ['required', 'numeric', 'between:-90,90'],
             'stops.*.lng' => ['required', 'numeric', 'between:-180,180'],
@@ -76,6 +77,13 @@ class TripController extends Controller
             'pending_payment' => (new TripResource($trip))->response()->setStatusCode(202),
             default => (new TripResource($trip))->response()->setStatusCode(201),
         };
+    }
+
+    /** GET /trips/scheduled — rides booked for later, soonest first. */
+    public function scheduled(Request $request): AnonymousResourceCollection
+    {
+        return TripResource::collection(Trip::query()->rides()->where('rider_id', $request->user()->id)
+            ->where('status', \App\Enums\TripStatus::Scheduled->value)->with('card')->orderBy('scheduled_at')->get());
     }
 
     /** GET /trips/{trip} */

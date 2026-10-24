@@ -38,7 +38,8 @@ class TripService
      */
     public function request(User $rider, array $data): Trip
     {
-        if ($rider->activeTrip()) {
+        $scheduledAt = isset($data['scheduled_at']) ? self::scheduledTime($rider, $data['scheduled_at']) : null;
+        if (! $scheduledAt && $rider->activeTrip()) {
             throw ValidationException::withMessages(['trip' => ['You already have an active trip.']]);
         }
         if ($owed = $rider->outstandingTrips()->first()) {
@@ -55,7 +56,7 @@ class TripService
         // Geofences, stops and capacity are enforced inside the estimate.
         $quote = $this->pricing->estimate(
             (float) $data['pickup_lat'], (float) $data['pickup_lng'], (float) $data['dropoff_lat'], (float) $data['dropoff_lng'],
-            $data['vehicle_type'], null, $passengers, $luggage, $stops,
+            $data['vehicle_type'], $scheduledAt, $passengers, $luggage, $stops,
         );
 
         $method = PaymentMethod::from($data['payment_method'] ?? PaymentMethod::Cash->value);
@@ -69,7 +70,8 @@ class TripService
             'pickup_zone_id' => $quote['pickup_zone_id'],
             'dropoff_zone_id' => $quote['dropoff_zone_id'],
             'vehicle_type' => $data['vehicle_type'],
-            'status' => $card ? TripStatus::PendingPayment : TripStatus::Requested,
+            'status' => $scheduledAt ? TripStatus::Scheduled : ($card ? TripStatus::PendingPayment : TripStatus::Requested),
+            'scheduled_at' => $scheduledAt,
             'pickup_lat' => $data['pickup_lat'],
             'pickup_lng' => $data['pickup_lng'],
             'pickup_address' => $data['pickup_address'] ?? null,
@@ -91,8 +93,14 @@ class TripService
             'luggage' => $luggage,
             'required_features' => $features ?: null,
             'rider_note' => $data['rider_note'] ?? null,
-            'requested_at' => now(),
+            'requested_at' => $scheduledAt ? null : now(),
         ]);
+
+        if ($scheduledAt) {
+            event(new TripUpdated($trip));
+
+            return $trip; // the card is held and drivers are asked shortly before pickup (startScheduled)
+        }
 
         if ($card) {
             // Authorised → requested + dispatch; 3-D Secure → stays pending_payment; declined → cancelled.
@@ -105,6 +113,99 @@ class TripService
         event(new TripUpdated($trip));
 
         return $trip;
+    }
+
+    /** Validates a requested pickup time against App features (earliest / furthest ahead, 3 upcoming at most). */
+    public static function scheduledTime(User $rider, string $value): \Carbon\CarbonImmutable
+    {
+        \App\Support\Features::require('scheduled_rides', 'Booking rides for later');
+        try {
+            $at = \Carbon\CarbonImmutable::parse($value)->utc()->startOfMinute();
+        } catch (\Throwable) {
+            throw ValidationException::withMessages(['scheduled_at' => ['Choose a pickup date and time.']]);
+        }
+        $min = (int) \App\Support\Features::number('scheduled.min_minutes');
+        $maxDays = (int) \App\Support\Features::number('scheduled.max_days');
+        if ($at->lt(now()->addMinutes($min)->subMinute())) {
+            throw ValidationException::withMessages(['scheduled_at' => ["Book at least {$min} minutes ahead, or request a ride now."]]);
+        }
+        if ($at->gt(now()->addDays($maxDays))) {
+            throw ValidationException::withMessages(['scheduled_at' => ["Rides can be booked up to {$maxDays} days ahead."]]);
+        }
+        if (Trip::query()->where('rider_id', $rider->id)->where('status', TripStatus::Scheduled->value)->count() >= 3) {
+            throw ValidationException::withMessages(['scheduled_at' => ['You already have 3 rides booked. Cancel one to book another.']]);
+        }
+
+        return $at;
+    }
+
+    /**
+     * Scheduler: it's nearly pickup time — hold the card (or go straight to drivers for cash) and start dispatch.
+     * A booking missed by more than 30 minutes (server was down) is cancelled instead.
+     */
+    public function startScheduled(Trip $trip): ?Trip
+    {
+        $t = DB::transaction(function () use ($trip) {
+            $t = Trip::query()->whereKey($trip->id)->lockForUpdate()->first();
+            if (! $t || $t->status !== TripStatus::Scheduled) {
+                return null;
+            }
+            if ($t->scheduled_at->lt(now()->subMinutes(30))) {
+                $t->forceFill(['status' => TripStatus::Cancelled, 'cancelled_at' => now(), 'cancelled_by' => 'system',
+                    'cancellation_reason' => 'Booking missed', 'payment_status' => PaymentStatus::Waived])->save();
+
+                return $t;
+            }
+            $card = null;
+            if ($t->payment_method === PaymentMethod::Card) {
+                try {
+                    $card = $this->payments->cardForRide($t->rider, $t->card?->public_id, $t->service_area_id);
+                } catch (ValidationException) {
+                    try {
+                        $card = $this->payments->cardForRide($t->rider, null, $t->service_area_id); // the chosen card went: use the default
+                    } catch (ValidationException) {
+                        $card = null;
+                    }
+                }
+                if (! $card) {
+                    $t->forceFill(['status' => TripStatus::Cancelled, 'cancelled_at' => now(), 'cancelled_by' => 'system',
+                        'cancellation_reason' => 'No card to pay with', 'payment_status' => PaymentStatus::Waived])->save();
+
+                    return $t;
+                }
+            }
+            $t->forceFill(['status' => $card ? TripStatus::PendingPayment : TripStatus::Requested, 'requested_at' => now(),
+                'payment_method_id' => $card?->id ?? $t->payment_method_id])->save();
+
+            return $t;
+        });
+        if (! $t) {
+            return null;
+        }
+        if ($t->status === TripStatus::PendingPayment) {
+            $this->payments->placeHold($t, $t->card);
+        } elseif ($t->status === TripStatus::Requested) {
+            $this->dispatch->start($t);
+        }
+        $t = $t->fresh();
+        event(new TripUpdated($t));
+
+        return $t;
+    }
+
+    /** Scheduler, every minute: start the bookings whose pickup is within the dispatch lead time. */
+    public function startDueScheduled(): int
+    {
+        $lead = (int) \App\Support\Features::number('scheduled.dispatch_lead_minutes');
+        $n = 0;
+        Trip::query()->where('status', TripStatus::Scheduled->value)->where('scheduled_at', '<=', now()->addMinutes($lead))
+            ->orderBy('scheduled_at')->get()->each(function (Trip $t) use (&$n) {
+                if ($this->startScheduled($t)) {
+                    $n++;
+                }
+            });
+
+        return $n;
     }
 
     public function cancel(Trip $trip, User $by, ?string $reason = null): Trip

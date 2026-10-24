@@ -23,7 +23,7 @@ class Trip extends Model
         'platform_fee', 'driver_earnings', 'fare_breakdown', 'surge_multiplier',
         'payment_method', 'payment_status', 'amount_due', 'payment_method_id', 'hold_amount',
         'passengers', 'luggage', 'required_features', 'rider_note',
-        'requested_at', 'accepted_at', 'arrived_at', 'started_at', 'completed_at', 'cancelled_at',
+        'requested_at', 'scheduled_at', 'accepted_at', 'arrived_at', 'started_at', 'completed_at', 'cancelled_at',
         'cancelled_by', 'cancellation_reason', 'cancellation_fee',
     ];
 
@@ -68,6 +68,7 @@ class Trip extends Model
             'fare_breakdown' => 'array',
             'passengers' => 'integer',
             'requested_at' => 'datetime',
+            'scheduled_at' => 'datetime',
             'accepted_at' => 'datetime',
             'arrived_at' => 'datetime',
             'started_at' => 'datetime',

@@ -117,6 +117,7 @@ Route::prefix('v1')->group(function () {
         Route::prefix('trips')->group(function () {
             Route::get('/', [RiderTripController::class, 'index']);
             Route::get('active', [RiderTripController::class, 'active']);
+            Route::get('scheduled', [RiderTripController::class, 'scheduled']);
             Route::post('/', [RiderTripController::class, 'store'])->middleware('role:rider,admin');
             Route::get('{trip}', [RiderTripController::class, 'show']);
             Route::post('{trip}/cancel', [RiderTripController::class, 'cancel']);

@@ -12,3 +12,5 @@ Schedule::command('documents:expire')->hourly();
 Schedule::call(fn () => app(App\Services\OrderService::class)->expireUnanswered())->everyMinute()->name('orders:expire')->withoutOverlapping();
 // Shop deliveries: send drivers when orders are nearly ready, retry jobs nobody took, alert after a while.
 Schedule::call(fn () => app(App\Services\OrderService::class)->dispatchDue())->everyMinute()->name('orders:dispatch')->withoutOverlapping();
+// Rides booked for later: hold the card and start finding a driver shortly before pickup.
+Schedule::call(fn () => app(App\Services\TripService::class)->startDueScheduled())->everyMinute()->name('trips:scheduled')->withoutOverlapping();
