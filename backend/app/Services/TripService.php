@@ -120,7 +120,8 @@ class TripService
                 abort(409, 'A trip in progress cannot be cancelled from the app. Contact support.');
             }
 
-            $who = $by->isAdmin() ? 'admin' : ($t->driver_id === $by->id ? 'driver' : 'rider');
+            // The person's part in this trip decides the label (an admin booking their own ride is its rider).
+            $who = $t->driver_id === $by->id ? 'driver' : ($t->rider_id === $by->id ? 'rider' : ($by->isAdmin() ? 'admin' : 'rider'));
 
             // Rider pays a cancellation fee once a driver has accepted (never when the driver or admin cancels).
             $charge = ['total' => 0.0, 'tax' => 0.0, 'subtotal' => 0.0, 'platform_fee' => 0.0, 'driver_earnings' => 0.0];

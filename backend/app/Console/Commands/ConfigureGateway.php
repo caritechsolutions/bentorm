@@ -12,6 +12,7 @@ use Illuminate\Validation\ValidationException;
  * encrypted storage as the admin panel; secrets left out keep their saved value.
  *
  *   php artisan bentorm:gateway smtp --name="Ride Coop email" --set host=smtp.example.com --set port=465 ... --test
+ *   php artisan bentorm:gateway fcm --name="Push (Firebase)" --set-file service_account=/root/firebase.json --test
  */
 class ConfigureGateway extends Command
 {
@@ -19,9 +20,10 @@ class ConfigureGateway extends Command
         {--name= : Gateway name (default: the plugin name)}
         {--priority=10 : Higher wins among active gateways of the same type}
         {--set=* : Config value as key=value (repeatable)}
+        {--set-file=* : Config value read from a file, as key=/path/to/file (keeps long secrets off the command line)}
         {--test : Run the plugin\'s connection test afterwards and record the result}';
 
-    protected $description = 'Create or update a payment / SMS / email gateway';
+    protected $description = 'Create or update a payment / SMS / email / push gateway';
 
     public function handle(PluginManager $plugins): int
     {
@@ -42,6 +44,15 @@ class ConfigureGateway extends Command
             }
             [$k, $v] = explode('=', $pair, 2);
             $incoming[trim($k)] = $v;
+        }
+        foreach ((array) $this->option('set-file') as $pair) {
+            [$k, $path] = array_pad(explode('=', $pair, 2), 2, '');
+            if ($path === '' || ! is_readable($path)) {
+                $this->error("--set-file: cannot read '{$path}'");
+
+                return self::FAILURE;
+            }
+            $incoming[trim($k)] = trim((string) file_get_contents($path));
         }
 
         $gateway = Gateway::query()->where('plugin', $key)

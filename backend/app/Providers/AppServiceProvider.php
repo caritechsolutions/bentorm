@@ -33,6 +33,10 @@ class AppServiceProvider extends ServiceProvider
         // Single resources are returned bare; paginated lists keep {data, links, meta}.
         JsonResource::withoutWrapping();
 
+        // Push notifications for ride events (queued; nothing is sent until a Push gateway is configured).
+        \App\Models\Trip::updated(fn (\App\Models\Trip $t) => app(\App\Observers\TripNotifications::class)->tripUpdated($t));
+        \App\Models\TripOffer::created(fn (\App\Models\TripOffer $o) => app(\App\Observers\TripNotifications::class)->offerCreated($o));
+
         RateLimiter::for('otp-lookup', fn (Request $r) => [
             Limit::perMinute(10)->by('otp-lookup-phone:'.preg_replace('/\D+/', '', (string) $r->input('phone'))),
             Limit::perMinute(60)->by('otp-lookup-ip:'.$r->ip()),

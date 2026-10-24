@@ -4,13 +4,15 @@ import 'package:ridecoop_core/ridecoop_core.dart';
 import '../api/driver_api.dart';
 import 'engine.dart';
 import 'location.dart';
+import 'push.dart';
 
 class AppScope extends InheritedWidget {
-  const AppScope({super.key, required this.session, required this.location, required this.engine, required super.child});
+  const AppScope({super.key, required this.session, required this.location, required this.engine, this.push, required super.child});
 
   final Session session;
   final LocationService location;
   final DriverEngine engine;
+  final PushRegistrar? push;
 
   DriverApi get api => session.api as DriverApi;
 

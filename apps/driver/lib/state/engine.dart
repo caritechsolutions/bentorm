@@ -152,6 +152,7 @@ class DriverEngine extends ChangeNotifier {
   void _startTimers() {
     _locTimer ??= Timer.periodic(locationEvery, (_) => _ping());
     _offerTimer ??= Timer.periodic(offersEvery, (_) => _pollOffers());
+    location.startBackground();
     _wake(true);
   }
 
@@ -160,6 +161,7 @@ class DriverEngine extends ChangeNotifier {
     _offerTimer?.cancel();
     _locTimer = null;
     _offerTimer = null;
+    location.stopBackground();
     _wake(false);
   }
 
@@ -174,6 +176,11 @@ class DriverEngine extends ChangeNotifier {
       // Next tick retries.
     }
     _notify();
+  }
+
+  /// A push arrived (or was tapped): don't wait for the next tick.
+  Future<void> refreshNow() async {
+    if (online && activeTrip == null) await _pollOffers();
   }
 
   Future<void> _pollOffers() async {

@@ -44,11 +44,22 @@ class SessionController extends Controller
             'token' => ['required', 'string', 'max:512'],
             'platform' => ['required', 'in:android,ios,web'],
         ]);
+        // A phone belongs to whoever is signed in on it now: drop the token from any other account.
+        DeviceToken::query()->where('token', $data['token'])->where('user_id', '!=', $request->user()->id)->delete();
         DeviceToken::query()->updateOrCreate(
             ['user_id' => $request->user()->id, 'token' => $data['token']],
-            ['platform' => $data['platform']],
+            ['platform' => $data['platform'], 'last_used_at' => now()],
         );
 
         return response()->json(['message' => 'Device registered.']);
+    }
+
+    /** DELETE /devices {token} — stop pushes to this phone (signing out). */
+    public function forgetDevice(Request $request): JsonResponse
+    {
+        $data = $request->validate(['token' => ['required', 'string', 'max:512']]);
+        DeviceToken::query()->where('user_id', $request->user()->id)->where('token', $data['token'])->delete();
+
+        return response()->json(['message' => 'Device removed.']);
     }
 }

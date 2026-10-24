@@ -5,6 +5,9 @@ class AppConfig {
   static const defaultLat = 13.0969; // Bridgetown
   static const defaultLng = -59.6145;
 
+  /// Push notifications: CI sets PUSH=true when it packaged google-services.json (Firebase starts natively from it).
+  static const pushConfigured = bool.fromEnvironment('PUSH');
+
   /// How often an online driver reports their position (doubles as the 90 s presence heartbeat).
   static const locationEvery = Duration(seconds: 4);
 

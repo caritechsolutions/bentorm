@@ -14,6 +14,8 @@
 #   SMTP_HOST, SMTP_PORT (465), SMTP_ENCRYPTION (ssl|tls|none), SMTP_USER, SMTP_PASSWORD, SMTP_FROM, SMTP_FROM_NAME
 #                               email sender for sign-in codes and receipts (stored encrypted in the gateways table)
 #   TWILIO_SID, TWILIO_TOKEN [, TWILIO_FROM | TWILIO_MESSAGING_SID]  SMS sender for sign-in codes
+#   FIREBASE_CREDENTIALS=/root/firebase.json  Firebase service-account key file, for push notifications
+#                               (stored encrypted in the gateways table; delete the file afterwards)
 #                               (no FROM: the account's first SMS-capable number is used)
 #   Secrets are only needed once (or to change them). Start the command with a space so bash keeps
 #   it out of your history, and use single quotes around passwords containing ! or $.
@@ -185,6 +187,15 @@ if [[ -n "${SMTP_HOST:-}" ]]; then
   SMTP_ARGS+=(--set "from_address=${SMTP_FROM:-${SMTP_USER:-}}" --set "from_name=${SMTP_FROM_NAME:-Ride Coop}")
   php artisan bentorm:gateway smtp --name="Email (SMTP)" "${SMTP_ARGS[@]}" --test 2>&1 | sed 's/^/    /' || warn "Email gateway test failed - see above"
 fi
+if [[ -n "${FIREBASE_CREDENTIALS:-}" ]]; then
+  # Path to the Firebase service-account key file (Firebase console → Project settings → Service accounts).
+  log "Configuring push notifications (Firebase)"
+  if [[ -r "$FIREBASE_CREDENTIALS" ]]; then
+    php artisan bentorm:gateway fcm --name="Push (Firebase)" --set-file "service_account=$FIREBASE_CREDENTIALS" --test 2>&1 | sed 's/^/    /' || warn "Firebase test failed - see above"
+  else
+    warn "FIREBASE_CREDENTIALS: cannot read $FIREBASE_CREDENTIALS"
+  fi
+fi
 if [[ -n "${TWILIO_SID:-}" ]]; then
   # TWILIO_FROM is optional: without it the first SMS-capable number on the account is used.
   log "Configuring SMS gateway (Twilio)"
@@ -252,6 +263,7 @@ echo "  Admin panel : http://$IP:8082/admin  ($(curl -s -o /dev/null -w '%{http_
 echo "  Google Maps : $(grep -q '^GOOGLE_MAPS_SERVER_KEY=.\+' "$ENV_FILE" && echo "configured (distance: $(grep '^DISTANCE_PROVIDER=' "$ENV_FILE" | cut -d= -f2))" || echo "not set — pass GOOGLE_MAPS_KEY=... (address search off, straight-line distances)")"
 echo "  SMS         : $(php artisan tinker --execute='$g=app(App\Plugins\PluginManager::class)->gatewayFor(App\Enums\GatewayType::Sms); echo $g ? "{$g->name} ({$g->plugin})".($g->last_test_result ? " - last test {$g->last_test_result}" : "") : "none (codes only in the log)";' 2>/dev/null | tail -1)"
 echo "  Email       : $(php artisan tinker --execute='$g=app(App\Plugins\PluginManager::class)->gatewayFor(App\Enums\GatewayType::Email); echo $g ? "{$g->name} ({$g->plugin})".($g->last_test_result ? " - last test {$g->last_test_result}" : "") : "none";' 2>/dev/null | tail -1)"
+echo "  Push        : $(php artisan tinker --execute='$g=app(App\Plugins\PluginManager::class)->gatewayFor(App\Enums\GatewayType::Push); echo $g ? "{$g->name} ({$g->plugin})".($g->last_test_result ? " - last test {$g->last_test_result}" : "") : "none (apps must be open to see new rides)";' 2>/dev/null | tail -1)"
 echo "  Config      : $ENV_FILE"
 echo
 echo "$ADMIN_LOGIN" | sed 's/^/  /'

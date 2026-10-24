@@ -8,6 +8,15 @@ class DriverApi extends AuthApi {
 
   Map<String, dynamic> _map(dynamic r) => r as Map<String, dynamic>;
 
+  // ---------------------------------------------------------------- push notifications
+  Future<void> registerDevice(String token, {String platform = 'android'}) async {
+    await client.post('/devices', {'token': token, 'platform': platform});
+  }
+
+  Future<void> forgetDevice(String token) async {
+    await client.delete('/devices', {'token': token});
+  }
+
   // ---------------------------------------------------------------- reference data
   Future<List<ServiceAreaOption>> serviceAreas() async =>
       (await client.get('/service-areas') as List).map((e) => ServiceAreaOption.fromJson(_map(e))).toList();

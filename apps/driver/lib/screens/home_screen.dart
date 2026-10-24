@@ -395,6 +395,7 @@ class _Menu extends StatelessWidget {
             onTap: () async {
               Navigator.pop(context);
               if (scope.engine.online) await scope.engine.goOffline();
+              await scope.push?.forget();
               await scope.session.signOut();
             },
           ),

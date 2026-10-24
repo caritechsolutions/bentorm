@@ -83,6 +83,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('me/payment-methods/{paymentMethod}', [PaymentMethodController::class, 'destroy']);
         Route::post('auth/logout', [SessionController::class, 'logout']);
         Route::post('devices', [SessionController::class, 'registerDevice']);
+        Route::delete('devices', [SessionController::class, 'forgetDevice']);
 
         Route::get('files/avatars/{user}', [FileController::class, 'avatar'])->name('files.avatar');
         Route::get('files/documents/{document}', [FileController::class, 'document'])->name('files.document');

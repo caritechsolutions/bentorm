@@ -53,6 +53,11 @@ flutter {
     source = "../.."
 }
 
+// Push notifications: only when CI has placed google-services.json (from the GOOGLE_SERVICES_JSON secret).
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
 }

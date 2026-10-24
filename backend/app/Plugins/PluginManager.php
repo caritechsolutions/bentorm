@@ -96,6 +96,13 @@ class PluginManager
         return $g ? $this->make($g) : null;
     }
 
+    public function push(?int $serviceAreaId = null): ?\App\Plugins\Contracts\PushPlugin
+    {
+        $g = $this->gatewayFor(GatewayType::Push, $serviceAreaId);
+
+        return $g ? $this->make($g) : null;
+    }
+
     public function payment(Gateway $gateway): PaymentPlugin
     {
         $p = $this->make($gateway);

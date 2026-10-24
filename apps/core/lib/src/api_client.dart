@@ -42,7 +42,7 @@ class ApiClient {
   Future<dynamic> get(String path, {Map<String, String>? query}) => _send('GET', path, query: query);
   Future<dynamic> post(String path, [Map<String, dynamic>? body]) => _send('POST', path, body: body);
   Future<dynamic> patch(String path, [Map<String, dynamic>? body]) => _send('PATCH', path, body: body);
-  Future<dynamic> delete(String path) => _send('DELETE', path);
+  Future<dynamic> delete(String path, [Map<String, dynamic>? body]) => _send('DELETE', path, body: body);
 
   /// Multipart upload (documents, photos). [fields] are sent as text parts.
   Future<dynamic> upload(String path, {required String field, required List<int> bytes, required String filename, String? contentType, Map<String, String> fields = const {}}) async {

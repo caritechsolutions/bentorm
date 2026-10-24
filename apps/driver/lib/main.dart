@@ -6,6 +6,7 @@ import 'config.dart';
 import 'screens/home_screen.dart';
 import 'state/engine.dart';
 import 'state/location.dart';
+import 'state/push.dart';
 import 'state/scope.dart';
 
 void main() {
@@ -17,16 +18,20 @@ void main() {
   session.addListener(() {
     if (session.state == SessionState.signedOut) engine.reset();
   });
-  runApp(DriverApp(session: session, location: location, engine: engine));
+  // Push: a tapped or arriving notification (new ride, stop change, cancellation) refreshes at once.
+  final push = PushRegistrar(api, session, onOpened: (_) => engine.refreshNow());
+  runApp(DriverApp(session: session, location: location, engine: engine, push: push));
   session.restore();
+  push.attach();
 }
 
 class DriverApp extends StatelessWidget {
-  const DriverApp({super.key, required this.session, required this.location, required this.engine});
+  const DriverApp({super.key, required this.session, required this.location, required this.engine, this.push});
 
   final Session session;
   final LocationService location;
   final DriverEngine engine;
+  final PushRegistrar? push;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +39,7 @@ class DriverApp extends StatelessWidget {
       session: session,
       location: location,
       engine: engine,
+      push: push,
       child: MaterialApp(
         title: 'Ride Coop Driver',
         debugShowCheckedModeBanner: false,
