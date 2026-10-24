@@ -43,6 +43,8 @@ Route::prefix('v1')->group(function () {
         'otp_length' => 6,
         // Driver app: show in-app turn-by-turn (each start is still checked with POST /driver/trips/{id}/navigation).
         'navigation' => ['in_app' => app(\App\Services\NavigationPolicy::class)->blockedReason() === null],
+        // Feature switches (Settings → App features): the apps hide what is off, no new build needed.
+        'features' => \App\Support\Features::forApps(),
     ]);
     // Shop browsing is public (the app shows stores before sign-in).
     Route::get('shop/categories', [\App\Http\Controllers\Api\V1\Shop\ShopController::class, 'categories']);
@@ -96,6 +98,8 @@ Route::prefix('v1')->group(function () {
         Route::post('shop/orders/{order}/change', [\App\Http\Controllers\Api\V1\Shop\ShopController::class, 'respondToChange']);
         Route::post('devices', [SessionController::class, 'registerDevice']);
         Route::delete('devices', [SessionController::class, 'forgetDevice']);
+        // Newer features (app pages, saved places, scheduled rides, tips, promos, safety, support, payouts).
+        require __DIR__.'/api_features.php';
 
         Route::get('files/avatars/{user}', [FileController::class, 'avatar'])->name('files.avatar');
         Route::get('files/documents/{document}', [FileController::class, 'document'])->name('files.document');

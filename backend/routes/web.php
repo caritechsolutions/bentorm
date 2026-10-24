@@ -10,6 +10,9 @@ Route::get('/', fn () => match (request()->getHost()) {
     default => response()->json(['service' => 'bentorm-api', 'health' => '/api/v1/health']),
 });
 
+// Web pages inside the apps (help, support, statements…): routes/app.php
+Route::prefix('app')->group(base_path('routes/app.php'));
+
 // Private document files for the admin panel (session auth; the apps use /api/v1/files/documents/{id}).
 Route::middleware(['web', 'auth'])->get('/admin-files/documents/{document}', function (Document $document) {
     $user = auth()->user();

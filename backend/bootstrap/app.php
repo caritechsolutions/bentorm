@@ -24,7 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Behind Nginx Proxy Manager: trust X-Forwarded-* so URLs and client IPs are correct.
         $middleware->trustProxies(at: '*');
         // API has no login page: unauthenticated requests get 401 JSON, never a redirect.
-        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*', 'broadcasting/*') ? null : '/');
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*', 'broadcasting/*') ? null : ($request->is('app/*') ? '/app/signed-out' : '/'));
         $middleware->api(append: [PreserveZeroFraction::class]);
         $middleware->alias([
             'role' => EnsureRole::class,
