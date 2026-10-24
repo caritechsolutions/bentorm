@@ -28,7 +28,8 @@ class EarningsController extends Controller
                     ->orWhere(fn ($c) => $c->where('status', TripStatus::Cancelled->value)->where('cancellation_fee', '>', 0)));
             $out[$name] = [
                 'trips' => (clone $q)->where('status', TripStatus::Completed->value)->count(),
-                'earnings' => round((float) (clone $q)->sum('driver_earnings'), 2),
+                'earnings' => round((float) (clone $q)->sum('driver_earnings') + (float) (clone $q)->sum('tip_amount'), 2),
+                'tips' => round((float) (clone $q)->sum('tip_amount'), 2),
                 'cash_collected' => round((float) (clone $q)->where('payment_method', 'cash')->where('status', TripStatus::Completed->value)->sum('final_fare'), 2),
             ];
         }

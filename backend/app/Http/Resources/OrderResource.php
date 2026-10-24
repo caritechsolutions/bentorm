@@ -35,7 +35,7 @@ class OrderResource extends JsonResource
             'currency' => $this->currency,
             'totals' => [
                 'items' => $this->items_subtotal, 'items_tax' => $this->items_tax, 'delivery' => $this->delivery_fee,
-                'service_fee' => $this->service_fee, 'total' => $this->total,
+                'service_fee' => $this->service_fee, 'tip' => $this->tip, 'discount' => $this->discount, 'credit' => $this->credit, 'total' => $this->total,
             ],
             'lines' => $this->breakdown['lines'] ?? [],
             'dropoff' => ['lat' => $this->dropoff_lat, 'lng' => $this->dropoff_lng, 'address' => $this->dropoff_address],
@@ -51,6 +51,8 @@ class OrderResource extends JsonResource
                 'redirect_url' => $hold?->redirect_url,
             ],
             'delivery' => $this->delivery($request),
+            'can_tip' => ($d = $this->deliveries()->where('status', 'completed')->latest('id')->first()) !== null
+                && app(\App\Services\TipService::class)->canTip($d, $request->user()),
             'timestamps' => [
                 'created_at' => $this->created_at?->toIso8601String(), 'placed_at' => $this->placed_at?->toIso8601String(),
                 'expires_at' => $this->expires_at?->toIso8601String(), 'accepted_at' => $this->accepted_at?->toIso8601String(),

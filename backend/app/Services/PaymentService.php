@@ -428,6 +428,12 @@ class PaymentService
         return $p;
     }
 
+    /** A tip on a finished ride or delivery, charged straight to a saved card. */
+    public function chargeTip(Trip $trip, PaymentMethod $card, float $amount): Payment
+    {
+        return $this->charge($trip, $card, $amount, 'tip');
+    }
+
     // ================================================================= internals
 
     private function onHoldAuthorized(Payment $hold): void

@@ -69,6 +69,8 @@ class Trip extends Model
             'passengers' => 'integer',
             'requested_at' => 'datetime',
             'scheduled_at' => 'datetime',
+            'tipped_at' => 'datetime',
+            'tip_amount' => 'float',
             'accepted_at' => 'datetime',
             'arrived_at' => 'datetime',
             'started_at' => 'datetime',

@@ -404,6 +404,7 @@ class TripService
                 'wait_duration_s' => ($t->arrived_at && $t->started_at) ? (int) max(0, $t->arrived_at->diffInSeconds($t->started_at, true)) : 0,
                 'subtotal' => $ex, 'tax_amount' => round($fee - $ex, 2), 'final_fare' => $fee,
                 'platform_fee' => (float) $order->delivery_platform_share, 'driver_earnings' => (float) $order->driver_earnings,
+                'tip_amount' => (float) $order->tip, // checkout tip: 100% to the driver
                 // The customer paid by card with the order; nothing is owed on the trip itself.
                 'payment_status' => PaymentStatus::Paid, 'amount_due' => 0,
             ])->save();

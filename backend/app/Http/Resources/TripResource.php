@@ -50,6 +50,8 @@ class TripResource extends Resource
                 'tax' => $this->tax_amount,
             ],
             'driver_earnings' => $this->when($isDriverOrAdmin, $this->driver_earnings),
+            'tip' => (float) $this->tip_amount,
+            'can_tip' => $isRiderOrAdmin && app(\App\Services\TipService::class)->canTip($this->resource, $request->user()),
             'platform_fee' => $this->when($request->user()?->isAdmin() ?? false, $this->platform_fee),
             'currency' => $this->currency,
             'fare_breakdown' => $this->fare_breakdown ? ['lines' => $this->fare_breakdown['lines'] ?? [], 'total' => $this->fare_breakdown['total'] ?? null] : null,

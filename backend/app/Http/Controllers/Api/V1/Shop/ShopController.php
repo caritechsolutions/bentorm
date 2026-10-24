@@ -80,12 +80,13 @@ class ShopController extends Controller
     public function quote(Request $request): JsonResponse
     {
         [$store, $data] = $this->cartRequest($request);
-        $q = $this->orders->quote($store, $data['items'], (float) $data['lat'], (float) $data['lng']);
+        $q = $this->orders->quote($store, $data['items'], (float) $data['lat'], (float) $data['lng'], $this->extras($request, $data));
 
         return response()->json([
             'store' => $store->slug, 'currency' => $q['totals']['currency'], 'items' => $q['lines'], 'lines' => $q['breakdown']['lines'],
             'totals' => ['items' => $q['totals']['items_subtotal'], 'items_tax' => $q['totals']['items_tax'], 'delivery' => $q['totals']['delivery_fee'],
-                'service_fee' => $q['totals']['service_fee'], 'total' => $q['totals']['total']],
+                'service_fee' => $q['totals']['service_fee'], 'tip' => $q['totals']['tip'], 'discount' => $q['totals']['discount'],
+                'credit' => $q['totals']['credit'], 'total' => $q['totals']['total']],
             'prices_include_vat' => $q['breakdown']['prices_include_vat'],
             'distance_m' => $q['route']->distanceM, 'prep_minutes' => $store->currentPrepMinutes(),
             'eta_minutes' => $store->currentPrepMinutes() + (int) ceil($q['route']->durationS / 60) + 10,
@@ -97,7 +98,7 @@ class ShopController extends Controller
     {
         [$store, $data] = $this->cartRequest($request, true);
         $order = $this->orders->place($request->user(), $store, $data['items'], (float) $data['lat'], (float) $data['lng'],
-            $data['address'] ?? null, $data['note'] ?? null, $data['payment_method_id'] ?? null);
+            $data['address'] ?? null, $data['note'] ?? null, $data['payment_method_id'] ?? null, $this->extras($request, $data));
 
         return (new OrderResource($order->fresh(['items', 'store', 'card', 'payments'])))->response()->setStatusCode(201);
     }
@@ -139,6 +140,12 @@ class ShopController extends Controller
 
     // ---------------------------------------------------------------- helpers
 
+    /** Tip (and later promo / credit) asked for at checkout. */
+    private function extras(Request $request, array $data): array
+    {
+        return array_filter(['tip' => isset($data['tip']) ? (float) $data['tip'] : null], fn ($v) => $v !== null);
+    }
+
     /** Approved stores; with lat/lng given, only those in that service area. */
     private function visibleStores(Request $request, bool $withinArea = true)
     {
@@ -178,6 +185,7 @@ class ShopController extends Controller
             'items.*.options.*.group' => ['required', 'string'],
             'items.*.options.*.choices' => ['required', 'array'],
             'items.*.note' => ['nullable', 'string', 'max:200'],
+            'tip' => ['nullable', 'numeric', 'min:0'],
         ] + ($placing ? [
             'address' => ['nullable', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:500'],

@@ -50,7 +50,7 @@ class OrderService
      * @param  array<int, array{product_id: int, quantity: int, options?: array, note?: ?string}>  $lines
      * @return array{store: Store, lines: array, totals: array, breakdown: array, route: mixed, dropoff: mixed}
      */
-    public function quote(Store $store, array $lines, float $lat, float $lng): array
+    public function quote(Store $store, array $lines, float $lat, float $lng, array $extras = []): array
     {
         if (! $store->isAcceptingOrders()) {
             throw ValidationException::withMessages(['store' => [$store->isApproved() ? "{$store->name} is closed right now." : 'This store is not available.']]);
@@ -101,7 +101,22 @@ class OrderService
         $delivery = $this->pricing->deliveryQuote($from, $to);
 
         return ['store' => $store, 'lines' => $priced, 'route' => $delivery['route'], 'dropoff' => $to]
-            + $this->totals($store, $subtotal, $delivery);
+            + $this->totals($store, $subtotal, $delivery, $this->checkTip($extras));
+    }
+
+    /** A checkout tip: allowed when tips are on, up to the maximum. */
+    private function checkTip(array $extras): array
+    {
+        $tip = (float) ($extras['tip'] ?? 0);
+        if ($tip > 0) {
+            \App\Support\Features::require('tips', 'Tipping');
+            $max = \App\Support\Features::number('tips.max_amount');
+            if ($tip > $max) {
+                throw ValidationException::withMessages(['tip' => [sprintf('The largest tip is %.2f.', $max)]]);
+            }
+        }
+
+        return $extras;
     }
 
     /**
@@ -146,7 +161,12 @@ class OrderService
     }
 
     /** Totals and the money split for an item subtotal and a delivery quote. */
-    private function totals(Store $store, float $subtotal, array $delivery): array
+    /**
+     * Totals and the money split for an item subtotal and a delivery quote. $extras: tip (to the driver),
+     * discount (promo, paid by Ride Coop) and credit (the customer's ride credit). Discount + credit never take the
+     * card charge below 1.00, and never touch what the store or driver gets.
+     */
+    private function totals(Store $store, float $subtotal, array $delivery, array $extras = []): array
     {
         $area = $store->serviceArea;
         $taxRate = (float) ($area?->tax_rate ?? 0);
@@ -158,7 +178,11 @@ class OrderService
 
         $deliveryFee = round((float) $delivery['fare'], 2);
         $deliveryEx = round((float) $delivery['subtotal'], 2);
-        $total = round($subtotal + $itemsTax + $deliveryFee + $serviceFee, 2);
+        $tip = round(max(0, (float) ($extras['tip'] ?? 0)), 2);
+        $gross = round($subtotal + $itemsTax + $deliveryFee + $serviceFee + $tip, 2);
+        $discount = round(min(max(0, (float) ($extras['discount'] ?? 0)), max(0, $gross - 1)), 2);
+        $credit = round(min(max(0, (float) ($extras['credit'] ?? 0)), max(0, $gross - $discount - 1)), 2);
+        $total = round($gross - $discount - $credit, 2);
 
         $commissionRate = $store->commission_rate ?? ShopSettings::value('shop.commission_rate');
         $commission = round($subtotal * $commissionRate, 2);
@@ -171,12 +195,15 @@ class OrderService
             $itemsTax > 0 ? ['code' => 'items_tax', 'label' => sprintf('%s on items (%s%%)', $taxLabel, rtrim(rtrim(number_format($taxRate * 100, 2), '0'), '.')), 'amount' => $itemsTax] : null,
             ['code' => 'delivery', 'label' => sprintf('Delivery (%.1f km)', $km), 'amount' => $deliveryFee],
             $serviceFee > 0 ? ['code' => 'service_fee', 'label' => 'Service fee', 'amount' => $serviceFee] : null,
+            $tip > 0 ? ['code' => 'tip', 'label' => 'Tip for your driver', 'amount' => $tip] : null,
+            $discount > 0 ? ['code' => 'discount', 'label' => 'Promo'.(isset($extras['promo_code']) ? ' '.$extras['promo_code'] : ''), 'amount' => -$discount] : null,
+            $credit > 0 ? ['code' => 'credit', 'label' => 'Ride credit', 'amount' => -$credit] : null,
         ]));
 
         return [
             'totals' => [
                 'currency' => $cur, 'items_subtotal' => $subtotal, 'items_tax' => $itemsTax, 'delivery_fee' => $deliveryFee,
-                'delivery_fee_ex_tax' => $deliveryEx, 'service_fee' => $serviceFee, 'total' => $total,
+                'delivery_fee_ex_tax' => $deliveryEx, 'service_fee' => $serviceFee, 'tip' => $tip, 'discount' => $discount, 'credit' => $credit, 'total' => $total,
                 'commission' => $commission, 'store_payout' => round($subtotal + $itemsTax - $commission, 2),
                 'delivery_platform_share' => $platformDelivery, 'driver_earnings' => round($deliveryEx - $platformDelivery, 2),
             ],
@@ -185,6 +212,7 @@ class OrderService
                 'prices_include_vat' => $store->vat_registered && $store->prices_include_vat,
                 'rates' => ['commission' => $commissionRate, 'delivery_share' => ShopSettings::value('shop.delivery_share'), 'tax' => $taxRate],
                 'delivery' => $delivery['breakdown'] ?? null,
+                'promo_code' => $extras['promo_code'] ?? null,
             ],
         ];
     }
@@ -192,9 +220,9 @@ class OrderService
     // ================================================================= customer
 
     /** Place an order: price it, hold the total on the card. 3-D Secure leaves it pending_payment. */
-    public function place(User $customer, Store $store, array $lines, float $lat, float $lng, ?string $address, ?string $note, ?string $cardId): Order
+    public function place(User $customer, Store $store, array $lines, float $lat, float $lng, ?string $address, ?string $note, ?string $cardId, array $extras = []): Order
     {
-        $q = $this->quote($store, $lines, $lat, $lng);
+        $q = $this->quote($store, $lines, $lat, $lng, $extras);
         $card = $this->payments->cardForRide($customer, $cardId, $store->service_area_id);
 
         $order = DB::transaction(function () use ($customer, $store, $q, $lat, $lng, $address, $note, $card) {
@@ -344,7 +372,7 @@ class OrderService
             throw ValidationException::withMessages(['items' => ['That\'s everything — decline the order instead.']]);
         }
         $keep = round($order->items()->where('removed', false)->whereNotIn('id', $items->pluck('id'))->sum('line_total'), 2);
-        $new = $this->totals($store, $keep, ['fare' => $order->delivery_fee, 'subtotal' => $order->delivery_fee_ex_tax, 'distance_m' => (int) $order->distance_m]);
+        $new = $this->totals($store, $keep, ['fare' => $order->delivery_fee, 'subtotal' => $order->delivery_fee_ex_tax, 'distance_m' => (int) $order->distance_m], $this->extrasOf($order));
         $order->forceFill(['change_request' => [
             'status' => 'pending', 'item_ids' => $items->pluck('id')->all(),
             'items' => $items->map(fn ($i) => ['name' => $i->name, 'quantity' => $i->quantity])->all(),
@@ -540,10 +568,16 @@ class OrderService
         });
     }
 
+    /** Tip / promo / credit already on an order, for recalculating after items change. */
+    private function extrasOf(Order $order): array
+    {
+        return ['tip' => $order->tip, 'discount' => $order->discount, 'credit' => $order->credit, 'promo_code' => $order->breakdown['promo_code'] ?? null];
+    }
+
     private function recalculate(Order $order): void
     {
         $keep = round($order->items()->where('removed', false)->sum('line_total'), 2);
-        $t = $this->totals($order->store, $keep, ['fare' => $order->delivery_fee, 'subtotal' => $order->delivery_fee_ex_tax, 'distance_m' => (int) $order->distance_m]);
+        $t = $this->totals($order->store, $keep, ['fare' => $order->delivery_fee, 'subtotal' => $order->delivery_fee_ex_tax, 'distance_m' => (int) $order->distance_m], $this->extrasOf($order));
         $order->forceFill(collect($t['totals'])->except('currency')->all() + ['breakdown' => $t['breakdown']])->save();
     }
 

@@ -22,6 +22,7 @@ class Order extends Model
             'items_subtotal' => 'float', 'items_tax' => 'float', 'delivery_fee' => 'float', 'delivery_fee_ex_tax' => 'float',
             'service_fee' => 'float', 'total' => 'float', 'commission' => 'float', 'store_payout' => 'float',
             'delivery_platform_share' => 'float', 'driver_earnings' => 'float',
+            'tip' => 'float', 'discount' => 'float', 'credit' => 'float',
             'dropoff_lat' => 'float', 'dropoff_lng' => 'float',
             'breakdown' => 'array', 'change_request' => 'array',
             'placed_at' => 'datetime', 'expires_at' => 'datetime', 'accepted_at' => 'datetime', 'ready_by' => 'datetime',

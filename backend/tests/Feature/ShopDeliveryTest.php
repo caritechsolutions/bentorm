@@ -91,11 +91,11 @@ class ShopDeliveryTest extends TestCase
         return $d->fresh();
     }
 
-    private function acceptedOrder(int $prep = 30): Order
+    private function acceptedOrder(int $prep = 30, array $extras = []): Order
     {
         $card = $this->card();
         $o = app(OrderService::class)->place($this->customer, $this->store, [['product_id' => $this->fish->id, 'quantity' => 1]],
-            self::BRIDGETOWN[0], self::BRIDGETOWN[1], 'Bay Street', 'Blue gate', $card);
+            self::BRIDGETOWN[0], self::BRIDGETOWN[1], 'Bay Street', 'Blue gate', $card, $extras);
 
         return app(OrderService::class)->accept($o->fresh(), $this->store, $prep);
     }
@@ -265,5 +265,31 @@ class ShopDeliveryTest extends TestCase
         $d = $this->driver(false);
         $this->actingAs($d, 'sanctum')->patchJson('/api/v1/driver/profile', ['accepts_deliveries' => true])->assertOk()->assertJsonPath('accepts_deliveries', true);
         $this->assertTrue($d->driverProfile->fresh()->accepts_deliveries);
+    }
+
+    public function test_tips_at_checkout_and_after_delivery_go_to_the_driver(): void
+    {
+        $d = $this->driver(true);
+        $this->actingAs($this->customer, 'sanctum');
+        $q = $this->postJson('/api/v1/shop/quote', ['store' => $this->store->slug, 'lat' => self::BRIDGETOWN[0], 'lng' => self::BRIDGETOWN[1],
+            'items' => [['product_id' => $this->fish->id, 'quantity' => 1]], 'tip' => 4])->assertOk();
+        $this->assertEquals(4, $q->json('totals.tip'));
+        $this->assertContains('Tip for your driver', array_column($q->json('lines'), 'label'));
+
+        $order = $this->acceptedOrder(5, ['tip' => 4]);
+        $this->assertEqualsWithDelta($order->total, $order->hold()->authorized_amount, 0.001, 'the tip is in the hold');
+        app(OrderService::class)->dispatchDue();
+        $trip = $order->fresh()->activeDelivery();
+        $this->wave($trip);
+        $this->actingAs($d, 'sanctum')->postJson("/api/v1/driver/trips/{$trip->public_id}/accept")->assertOk();
+        app(OrderService::class)->pickedUp($order->fresh(), $this->store);
+        $this->actingAs($this->customer, 'sanctum')->postJson("/api/v1/shop/orders/{$order->public_id}/tip", ['amount' => 3])->assertStatus(409);
+        $this->actingAs($d, 'sanctum')->postJson("/api/v1/driver/trips/{$trip->public_id}/complete", ['pin' => $order->fresh()->delivery_pin])->assertOk();
+        $this->assertSame(4.0, $trip->fresh()->tip_amount);
+
+        $this->actingAs($this->customer, 'sanctum')->getJson("/api/v1/shop/orders/{$order->public_id}")->assertJsonPath('can_tip', true);
+        $this->postJson("/api/v1/shop/orders/{$order->public_id}/tip", ['amount' => 3])->assertOk()->assertJsonPath('can_tip', false);
+        $this->assertSame([7.0, 7.0], [$trip->fresh()->tip_amount, $order->fresh()->tip]);
+        $this->assertTrue($this->pushedTo($d->id, 'tipped you BBD 3.00'));
     }
 }
