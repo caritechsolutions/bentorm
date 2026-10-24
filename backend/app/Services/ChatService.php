@@ -36,8 +36,8 @@ class ChatService
         abort_unless($this->canChat($trip), 409, 'Chat is open while a driver is on the way and during the trip.');
         $m = TripMessage::query()->create(['trip_id' => $trip->id, 'sender_id' => $sender->id, 'body' => mb_substr(trim($body), 0, 500)]);
         $to = $sender->id === $trip->driver_id ? $trip->rider_id : $trip->driver_id;
-        event(new UserSignal($to, 'chat.message', ['trip_id' => $trip->public_id, 'id' => $m->id, 'body' => $m->body, 'sender' => $sender->firstName()]));
-        $this->push->notify($to, new PushMessage($sender->firstName(), $m->body, ['type' => 'chat', 'trip_id' => $trip->public_id],
+        UserSignal::send($to, 'chat.message', ['trip_id' => $trip->public_id, 'id' => $m->id, 'body' => $m->body, 'sender' => $sender->firstName()]);
+        $this->push->notify($to, new PushMessage($sender->firstName(), $m->body, ['type' => 'chat', 'trip_id' => $trip->public_id] + ($trip->order_id && $to === $trip->rider_id ? ['order_id' => $trip->order?->public_id] : []),
             collapseKey: 'chat-'.$trip->public_id, urgent: true));
 
         return $m;

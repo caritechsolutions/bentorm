@@ -196,8 +196,18 @@ void main() {
     expect(find.text('Smoke will collect your order'), findsOneWidget);
     expect(find.text('Toyota Corolla · ZR101'), findsOneWidget);
     expect(find.text(pin.split('').join(' ')), findsOneWidget);
-    await tapKey(tester, 'call-driver');
-    expect(opened.single.toString(), 'tel:+12465550202');
+    // Numbers stay private: message (or call) the driver through the app.
+    final tripId = fixture('shop_order_driver_assigned')['delivery']['trip_id'] as String;
+    expect(find.byKey(const Key('order-call')), findsOneWidget);
+    server
+      ..on('GET /trips/$tripId/messages', {'messages': <dynamic>[], 'open': true})
+      ..on('POST /trips/$tripId/messages', fixture('message_sent'), status: 201);
+    await tapKey(tester, 'order-chat');
+    await tester.enterText(find.byKey(const Key('chat-input')), 'Blue gate please');
+    await tapKey(tester, 'chat-send');
+    expect(server.calls('POST /trips/$tripId/messages').single.body, contains('Blue gate please'));
+    await tester.pageBack();
+    await settle(tester);
     expect(find.byKey(const Key('cancel-order')), findsNothing);
 
     stage = 'shop_order_on_the_way';
@@ -212,6 +222,17 @@ void main() {
     expect(find.text('Delivered — enjoy!'), findsOneWidget);
     expect(find.byKey(const Key('delivery-pin-card')), findsNothing);
     expect(find.textContaining('charged'), findsOneWidget);
+
+    // Tip the driver after delivery (100% to them, on the same card).
+    final tipped = fixture('shop_order_delivered') as Map<String, dynamic>;
+    tipped['can_tip'] = false;
+    (tipped['totals'] as Map)['tip'] = 5;
+    server.on('POST /shop/orders/$id/tip', tipped);
+    await tapKey(tester, 'order-tip-5');
+    await tapKey(tester, 'order-send-tip');
+    expect(server.calls('POST /shop/orders/$id/tip').single.body, contains('"amount":5'));
+    expect(find.byKey(const Key('order-tip-box')), findsNothing);
+    expect(find.textContaining('Tip BBD 5.00'), findsOneWidget);
     await unmount(tester);
   });
 

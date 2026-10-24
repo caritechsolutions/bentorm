@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ridecoop_core/ridecoop_core.dart' show AppPages, IncomingCalls, LiveLink;
 
 import 'api/api_client.dart';
 import 'api/rider_api.dart';
@@ -7,6 +8,7 @@ import 'config.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/shop/order_screen.dart';
+import 'screens/trip_screen.dart';
 import 'state/cart.dart';
 import 'state/location.dart';
 import 'state/push.dart';
@@ -19,29 +21,48 @@ final navigatorKey = GlobalKey<NavigatorState>();
 void main() {
   final api = RiderApi(ApiClient(baseUrl: AppConfig.apiBase));
   final session = Session(api, SecureTokenStore(), role: 'rider');
-  // A tapped order notification opens that order. (Open screens refresh themselves every few seconds.)
+  final live = LiveLink(session);
+  final calls = IncomingCalls(navigator: navigatorKey, client: api.client, session: session, live: live);
+  // Notifications: a call rings at once; a tapped one opens its order, ride or help page.
+  // (Open screens refresh themselves, so nothing else is needed while the app is in front.)
   final push = PushRegistrar(api, session, onMessage: (data, {required tapped}) async {
-    final id = data['order_id'];
-    if (!tapped || id == null || id.isEmpty) return;
+    if (data['type'] == 'call') {
+      calls.check();
+      return;
+    }
+    if (!tapped) return;
     try {
-      final order = await api.order(id);
-      navigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => OrderScreen(initial: order)));
+      final page = data['page'];
+      final orderId = data['order_id'];
+      final tripId = data['trip_id'];
+      if (page != null && page.isNotEmpty) {
+        await AppPages.open(api.client, page);
+      } else if (orderId != null && orderId.isNotEmpty) {
+        final order = await api.order(orderId);
+        navigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => OrderScreen(initial: order)));
+      } else if (tripId != null && tripId.isNotEmpty && data['type'] == 'chat') {
+        final snap = await api.trip(tripId);
+        if (snap.trip != null) navigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => TripScreen(initial: snap.trip!)));
+      }
     } on ApiException {
-      // Offline: the order is on the home screen when the app connects.
+      // Offline: the order or ride is on the home screen when the app connects.
     }
   });
-  runApp(RideCoopApp(session: session, location: LocationService(), push: push));
+  runApp(RideCoopApp(session: session, location: LocationService(), push: push, live: live));
   session.restore();
+  live.start();
+  calls.start();
   push.attach();
 }
 
 class RideCoopApp extends StatelessWidget {
-  RideCoopApp({super.key, required this.session, required this.location, Cart? cart, this.push}) : cart = cart ?? Cart();
+  RideCoopApp({super.key, required this.session, required this.location, Cart? cart, this.push, this.live}) : cart = cart ?? Cart();
 
   final Session session;
   final LocationService location;
   final Cart cart;
   final PushRegistrar? push;
+  final LiveLink? live;
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +71,7 @@ class RideCoopApp extends StatelessWidget {
       location: location,
       cart: cart,
       push: push,
+      live: live,
       child: MaterialApp(
         navigatorKey: navigatorKey,
         title: Brand.name,

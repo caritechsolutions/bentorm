@@ -1,5 +1,5 @@
 name: ridecoop_core
-description: Shared code for the Ride Coop rider and driver apps (API client, sign-in, brand).
+description: Shared code for the Ride Coop rider and driver apps (API client, sign-in, brand, live updates, chat, calls).
 publish_to: none
 version: 1.0.0
 
@@ -12,6 +12,11 @@ dependencies:
   http: ^1.2.2
   http_parser: ^4.0.2
   flutter_secure_storage: ">=9.2.2 <11.0.0"
+  url_launcher: ^6.3.1
+  # Live updates over the server's websocket (Laravel Reverb, Pusher protocol).
+  web_socket_channel: ^3.0.1
+  # In-app audio/video calls between rider and driver (WebRTC).
+  flutter_webrtc: ">=0.12.0 <2.0.0"
 
 dev_dependencies:
   flutter_test:

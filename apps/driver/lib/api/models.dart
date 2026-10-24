@@ -309,7 +309,22 @@ class DriverTrip {
     this.stopChange,
     this.pinVerified = false,
     this.delivery,
+    this.payable,
+    this.tip = 0,
+    this.canChat = false,
+    this.canCall = false,
+    this.unreadMessages = 0,
   });
+
+  /// What the rider pays after promo / ride credit (Ride Coop covers the difference; you earn on the full fare).
+  final double? payable;
+  final double tip;
+  final bool canChat;
+  final bool canCall;
+  final int unreadMessages;
+
+  /// Cash to collect: the fare less any promo or credit.
+  double? get cashToCollect => payable ?? finalFare;
 
   /// Set for shop deliveries (null for rides).
   final DeliveryInfo? delivery;
@@ -370,6 +385,11 @@ class DriverTrip {
       stopChange: StopChange.fromJson(j['stop_change']),
       pinVerified: j['pin_verified'] == true,
       delivery: j['kind'] == 'delivery' ? DeliveryInfo.fromJson(j['delivery']) : null,
+      payable: _dn(j['payable']),
+      tip: _dn(j['tip']) ?? 0,
+      canChat: j['can_chat'] == true,
+      canCall: j['can_call'] == true,
+      unreadMessages: _in(j['unread_messages']) ?? 0,
     );
   }
 
@@ -384,7 +404,7 @@ class DriverTrip {
   bool get hasPendingStopChange => stopChange?.pending ?? false;
 
   /// Changes when anything the trip screen shows changes (used to decide whether a poll result is new).
-  String get signature => [status, for (final s in stops) '${s.lat},${s.lng},${s.reached}', stopChange?.status, stopChange?.stops.length].join('|');
+  String get signature => [status, unreadMessages, canChat, canCall, tip, for (final s in stops) '${s.lat},${s.lng},${s.reached}', stopChange?.status, stopChange?.stops.length].join('|');
 
   bool get isActive => const ['accepted', 'arrived', 'in_progress'].contains(status);
   bool get canCancel => const ['accepted', 'arrived'].contains(status);

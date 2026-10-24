@@ -79,7 +79,14 @@ class Quote {
     required this.maxPassengers,
     required this.maxLuggage,
     required this.lines,
+    this.discount = 0,
+    this.promo,
   });
+
+  /// Promo discount on this fare (Ride Coop pays it; the driver still earns the full fare).
+  final double discount;
+  final String? promo;
+  double get afterDiscount => (fare - discount).clamp(0, double.infinity).toDouble();
 
   final String vehicleType;
   final String displayName;
@@ -107,6 +114,8 @@ class Quote {
         maxPassengers: _in(j['max_passengers']) ?? 4,
         maxLuggage: _in(j['max_luggage']) ?? 2,
         lines: _l(_m(j['breakdown'])['lines']).map((e) => FareLine.fromJson(_m(e))).toList(),
+        discount: _d(j['discount']),
+        promo: _s(j['promo']),
       );
 }
 
@@ -219,7 +228,33 @@ class Trip {
     this.stopChange,
     this.pin,
     this.pinVerified = false,
+    this.scheduledAt,
+    this.tip = 0,
+    this.canTip = false,
+    this.discount = 0,
+    this.credit = 0,
+    this.payable,
+    this.promoCode,
+    this.canChat = false,
+    this.canCall = false,
+    this.unreadMessages = 0,
   });
+
+  /// Booked for later (status "scheduled" until shortly before pickup).
+  final DateTime? scheduledAt;
+  final double tip;
+  final bool canTip;
+
+  /// Promo discount and ride credit (paid by Ride Coop); [payable] is what the rider pays.
+  final double discount;
+  final double credit;
+  final double? payable;
+  final String? promoCode;
+
+  /// Safety: message or call the driver in the app (numbers stay private).
+  final bool canChat;
+  final bool canCall;
+  final int unreadMessages;
 
   final String id;
   final String status;
@@ -285,6 +320,16 @@ class Trip {
       stopChange: j['stop_change'] is Map<String, dynamic> ? StopChange.fromJson(j['stop_change']) : null,
       pin: _s(j['pin']),
       pinVerified: j['pin_verified'] == true,
+      scheduledAt: _dt(j['scheduled_at']),
+      tip: _d(j['tip']),
+      canTip: j['can_tip'] == true,
+      discount: _d(j['discount']),
+      credit: _d(j['credit']),
+      payable: _dn(j['payable']),
+      promoCode: _s(j['promo_code']),
+      canChat: j['can_chat'] == true,
+      canCall: j['can_call'] == true,
+      unreadMessages: _in(j['unread_messages']) ?? 0,
     );
   }
 
@@ -295,7 +340,7 @@ class Trip {
 
   List<TripStop> get remainingStops => stops.where((s) => !s.reached).toList();
   bool get hasDriver => const ['accepted', 'arrived', 'in_progress'].contains(status);
-  bool get canCancel => const ['pending_payment', 'requested', 'accepted', 'arrived'].contains(status);
+  bool get canCancel => const ['scheduled', 'pending_payment', 'requested', 'accepted', 'arrived'].contains(status);
 
   /// Cancelling now costs a fee (a driver has accepted).
   bool get cancelHasFee => const ['accepted', 'arrived'].contains(status);
@@ -303,6 +348,7 @@ class Trip {
   double? get fare => finalFare ?? estimatedFare;
 
   String get statusTitle => switch (status) {
+        'scheduled' => 'Ride booked',
         'pending_payment' => 'Confirm your card',
         'requested' => 'Finding your driver',
         'accepted' => 'Your driver is on the way',
@@ -377,4 +423,96 @@ class PaymentCard {
   bool get usable => status == 'active' && !expired;
   String get label => '${brand ?? 'Card'} •••• ${last4 ?? '????'}';
   String get expiry => expMonth == null ? '' : '${expMonth.toString().padLeft(2, '0')}/${(expYear ?? 0) % 100}';
+}
+
+/// Home, Work or another place the rider saved.
+class SavedPlace {
+  const SavedPlace({required this.id, required this.kind, required this.label, this.address, required this.lat, required this.lng, this.placeId});
+
+  final int id;
+  final String kind; // home | work | other
+  final String label;
+  final String? address;
+  final double lat;
+  final double lng;
+  final String? placeId;
+
+  factory SavedPlace.fromJson(Map<String, dynamic> j) => SavedPlace(
+        id: _in(j['id']) ?? 0,
+        kind: _s(j['kind']) ?? 'other',
+        label: _s(j['label']) ?? 'Saved place',
+        address: _s(j['address']),
+        lat: _d(j['lat']),
+        lng: _d(j['lng']),
+        placeId: _s(j['place_id']),
+      );
+
+  Place get place => Place(name: label, address: address, lat: lat, lng: lng, placeId: placeId);
+}
+
+/// A checked promo code.
+class PromoCheck {
+  const PromoCheck({required this.code, required this.summary, this.description, this.discount});
+  final String code;
+  final String summary;
+  final String? description;
+  final double? discount;
+
+  factory PromoCheck.fromJson(Map<String, dynamic> j) =>
+      PromoCheck(code: _s(j['code']) ?? '', summary: _s(j['summary']) ?? '', description: _s(j['description']), discount: _dn(j['discount']));
+}
+
+class CreditLine {
+  const CreditLine({required this.amount, required this.label, this.date});
+  final double amount;
+  final String label;
+  final DateTime? date;
+}
+
+class CreditInfo {
+  const CreditInfo({required this.balance, required this.currency, required this.entries});
+  final double balance;
+  final String currency;
+  final List<CreditLine> entries;
+
+  factory CreditInfo.fromJson(Map<String, dynamic> j) => CreditInfo(
+        balance: _d(j['balance']),
+        currency: _s(j['currency']) ?? 'BBD',
+        entries: [
+          for (final e in (j['entries'] as List? ?? const []))
+            if (e is Map) CreditLine(amount: _d(e['amount']), label: _s(e['label']) ?? '', date: _dt(e['date'])),
+        ],
+      );
+}
+
+class ReferralInfo {
+  const ReferralInfo({
+    required this.code,
+    required this.shareText,
+    required this.referrerCredit,
+    required this.refereeCredit,
+    required this.invited,
+    required this.rewarded,
+    required this.canEnterCode,
+    this.referredBy,
+  });
+  final String code;
+  final String shareText;
+  final double referrerCredit;
+  final double refereeCredit;
+  final int invited;
+  final int rewarded;
+  final bool canEnterCode;
+  final String? referredBy;
+
+  factory ReferralInfo.fromJson(Map<String, dynamic> j) => ReferralInfo(
+        code: _s(j['code']) ?? '',
+        shareText: _s(j['share_text']) ?? '',
+        referrerCredit: _d(j['referrer_credit']),
+        refereeCredit: _d(j['referee_credit']),
+        invited: _in(j['invited']) ?? 0,
+        rewarded: _in(j['rewarded']) ?? 0,
+        canEnterCode: j['can_enter_code'] == true,
+        referredBy: _s(j['referred_by']),
+      );
 }

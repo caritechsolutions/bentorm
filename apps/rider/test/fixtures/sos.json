@@ -1,0 +1,19 @@
+{
+  "alert_id": 2,
+  "message": "Ride Coop has been alerted and can see where you are. If you are in danger, call the police now.",
+  "emergency_numbers": [
+    {
+      "name": "Police",
+      "number": "211"
+    },
+    {
+      "name": "Ambulance",
+      "number": "511"
+    },
+    {
+      "name": "Fire",
+      "number": "311"
+    }
+  ],
+  "share_url": "http://127.0.0.1:8099/t/A5UCtCI28QdVXXXDCvBbMmKaAvWWErhE"
+}

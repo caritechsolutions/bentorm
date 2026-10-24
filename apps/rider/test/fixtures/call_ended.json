@@ -1,0 +1,18 @@
+{
+  "id": "01m5q4pbmvt6b4z4ea8k0m2n5f",
+  "trip_id": "01m5q4pa7kh30s6jxr9c9bb1wv",
+  "status": "ended",
+  "video": true,
+  "via": "app",
+  "incoming": false,
+  "other_name": "Smoke",
+  "ice_servers": [
+    {
+      "urls": [
+        "stun:stun.l.google.com:19302"
+      ]
+    }
+  ],
+  "ring_seconds": 45,
+  "phone_bridge": false
+}

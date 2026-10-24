@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ridecoop_core/ridecoop_core.dart' show AppPages;
 
 import '../api/api_client.dart';
 import '../api/models.dart';
@@ -9,11 +10,14 @@ import '../state/scope.dart';
 import '../widgets/ride_map.dart';
 import 'cards_screen.dart';
 import 'history_screen.dart';
+import 'places_screen.dart';
+import 'rewards_screens.dart';
 import 'search_screen.dart';
 import 'shop/order_screen.dart';
 import 'shop/orders_screen.dart';
 import 'shop/shop_screen.dart';
 import 'trip_screen.dart';
+import 'upcoming_screen.dart';
 
 /// Book a ride: pickup → where to → choose a vehicle → pay → request.
 class HomeScreen extends StatefulWidget {
@@ -41,6 +45,11 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _requesting = false;
   bool _started = false;
   List<Order> _orders = const [];
+  List<SavedPlace> _places = const [];
+  DateTime? _when; // null = now
+  String? _promo; // checked code, sent with the estimate and the request
+  bool _useCredit = false;
+  double _creditBalance = 0;
 
   @override
   void didChangeDependencies() {
@@ -64,6 +73,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     _loadCards();
     _loadOrders();
+    _loadPlaces();
+    _loadCredit();
     final me = await scope.location.current();
     if (!mounted) return;
     final point = me ?? const LatLngPoint(AppConfig.defaultLat, AppConfig.defaultLng);
@@ -86,6 +97,30 @@ class _HomeScreenState extends State<HomeScreen> {
     } on ApiException {
       // Cash still works.
     }
+  }
+
+  Future<void> _loadPlaces() async {
+    if (!AppScope.of(context).config.on('saved_places')) return;
+    try {
+      final p = await AppScope.of(context).api.savedPlaces();
+      if (mounted) setState(() => _places = p);
+    } on ApiException {
+      // Not essential.
+    }
+  }
+
+  Future<void> _loadCredit() async {
+    try {
+      final c = await AppScope.of(context).api.credit();
+      if (mounted) setState(() => _creditBalance = c.balance);
+    } on ApiException {
+      // Not essential.
+    }
+  }
+
+  void _goTo(SavedPlace p) {
+    setState(() => _dropoff = p.place);
+    _quote();
   }
 
   /// Shop orders still in progress, shown as banners on the start panel.
@@ -116,6 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: 'Pickup',
         near: _me,
         currentLocation: _me == null ? null : (here ?? Place(name: 'Current location', lat: _me!.lat, lng: _me!.lng)),
+        saved: _places,
       ),
     ));
     if (place != null && mounted) {
@@ -126,7 +162,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _chooseDropoff() async {
     final place = await Navigator.of(context).push<Place>(MaterialPageRoute(
-      builder: (_) => SearchScreen(title: 'Where to?', near: _me ?? (_pickup == null ? null : LatLngPoint(_pickup!.lat, _pickup!.lng))),
+      builder: (_) => SearchScreen(title: 'Where to?', near: _me ?? (_pickup == null ? null : LatLngPoint(_pickup!.lat, _pickup!.lng)), saved: _places),
     ));
     if (place != null && mounted) {
       setState(() => _dropoff = place);
@@ -156,7 +192,9 @@ class _HomeScreenState extends State<HomeScreen> {
       _estimateError = null;
     });
     try {
-      final e = await AppScope.of(context).api.estimate(_pickup!, _dropoff!, passengers: _passengers, luggage: _luggage, stops: _stops);
+      final e = await AppScope.of(context)
+          .api
+          .estimate(_pickup!, _dropoff!, passengers: _passengers, luggage: _luggage, stops: _stops, scheduledAt: _when, promoCode: _promo);
       if (!mounted) return;
       setState(() {
         _estimate = e;
@@ -167,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       setState(() {
         _estimate = null;
-        _estimateError = e.field('pickup') ?? e.field('dropoff') ?? e.field('stops') ?? e.field('stops.0') ?? e.field('stops.1') ?? e.message;
+        _estimateError = e.field('promo_code') ?? e.field('scheduled_at') ?? e.field('pickup') ?? e.field('dropoff') ?? e.field('stops') ?? e.field('stops.0') ?? e.field('stops.1') ?? e.message;
       });
     } finally {
       if (mounted) setState(() => _estimating = false);
@@ -192,12 +230,18 @@ class _HomeScreenState extends State<HomeScreen> {
         luggage: _luggage,
         features: _features.toList(),
         stops: _stops,
+        scheduledAt: _when,
+        promoCode: _promo,
+        useCredit: _useCredit && _creditBalance > 0,
       );
       if (!mounted) return;
+      if (trip.status == 'scheduled') {
+        _snack('Ride booked for ${scheduleLabel(trip.scheduledAt ?? _when!)}. We\'ll remind you when your driver is on the way.');
+      }
       await _openTrip(trip);
     } on ApiException catch (e) {
       if (!mounted) return;
-      _snack(e.status == 402 ? e.message : (e.field('vehicle_type') ?? e.field('passengers') ?? e.field('luggage') ?? e.field('pickup') ?? e.field('dropoff') ?? e.message));
+      _snack(e.status == 402 ? e.message : (e.field('scheduled_at') ?? e.field('promo_code') ?? e.field('vehicle_type') ?? e.field('passengers') ?? e.field('luggage') ?? e.field('pickup') ?? e.field('dropoff') ?? e.message));
     } finally {
       if (mounted) setState(() => _requesting = false);
     }
@@ -212,8 +256,78 @@ class _HomeScreenState extends State<HomeScreen> {
       _stops.clear();
       _estimate = null;
       _estimateError = null;
+      _when = null;
+      _promo = null;
+      _useCredit = false;
     });
     _loadCards();
+    _loadCredit();
+  }
+
+  /// Now or a time later (within the window the admin set).
+  Future<void> _pickWhen() async {
+    final cfg = AppScope.of(context).config;
+    final minMin = cfg.number('scheduled.min_minutes', 30).toInt();
+    final maxDays = cfg.number('scheduled.max_days', 7).toInt();
+    final picked = await showModalBottomSheet<DateTime?>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => _WhenSheet(current: _when, minMinutes: minMin, maxDays: maxDays),
+    );
+    if (!mounted || picked == null) return;
+    setState(() => _when = picked.millisecondsSinceEpoch == 0 ? null : picked);
+    _quote();
+  }
+
+  Future<void> _enterPromo() async {
+    final api = AppScope.of(context).api;
+    final ctl = TextEditingController(text: _promo ?? '');
+    String? error;
+    bool checking = false;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: const Text('Promo code'),
+          content: TextField(
+            key: const Key('promo-input'),
+            controller: ctl,
+            autofocus: true,
+            textCapitalization: TextCapitalization.characters,
+            decoration: InputDecoration(hintText: 'e.g. WELCOME10', errorText: error),
+          ),
+          actions: [
+            if (_promo != null) TextButton(onPressed: () => Navigator.pop(ctx, ''), child: const Text('Remove')),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(
+              key: const Key('promo-apply'),
+              onPressed: checking
+                  ? null
+                  : () async {
+                      if (ctl.text.trim().isEmpty) return;
+                      setD(() {
+                        checking = true;
+                        error = null;
+                      });
+                      try {
+                        final p = await api.checkPromo(ctl.text, forWhat: 'rides', amount: _quoteSelected?.fare);
+                        if (ctx.mounted) Navigator.pop(ctx, p.code);
+                      } on ApiException catch (e) {
+                        setD(() => error = e.field('code') ?? e.message);
+                      } finally {
+                        if (ctx.mounted) setD(() => checking = false);
+                      }
+                    },
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || result == null) return;
+    setState(() => _promo = result.isEmpty ? null : result);
+    _quote();
   }
 
   void _snack(String message) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
@@ -403,6 +517,25 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
+          if (_places.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(children: [
+                  for (final p in _places)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ActionChip(
+                        key: Key('saved-${p.id}'),
+                        avatar: Icon(placeIcon(p.kind), size: 18),
+                        label: Text(p.label),
+                        onPressed: () => _goTo(p),
+                      ),
+                    ),
+                ]),
+              ),
+            ),
         ],
       );
 
@@ -455,8 +588,31 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.tune, size: 18),
               label: Text(_features.isEmpty ? 'Needs' : 'Needs (${_features.length})'),
             ),
+            if (AppScope.of(context).config.on('scheduled_rides'))
+              TextButton.icon(
+                key: const Key('when'),
+                onPressed: _pickWhen,
+                icon: Icon(_when == null ? Icons.schedule : Icons.event, size: 18),
+                label: Text(_when == null ? 'Now' : scheduleLabel(_when!)),
+              ),
+            if (AppScope.of(context).config.on('promos'))
+              TextButton.icon(
+                key: const Key('promo'),
+                onPressed: _enterPromo,
+                icon: const Icon(Icons.local_offer_outlined, size: 18),
+                label: Text(_promo ?? 'Promo code'),
+              ),
           ],
         ),
+        if (_creditBalance > 0)
+          SwitchListTile(
+            key: const Key('use-credit'),
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            title: Text('Use ride credit (${money(_creditBalance, q?.currency ?? 'BBD')})'),
+            value: _useCredit,
+            onChanged: (v) => setState(() => _useCredit = v),
+          ),
         const Divider(),
         if (_estimating) const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())),
         if (!_estimating && _estimateError != null)
@@ -478,11 +634,15 @@ class _HomeScreenState extends State<HomeScreen> {
           onPressed: q == null || _requesting || _estimating ? null : _request,
           child: _requesting
               ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-              : Text(q == null ? 'Request' : 'Request ${q.displayName} · ${money(q.fare, q.currency)}'),
+              : Text(q == null
+                  ? (_when == null ? 'Request' : 'Book')
+                  : '${_when == null ? 'Request' : 'Book'} ${q.displayName} · ${money(q.afterDiscount, q.currency)}'),
         ),
         TextButton(
           onPressed: () => setState(() {
             _dropoff = null;
+            _when = null;
+            _promo = null;
             _stops.clear();
             _estimate = null;
             _estimateError = null;
@@ -607,7 +767,12 @@ class _QuoteTile extends StatelessWidget {
                     if (quote.surge > 1) Text('Busy time ×${quote.surge.toStringAsFixed(2)}', style: const TextStyle(color: Brand.red, fontSize: 12)),
                   ]),
                 ),
-                Text(money(quote.fare, quote.currency), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Text(money(quote.afterDiscount, quote.currency), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  if (quote.discount > 0)
+                    Text(money(quote.fare, quote.currency),
+                        style: const TextStyle(color: Colors.black45, fontSize: 13, decoration: TextDecoration.lineThrough)),
+                ]),
               ]),
             ),
           ),
@@ -623,6 +788,7 @@ class _AccountDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final session = AppScope.of(context).session;
+    final cfg = AppScope.of(context).config;
     final user = session.user;
     return Drawer(
       child: SafeArea(
@@ -665,6 +831,16 @@ class _AccountDrawer extends StatelessWidget {
                 onOrders();
               },
             ),
+            if (cfg.on('scheduled_rides'))
+              ListTile(
+                key: const Key('drawer-upcoming'),
+                leading: const Icon(Icons.event),
+                title: const Text('Booked rides'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UpcomingScreen()));
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.credit_card),
               title: const Text('Payment'),
@@ -674,6 +850,52 @@ class _AccountDrawer extends StatelessWidget {
                 onChanged();
               },
             ),
+            if (cfg.on('saved_places'))
+              ListTile(
+                key: const Key('drawer-places'),
+                leading: const Icon(Icons.bookmark_border),
+                title: const Text('Saved places'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PlacesScreen()));
+                  onChanged();
+                },
+              ),
+            ListTile(
+              key: const Key('drawer-credit'),
+              leading: const Icon(Icons.savings_outlined),
+              title: const Text('Ride credit'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CreditScreen()));
+              },
+            ),
+            if (cfg.on('referrals'))
+              ListTile(
+                key: const Key('drawer-invite'),
+                leading: const Icon(Icons.card_giftcard),
+                title: const Text('Invite friends'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const InviteScreen()));
+                },
+              ),
+            if (cfg.on('support'))
+              ListTile(
+                key: const Key('drawer-help'),
+                leading: const Icon(Icons.help_outline),
+                title: const Text('Help'),
+                onTap: () async {
+                  final client = AppScope.of(context).api.client;
+                  final messenger = ScaffoldMessenger.of(context);
+                  Navigator.pop(context);
+                  try {
+                    await AppPages.open(client, 'help');
+                  } on ApiException catch (e) {
+                    messenger.showSnackBar(SnackBar(content: Text(e.message)));
+                  }
+                },
+              ),
             const Spacer(),
             ListTile(
               leading: const Icon(Icons.logout),
@@ -687,6 +909,98 @@ class _AccountDrawer extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+IconData placeIcon(String kind) => switch (kind) { 'home' => Icons.home_outlined, 'work' => Icons.work_outline, _ => Icons.place_outlined };
+
+/// Day chips and 15-minute times. Pops with the time, or DateTime(0) for "Now".
+class _WhenSheet extends StatefulWidget {
+  const _WhenSheet({this.current, required this.minMinutes, required this.maxDays});
+  final DateTime? current;
+  final int minMinutes;
+  final int maxDays;
+
+  @override
+  State<_WhenSheet> createState() => _WhenSheetState();
+}
+
+class _WhenSheetState extends State<_WhenSheet> {
+  late final DateTime _earliest;
+  late int _day;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = DateTime.now().add(Duration(minutes: widget.minMinutes + 5));
+    // Round up to the next quarter hour.
+    _earliest = DateTime(e.year, e.month, e.day, e.hour, (e.minute ~/ 15) * 15).add(Duration(minutes: e.minute % 15 == 0 ? 0 : 15));
+    final c = widget.current;
+    final today = DateTime(_earliest.year, _earliest.month, _earliest.day);
+    _day = c == null ? 0 : DateTime(c.year, c.month, c.day).difference(today).inDays.clamp(0, widget.maxDays);
+  }
+
+  List<DateTime> _times() {
+    final first = DateTime(_earliest.year, _earliest.month, _earliest.day).add(Duration(days: _day));
+    final latest = DateTime.now().add(Duration(days: widget.maxDays));
+    return [
+      for (var m = 0; m < 24 * 60; m += 15)
+        if (!first.add(Duration(minutes: m)).isBefore(_earliest) && !first.add(Duration(minutes: m)).isAfter(latest)) first.add(Duration(minutes: m)),
+    ];
+  }
+
+  String _dayLabel(int i) {
+    if (i == 0) return 'Today';
+    if (i == 1) return 'Tomorrow';
+    final d = DateTime(_earliest.year, _earliest.month, _earliest.day).add(Duration(days: i));
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return '${days[d.weekday - 1]} ${d.day}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final times = _times();
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.6,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text('When do you want to be picked up?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ),
+          ListTile(
+            key: const Key('when-now'),
+            leading: const Icon(Icons.bolt),
+            title: const Text('Now'),
+            onTap: () => Navigator.pop(context, DateTime.fromMillisecondsSinceEpoch(0)),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(children: [
+              for (var i = 0; i <= widget.maxDays; i++)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(key: Key('when-day-$i'), label: Text(_dayLabel(i)), selected: _day == i, onSelected: (_) => setState(() => _day = i)),
+                ),
+            ]),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: times.isEmpty
+                ? const Center(child: Text('No times left on this day.'))
+                : ListView(children: [
+                    for (final t in times)
+                      ListTile(
+                        key: Key('when-time-${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}'),
+                        title: Text(scheduleLabel(t)),
+                        onTap: () => Navigator.pop(context, t),
+                      ),
+                  ]),
+          ),
+        ]),
       ),
     );
   }

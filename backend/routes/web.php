@@ -16,7 +16,7 @@ Route::get('/t/{token}', function (string $token, App\Services\SafetyService $sa
     abort_unless($trip, 404);
 
     return view('share.trip', ['token' => $token, 'trip' => $trip]);
-})->where('token', '[A-Za-z0-9]+')->middleware('throttle:60,1');
+})->where('token', '[A-Za-z0-9]+')->middleware('throttle:60,1,get-t-token');
 Route::get('/t/{token}.json', function (string $token, App\Services\SafetyService $safety, App\Services\DriverLocationService $locations) {
     $t = $safety->sharedTrip($token);
     abort_unless($t, 404);
@@ -33,7 +33,7 @@ Route::get('/t/{token}.json', function (string $token, App\Services\SafetyServic
         'driver_position' => $t->isActive() && $t->driver_id && ($p = $locations->position($t->driver_id))
             ? ['lat' => $p['lat'], 'lng' => $p['lng'], 'heading' => $p['heading']] : null,
     ])->header('Cache-Control', 'no-store');
-})->where('token', '[A-Za-z0-9]+')->middleware('throttle:120,1');
+})->where('token', '[A-Za-z0-9]+')->middleware('throttle:120,1,get-t-token-json');
 
 // Web pages inside the apps (help, support, statements…): routes/app.php
 Route::prefix('app')->group(base_path('routes/app.php'));

@@ -1,0 +1,8 @@
+{
+  "message": "That promo code isn't valid.",
+  "errors": {
+    "promo_code": [
+      "That promo code isn't valid."
+    ]
+  }
+}

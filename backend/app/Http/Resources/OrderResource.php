@@ -93,6 +93,12 @@ class OrderResource extends JsonResource
             'driver_position' => $withDriver ? app(DriverLocationService::class)->position($trip->driver_id) : null,
             // Read to the driver at the door. Only the customer sees it.
             'pin' => $this->when($isCustomer && $this->delivery_pin !== null && $this->resource->isActive() && $this->status !== OrderStatus::PendingPayment, $this->delivery_pin),
+            // The delivery trip: the customer can message or call the driver through the app (numbers stay private).
+            'trip_id' => $withDriver ? $trip->public_id : null,
+            'can_chat' => $isCustomer && $withDriver && app(\App\Services\ChatService::class)->canChat($trip),
+            'can_call' => $isCustomer && $withDriver && app(\App\Services\CallService::class)->canCall($trip),
+            'unread_messages' => $isCustomer && $withDriver ? \App\Models\TripMessage::query()->where('trip_id', $trip->id)
+                ->where('sender_id', '!=', $request->user()->id)->whereNull('read_at')->count() : 0,
             'no_driver_alert' => $this->driver_alert_at !== null && $status === 'searching',
             'can_cancel' => $isCustomer && ($this->status->value === 'placed' || $this->status->value === 'pending_payment' || app(OrderService::class)->customerMayCancelForNoDriver($this->resource)),
         ];

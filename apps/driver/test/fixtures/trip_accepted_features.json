@@ -1,0 +1,155 @@
+{
+  "id": "01m5q4pa7kh30s6jxr9c9bb1wv",
+  "status": "accepted",
+  "vehicle_type": "standard",
+  "service_area_id": 1,
+  "rider": {
+    "id": 26,
+    "name": "Rita Rider",
+    "role": "rider",
+    "avatar_url": null
+  },
+  "driver": {
+    "id": 3,
+    "name": "Smoke Driver",
+    "phone": "+12465550202",
+    "email": null,
+    "role": "driver",
+    "country_code": null,
+    "avatar_url": null,
+    "is_active": true,
+    "driver_profile": {
+      "status": "approved",
+      "status_note": null,
+      "service_area_id": 1,
+      "is_online": true,
+      "accepts_deliveries": false,
+      "rating_avg": 5.0,
+      "rating_count": 13,
+      "completed_trips": 24,
+      "licence_number": "L1",
+      "licence_expiry": "2030-01-01",
+      "psv_permit_number": null,
+      "current_vehicle_id": 3,
+      "approved_at": "2026-10-24T02:47:04+00:00"
+    },
+    "created_at": "2026-10-22T11:45:18+00:00"
+  },
+  "vehicle": {
+    "id": 3,
+    "driver_id": 3,
+    "make": "Toyota",
+    "model": "Corolla",
+    "year": null,
+    "colour": null,
+    "plate": "ZR101",
+    "seats": 4,
+    "luggage_capacity": 2,
+    "features": [
+      "child_seat"
+    ],
+    "vehicle_type": "standard",
+    "status": "approved",
+    "status_note": null,
+    "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/45"
+  },
+  "pickup": {
+    "lat": 13.0969,
+    "lng": -59.6145,
+    "address": "Broad Street, Bridgetown",
+    "zone_id": null
+  },
+  "dropoff": {
+    "lat": 13.0745,
+    "lng": -59.588,
+    "address": "Rockley, Christ Church",
+    "zone_id": null
+  },
+  "stops": [],
+  "stop_change": null,
+  "pin_verified": false,
+  "estimate": {
+    "distance_m": 4940,
+    "duration_s": 593,
+    "fare": 27.5
+  },
+  "actual": {
+    "distance_m": null,
+    "duration_s": null,
+    "wait_s": null,
+    "fare": null,
+    "subtotal": null,
+    "tax": null
+  },
+  "driver_earnings": null,
+  "tip": 0.0,
+  "discount": 0.0,
+  "credit": 0.0,
+  "payable": null,
+  "promo_code": "SAVE10",
+  "use_credit": true,
+  "can_chat": true,
+  "can_call": true,
+  "unread_messages": 0,
+  "can_tip": false,
+  "currency": "BBD",
+  "fare_breakdown": {
+    "lines": [
+      {
+        "code": "base",
+        "label": "Base fare",
+        "amount": 5
+      },
+      {
+        "code": "distance",
+        "label": "Distance (4.9 km)",
+        "amount": 12.35
+      },
+      {
+        "code": "time",
+        "label": "Time (10 min)",
+        "amount": 4.94
+      },
+      {
+        "code": "booking_fee",
+        "label": "Booking fee",
+        "amount": 1
+      },
+      {
+        "code": "rounding",
+        "label": "Rounding",
+        "amount": 0.11
+      },
+      {
+        "code": "tax",
+        "label": "VAT 17.5%",
+        "amount": 4.1
+      }
+    ],
+    "total": 27.5
+  },
+  "surge_multiplier": 1.0,
+  "payment_method": "cash",
+  "payment_status": "pending",
+  "amount_due": 0.0,
+  "passengers": 1,
+  "luggage": 0,
+  "required_features": [],
+  "hold_amount": null,
+  "payment_action": null,
+  "rider_note": null,
+  "cancelled_by": null,
+  "cancellation_reason": null,
+  "cancellation_fee": 0.0,
+  "scheduled_at": null,
+  "timestamps": {
+    "requested_at": "2026-10-24T14:23:01+00:00",
+    "accepted_at": "2026-10-24T14:23:02+00:00",
+    "arrived_at": null,
+    "started_at": null,
+    "completed_at": null,
+    "cancelled_at": null
+  },
+  "kind": "ride",
+  "delivery": null
+}

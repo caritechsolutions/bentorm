@@ -46,7 +46,8 @@ class RiderApi extends AuthApi {
   // ---------------------------------------------------------------- fares + trips
   static Map<String, dynamic> _stop(Place p) => {'lat': p.lat, 'lng': p.lng, 'address': p.label};
 
-  Future<Estimate> estimate(Place pickup, Place dropoff, {int passengers = 1, int luggage = 0, List<Place> stops = const []}) async =>
+  Future<Estimate> estimate(Place pickup, Place dropoff,
+          {int passengers = 1, int luggage = 0, List<Place> stops = const [], DateTime? scheduledAt, String? promoCode, bool useCredit = false}) async =>
       Estimate.fromJson(await client.post('/fares/estimate', {
         'pickup_lat': pickup.lat,
         'pickup_lng': pickup.lng,
@@ -55,6 +56,9 @@ class RiderApi extends AuthApi {
         if (stops.isNotEmpty) 'stops': stops.map(_stop).toList(),
         'passengers': passengers,
         'luggage': luggage,
+        if (scheduledAt != null) 'scheduled_at': scheduledAt.toUtc().toIso8601String(),
+        if (promoCode != null) 'promo_code': promoCode,
+        if (useCredit) 'use_credit': true,
       }) as Map<String, dynamic>);
 
   /// Requests a ride. A declined card hold throws ApiException(402).
@@ -69,6 +73,9 @@ class RiderApi extends AuthApi {
     List<String> features = const [],
     List<Place> stops = const [],
     String? note,
+    DateTime? scheduledAt,
+    String? promoCode,
+    bool useCredit = false,
   }) async =>
       Trip.fromJson(await client.post('/trips', {
         'pickup_lat': pickup.lat,
@@ -85,7 +92,52 @@ class RiderApi extends AuthApi {
         if (features.isNotEmpty) 'features': features,
         if (stops.isNotEmpty) 'stops': stops.map(_stop).toList(),
         if (note != null && note.trim().isNotEmpty) 'rider_note': note.trim(),
+        if (scheduledAt != null) 'scheduled_at': scheduledAt.toUtc().toIso8601String(),
+        if (promoCode != null) 'promo_code': promoCode,
+        if (useCredit) 'use_credit': true,
       }) as Map<String, dynamic>);
+
+  /// Rides booked for later, soonest first.
+  Future<List<Trip>> scheduledTrips() async =>
+      (await client.get('/trips/scheduled') as List).map((e) => Trip.fromJson(e as Map<String, dynamic>)).toList();
+
+  /// 100% to the driver, charged to [cardId] or the default card.
+  Future<Trip> tip(String tripId, double amount, {String? cardId}) async =>
+      Trip.fromJson(await client.post('/trips/$tripId/tip', {'amount': amount, if (cardId != null) 'payment_method_id': cardId}) as Map<String, dynamic>);
+
+  Future<Order> tipOrder(String orderId, double amount) async =>
+      Order.fromJson(await client.post('/shop/orders/$orderId/tip', {'amount': amount}) as Map<String, dynamic>);
+
+  // ---------------------------------------------------------------- saved places, promos, credit, invites
+  Future<List<SavedPlace>> savedPlaces() async =>
+      (await client.get('/me/places') as List).map((e) => SavedPlace.fromJson(e as Map<String, dynamic>)).toList();
+
+  Future<SavedPlace> savePlace({required String kind, String? label, required Place place}) async => SavedPlace.fromJson(await client.post('/me/places', {
+        'kind': kind,
+        if (label != null) 'label': label,
+        'address': place.label,
+        'lat': place.lat,
+        'lng': place.lng,
+        if (place.placeId != null) 'place_id': place.placeId,
+      }) as Map<String, dynamic>);
+
+  Future<SavedPlace> renamePlace(int id, String label) async =>
+      SavedPlace.fromJson(await client.patch('/me/places/$id', {'label': label}) as Map<String, dynamic>);
+
+  Future<List<SavedPlace>> deletePlace(int id) async =>
+      (await client.delete('/me/places/$id') as List).map((e) => SavedPlace.fromJson(e as Map<String, dynamic>)).toList();
+
+  /// Throws ApiException (422) with the reason when the code can't be used.
+  Future<PromoCheck> checkPromo(String code, {required String forWhat, double? amount}) async => PromoCheck.fromJson(
+      await client.post('/promo-codes/check', {'code': code.trim(), 'for': forWhat, if (amount != null) 'amount': amount}) as Map<String, dynamic>);
+
+  Future<CreditInfo> credit() async => CreditInfo.fromJson(await client.get('/me/credit') as Map<String, dynamic>);
+
+  Future<ReferralInfo> referral() async => ReferralInfo.fromJson(await client.get('/me/referral') as Map<String, dynamic>);
+
+  /// Returns the server's thank-you message.
+  Future<String> enterReferralCode(String code) async =>
+      '${(await client.post('/me/referral', {'code': code.trim()}) as Map<String, dynamic>)['message']}';
 
   Future<TripSnapshot> activeTrip() async => TripSnapshot.fromJson(await client.get('/trips/active') as Map<String, dynamic>);
 
@@ -161,8 +213,16 @@ class RiderApi extends AuthApi {
   Future<StoreMenu> shopStore(String slug, {double? lat, double? lng}) async =>
       StoreMenu.fromJson(await client.get('/shop/stores/${Uri.encodeComponent(slug)}', query: _near(lat, lng)) as Map<String, dynamic>);
 
-  Future<ShopQuote> shopQuote(String store, List<Map<String, dynamic>> items, double lat, double lng) async =>
-      ShopQuote.fromJson(await client.post('/shop/quote', {'store': store, 'lat': lat, 'lng': lng, 'items': items}) as Map<String, dynamic>);
+  Future<ShopQuote> shopQuote(String store, List<Map<String, dynamic>> items, double lat, double lng, {double tip = 0, String? promoCode, bool useCredit = false}) async =>
+      ShopQuote.fromJson(await client.post('/shop/quote', {
+        'store': store,
+        'lat': lat,
+        'lng': lng,
+        'items': items,
+        if (tip > 0) 'tip': tip,
+        if (promoCode != null) 'promo_code': promoCode,
+        if (useCredit) 'use_credit': true,
+      }) as Map<String, dynamic>);
 
   /// Places the order and holds the card. A card that needs 3-D Secure comes back pending_payment with a redirect_url.
   Future<Order> placeOrder({
@@ -171,6 +231,9 @@ class RiderApi extends AuthApi {
     required Place dropoff,
     required String cardId,
     String? note,
+    double tip = 0,
+    String? promoCode,
+    bool useCredit = false,
   }) async =>
       Order.fromJson(await client.post('/shop/orders', {
         'store': store,
@@ -180,6 +243,9 @@ class RiderApi extends AuthApi {
         'items': items,
         'payment_method_id': cardId,
         if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+        if (tip > 0) 'tip': tip,
+        if (promoCode != null) 'promo_code': promoCode,
+        if (useCredit) 'use_credit': true,
       }) as Map<String, dynamic>);
 
   Future<Order> order(String id) async => Order.fromJson(await client.get('/shop/orders/$id') as Map<String, dynamic>);

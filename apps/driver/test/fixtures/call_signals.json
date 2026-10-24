@@ -1,0 +1,13 @@
+{
+  "signals": [
+    {
+      "seq": 1,
+      "type": "offer",
+      "payload": {
+        "type": "offer",
+        "sdp": "v=0"
+      }
+    }
+  ],
+  "status": "accepted"
+}

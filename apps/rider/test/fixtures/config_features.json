@@ -1,0 +1,47 @@
+{
+  "realtime": {
+    "key": "localkey123",
+    "host": "127.0.0.1",
+    "port": 8098,
+    "scheme": "http",
+    "auth_endpoint": "http://127.0.0.1:8099/api/broadcasting/auth"
+  },
+  "address_search": false,
+  "app_scheme": "ridecoop",
+  "otp_length": 6,
+  "navigation": {
+    "in_app": false
+  },
+  "features": {
+    "saved_places": true,
+    "scheduled_rides": true,
+    "scheduled.min_minutes": 30,
+    "scheduled.max_days": 7,
+    "tips": true,
+    "tips.window_hours": 24,
+    "tips.max_amount": 200,
+    "promos": true,
+    "referrals": true,
+    "referral.referrer_credit": 10,
+    "referral.referee_credit": 10,
+    "share_trip": true,
+    "sos": true,
+    "chat": true,
+    "masked_calls": true,
+    "support": true
+  },
+  "emergency_numbers": [
+    {
+      "name": "Police",
+      "number": "211"
+    },
+    {
+      "name": "Ambulance",
+      "number": "511"
+    },
+    {
+      "name": "Fire",
+      "number": "311"
+    }
+  ]
+}

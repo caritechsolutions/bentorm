@@ -1,0 +1,12 @@
+{
+  "balance": 5.0,
+  "currency": "BBD",
+  "max_share": 1.0,
+  "entries": [
+    {
+      "amount": 5.0,
+      "label": "Welcome gift",
+      "date": "2026-10-24T14:23:01+00:00"
+    }
+  ]
+}

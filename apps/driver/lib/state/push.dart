@@ -29,7 +29,7 @@ abstract class PushBridge {
 /// Android channels: `ride_offers` (max importance, our ringing sound) and `ride_updates` (normal). The server
 /// picks the channel per message; when the app is in the background or closed Android shows and rings by itself.
 class PushRegistrar {
-  PushRegistrar(this.api, this.session, {PushBridge? bridge, this.onOpened})
+  PushRegistrar(this.api, this.session, {PushBridge? bridge, this.onOpened, this.onTapped})
       : bridge = bridge ?? (AppConfig.pushConfigured ? FirebasePushBridge() : null);
 
   final DriverApi api;
@@ -38,6 +38,9 @@ class PushRegistrar {
 
   /// Called when a notification is tapped or arrives in the foreground (e.g. check for offers right away).
   final void Function(Map<String, String> data)? onOpened;
+
+  /// Called only when the driver taps a notification (open its page).
+  final void Function(Map<String, String> data)? onTapped;
 
   final _subs = <StreamSubscription<Object?>>[];
   String? _registered;
@@ -62,7 +65,10 @@ class PushRegistrar {
         b.showLocal(data['title'] ?? 'Ride Coop', data['body'] ?? '', loud: loud);
         onOpened?.call(data);
       }))
-      ..add(b.opened.listen((data) => onOpened?.call(data)));
+      ..add(b.opened.listen((data) {
+        onOpened?.call(data);
+        onTapped?.call(data);
+      }));
     await _sync();
   }
 

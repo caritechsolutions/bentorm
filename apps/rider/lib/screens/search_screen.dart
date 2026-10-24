@@ -10,7 +10,7 @@ import '../state/scope.dart';
 
 /// Address search. Pops with the chosen [Place].
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key, required this.title, this.near, this.currentLocation});
+  const SearchScreen({super.key, required this.title, this.near, this.currentLocation, this.saved = const []});
 
   final String title;
 
@@ -19,6 +19,9 @@ class SearchScreen extends StatefulWidget {
 
   /// Offered as the first option (pickup search).
   final Place? currentLocation;
+
+  /// Home, Work and other saved places, offered before typing.
+  final List<SavedPlace> saved;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -120,6 +123,15 @@ class _SearchScreenState extends State<SearchScreen> {
                     subtitle: Text(current.label, maxLines: 1, overflow: TextOverflow.ellipsis),
                     onTap: () => Navigator.of(context).pop(current),
                   ),
+                if (_query.text.trim().length < 2)
+                  for (final p in widget.saved)
+                    ListTile(
+                      key: Key('pick-saved-${p.id}'),
+                      leading: Icon(p.kind == 'home' ? Icons.home_outlined : (p.kind == 'work' ? Icons.work_outline : Icons.bookmark_border), color: Brand.blue),
+                      title: Text(p.label),
+                      subtitle: p.address == null ? null : Text(p.address!, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      onTap: () => Navigator.of(context).pop(p.place),
+                    ),
                 for (final s in _results)
                   ListTile(
                     leading: const Icon(Icons.place_outlined),

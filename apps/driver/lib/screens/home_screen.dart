@@ -407,6 +407,19 @@ class _Menu extends StatelessWidget {
               Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HistoryScreen()));
             },
           ),
+          ListTile(
+            key: const Key('drawer-statement'),
+            leading: const Icon(Icons.account_balance_outlined),
+            title: const Text('Statement & payouts'),
+            onTap: () => _page(context, 'statement'),
+          ),
+          if (scope.config.on('support'))
+            ListTile(
+              key: const Key('drawer-help'),
+              leading: const Icon(Icons.help_outline),
+              title: const Text('Help'),
+              onTap: () => _page(context, 'help'),
+            ),
           const Spacer(),
           ListTile(
             leading: const Icon(Icons.logout),
@@ -421,5 +434,17 @@ class _Menu extends StatelessWidget {
         ]),
       ),
     );
+  }
+}
+
+/// Opens a server page (statement, help) in the in-app browser.
+Future<void> _page(BuildContext context, String page) async {
+  final client = AppScope.of(context).api.client;
+  final messenger = ScaffoldMessenger.of(context);
+  Navigator.pop(context);
+  try {
+    await AppPages.open(client, page);
+  } on ApiException catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text(e.message)));
   }
 }

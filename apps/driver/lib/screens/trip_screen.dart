@@ -30,16 +30,30 @@ class _TripScreenState extends State<TripScreen> {
   late DriverTrip _trip = widget.initial;
   Timer? _poll;
   bool _busy = false;
+  StreamSubscription<RealtimeEvent>? _live;
 
   @override
   void initState() {
     super.initState();
     _poll = Timer.periodic(widget.pollEvery, (_) => _refresh());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Live updates: a cancellation, stop change or message shows at once; the poll slows to a safety net.
+      final rt = AppScope.of(context).realtime;
+      if (rt?.connected == true && _poll != null && _poll!.isActive) {
+        _poll!.cancel();
+        _poll = Timer.periodic(widget.pollEvery * 3, (_) => _refresh());
+      }
+      _live = rt?.events.listen((e) {
+        final id = e.data['trip_id'] ?? (e.data['trip'] is Map ? (e.data['trip'] as Map)['id'] : null);
+        if (id == null || id == _trip.id) _refresh();
+      });
+    });
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    _live?.cancel();
     super.dispose();
   }
 
@@ -180,7 +194,19 @@ class _TripScreenState extends State<TripScreen> {
     return PopScope(
       canPop: !t.isActive,
       child: Scaffold(
-        appBar: AppBar(automaticallyImplyLeading: !t.isActive, title: Text(_title(t), key: const Key('trip-title'))),
+        appBar: AppBar(
+          automaticallyImplyLeading: !t.isActive,
+          title: Text(_title(t), key: const Key('trip-title')),
+          actions: [
+            if (t.isActive && AppScope.of(context).config.on('sos'))
+              TextButton(
+                key: const Key('sos'),
+                style: TextButton.styleFrom(foregroundColor: Brand.red),
+                onPressed: _sos,
+                child: const Text('SOS', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+          ],
+        ),
         body: Stack(children: [
           Positioned.fill(
             child: ListenableBuilder(
@@ -250,6 +276,7 @@ class _TripScreenState extends State<TripScreen> {
       if (t.features.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text('Needs: ${t.features.map((f) => f.replaceAll('_', ' ')).join(', ')}')),
       const SizedBox(height: 4),
       Text('${t.isCash ? 'Cash' : 'Card'} · estimate ${money(t.estimatedFare, cur)}', style: const TextStyle(color: Colors.black54)),
+      _contactRow(t),
       const Divider(height: 20),
     ];
 
@@ -324,14 +351,29 @@ class _TripScreenState extends State<TripScreen> {
               decoration: BoxDecoration(color: Brand.yellow.withValues(alpha: 0.25), borderRadius: BorderRadius.circular(14)),
               child: Column(children: [
                 const Text('Collect cash', style: TextStyle(fontSize: 16)),
-                Text(money(t.finalFare, cur), key: const Key('collect'), style: const TextStyle(fontSize: 34, fontWeight: FontWeight.bold)),
+                Text(money(t.cashToCollect, cur), key: const Key('collect'), style: const TextStyle(fontSize: 34, fontWeight: FontWeight.bold)),
                 Text('from ${t.riderFirstName}'),
+                if (t.payable != null && t.finalFare != null && t.payable! < t.finalFare!)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      'Fare ${money(t.finalFare, cur)} — ${t.riderFirstName} used a promo or ride credit. Ride Coop pays you the difference.',
+                      key: const Key('promo-note'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
               ]),
             )
           else
             Text('${money(t.finalFare, cur)} paid by card', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           if (t.earnings != null) Text('You earned ${money(t.earnings, cur)}', key: const Key('earned'), style: const TextStyle(fontSize: 18, color: Color(0xFF1E9E5A), fontWeight: FontWeight.w600)),
+          if (t.tip > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text('+ ${money(t.tip, cur)} tip from ${t.riderFirstName}', key: const Key('tip-received'), style: const TextStyle(fontSize: 16, color: Color(0xFF1E9E5A))),
+            ),
           const SizedBox(height: 16),
           FilledButton(key: const Key('done'), onPressed: () => Navigator.of(context).pop(), child: const Text('Done')),
         ];
@@ -359,6 +401,7 @@ class _TripScreenState extends State<TripScreen> {
       if (d.note != null && d.note!.isNotEmpty)
         Padding(padding: const EdgeInsets.only(top: 6), child: Text('Note: ${d.note}', key: const Key('rider-note'), style: const TextStyle(fontStyle: FontStyle.italic))),
       if (d.earnings != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text('You earn ${money(d.earnings, cur)} · paid by card', style: const TextStyle(color: Colors.black54))),
+      _contactRow(t),
       const Divider(height: 20),
     ];
     final callStore = d.storePhone == null
@@ -423,6 +466,62 @@ class _TripScreenState extends State<TripScreen> {
           FilledButton(key: const Key('done'), onPressed: () => Navigator.of(context).pop(), child: const Text('Done')),
         ];
     }
+  }
+
+  /// Message or call the rider / customer through the app (numbers stay private), and share the trip.
+  Widget _contactRow(DriverTrip t) {
+    final cfg = AppScope.of(context).config;
+    final who = t.riderFirstName;
+    final items = <Widget>[
+      if (t.canChat && cfg.on('chat'))
+        Badge(
+          isLabelVisible: t.unreadMessages > 0,
+          label: Text('${t.unreadMessages}'),
+          child: OutlinedButton.icon(key: const Key('open-chat'), onPressed: _openChat, icon: const Icon(Icons.chat_bubble_outline, size: 18), label: const Text('Message')),
+        ),
+      if (t.canCall)
+        OutlinedButton.icon(key: const Key('call-rider'), onPressed: () => _call(false), icon: const Icon(Icons.call, size: 18), label: Text('Call $who')),
+      if (t.canCall)
+        IconButton.outlined(key: const Key('video-call-rider'), tooltip: 'Video call', onPressed: () => _call(true), icon: const Icon(Icons.videocam_outlined)),
+      if (t.isActive && cfg.on('share_trip'))
+        IconButton.outlined(key: const Key('share-trip'), tooltip: 'Share trip', onPressed: _share, icon: const Icon(Icons.ios_share)),
+    ];
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Padding(padding: const EdgeInsets.only(top: 8), child: Wrap(spacing: 8, runSpacing: 6, children: items));
+  }
+
+  Future<void> _openChat() async {
+    final scope = AppScope.of(context);
+    final delivery = _trip.isDelivery;
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ChatScreen(
+        client: scope.api.client,
+        tripId: _trip.id,
+        otherName: _trip.riderFirstName,
+        realtime: scope.realtime,
+        quickReplies: delivery
+            ? const ['I\'m at the store', 'On my way with your order', 'I\'m outside', 'Thank you!']
+            : const ['On my way', 'I\'m here', 'Running a few minutes late', 'Thank you!'],
+      ),
+    ));
+    _refresh();
+  }
+
+  Future<void> _call(bool video) {
+    final scope = AppScope.of(context);
+    return CallScreen.start(context, client: scope.api.client, tripId: _trip.id, video: video, realtime: scope.realtime);
+  }
+
+  Future<void> _share() => Safety.shareTrip(context, client: AppScope.of(context).api.client, tripId: _trip.id);
+
+  Future<void> _sos() {
+    final scope = AppScope.of(context);
+    return Safety.sos(context, client: scope.api.client, config: scope.config, tripId: _trip.id, where: () async {
+      final p = scope.engine.position;
+      if (p != null) return (lat: p.lat, lng: p.lng);
+      final f = await scope.location.current();
+      return f == null ? null : (lat: f.lat, lng: f.lng);
+    });
   }
 
   /// Stops still to come, then the drop-off.

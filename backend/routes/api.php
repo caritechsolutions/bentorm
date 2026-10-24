@@ -51,7 +51,7 @@ Route::prefix('v1')->group(function () {
     Route::get('shop/categories', [\App\Http\Controllers\Api\V1\Shop\ShopController::class, 'categories']);
     Route::get('shop/stores', [\App\Http\Controllers\Api\V1\Shop\ShopController::class, 'stores']);
     Route::get('shop/stores/{slug}', [\App\Http\Controllers\Api\V1\Shop\ShopController::class, 'store']);
-    Route::post('shop/quote', [\App\Http\Controllers\Api\V1\Shop\ShopController::class, 'quote'])->middleware('throttle:60,1');
+    Route::post('shop/quote', [\App\Http\Controllers\Api\V1\Shop\ShopController::class, 'quote'])->middleware('throttle:60,1,post-shop-quote');
     Route::get('service-areas', [GeoController::class, 'serviceAreas']);
     Route::get('geo/check', [GeoController::class, 'check']);
     Route::get('vehicle-types', [GeoController::class, 'vehicleTypes']);
@@ -91,7 +91,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('me/payment-methods/{paymentMethod}', [PaymentMethodController::class, 'destroy']);
         Route::post('auth/logout', [SessionController::class, 'logout']);
         // Shop orders
-        Route::post('shop/orders', [\App\Http\Controllers\Api\V1\Shop\ShopController::class, 'place'])->middleware('throttle:20,1');
+        Route::post('shop/orders', [\App\Http\Controllers\Api\V1\Shop\ShopController::class, 'place'])->middleware('throttle:20,1,post-shop-orders');
         Route::get('shop/orders', [\App\Http\Controllers\Api\V1\Shop\ShopController::class, 'index']);
         Route::get('shop/orders/active', [\App\Http\Controllers\Api\V1\Shop\ShopController::class, 'active']);
         Route::get('shop/orders/{order}', [\App\Http\Controllers\Api\V1\Shop\ShopController::class, 'show']);

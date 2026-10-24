@@ -39,7 +39,7 @@ class CallService
         $callee = $caller->id === $trip->driver_id ? $trip->rider_id : $trip->driver_id;
         $call = Call::query()->create(['trip_id' => $trip->id, 'caller_id' => $caller->id, 'callee_id' => $callee, 'video' => $video])->refresh();
         $ring = ['call_id' => $call->public_id, 'trip_id' => $trip->public_id, 'from' => $caller->firstName(), 'video' => $video];
-        event(new UserSignal($callee, 'call.ring', $ring));
+        UserSignal::send($callee, 'call.ring', $ring);
         $this->push->notify($callee, new PushMessage(($video ? 'Video call' : 'Call').' from '.$caller->firstName(), 'Tap to answer in Ride Coop.',
             ['type' => 'call'] + $ring, channel: 'ride_offers', ttlSeconds: Call::RING_SECONDS, collapseKey: 'call-'.$call->public_id, urgent: true));
 
@@ -98,7 +98,7 @@ class CallService
         $seq = count($list) + 1;
         $list[] = ['seq' => $seq, 'type' => $type, 'payload' => $payload];
         Cache::put($key, array_slice($list, -200), now()->addHour());
-        event(new UserSignal($to, 'call.signal', ['call_id' => $call->public_id, 'seq' => $seq, 'type' => $type, 'payload' => $payload]));
+        UserSignal::send($to, 'call.signal', ['call_id' => $call->public_id, 'seq' => $seq, 'type' => $type, 'payload' => $payload]);
     }
 
     /** Signalling messages waiting for $user after $after (for apps without a live connection). */
@@ -149,6 +149,6 @@ class CallService
 
     private function tell(Call $call, int $userId): void
     {
-        event(new UserSignal($userId, 'call.updated', ['call_id' => $call->public_id, 'status' => $call->status]));
+        UserSignal::send($userId, 'call.updated', ['call_id' => $call->public_id, 'status' => $call->status]);
     }
 }

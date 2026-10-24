@@ -1,18 +1,18 @@
 {
   "offers": [
     {
-      "id": 41,
+      "id": 46,
       "distance_m": 117,
       "eta_s": null,
-      "expires_at": "2026-10-24T04:11:18+00:00",
-      "estimated_earnings": 27.58,
+      "expires_at": "2026-10-24T14:24:53+00:00",
+      "estimated_earnings": 22.13,
       "trip": {
-        "id": "01m5p1njtqtnp54bsn3y5dfg2d",
+        "id": "01m5q4s3d39ftsvsgrk5ywe51h",
         "status": "requested",
         "vehicle_type": "delivery",
         "service_area_id": 1,
         "rider": {
-          "id": 24,
+          "id": 27,
           "name": "Rita Rider",
           "role": "rider",
           "avatar_url": null
@@ -35,7 +35,7 @@
         "estimate": {
           "distance_m": 12238,
           "duration_s": 1469,
-          "fare": 40.5
+          "fare": 32.5
         },
         "actual": {
           "distance_m": null,
@@ -45,6 +45,16 @@
           "subtotal": null,
           "tax": null
         },
+        "tip": 0.0,
+        "discount": 0.0,
+        "credit": 0.0,
+        "payable": null,
+        "promo_code": null,
+        "use_credit": false,
+        "can_chat": false,
+        "can_call": false,
+        "unread_messages": 0,
+        "can_tip": false,
         "currency": "BBD",
         "fare_breakdown": null,
         "surge_multiplier": 1.0,
@@ -60,8 +70,9 @@
         "cancelled_by": null,
         "cancellation_reason": null,
         "cancellation_fee": 0.0,
+        "scheduled_at": null,
         "timestamps": {
-          "requested_at": "2026-10-24T04:10:57+00:00",
+          "requested_at": "2026-10-24T14:24:33+00:00",
           "accepted_at": null,
           "arrived_at": null,
           "started_at": null,
@@ -70,8 +81,8 @@
         },
         "kind": "delivery",
         "delivery": {
-          "order_id": "01m5p1nhsj0kn1m3rabrsx2044",
-          "order_number": "1010",
+          "order_id": "01m5q4s29xa5qgg7x5cgkn501t",
+          "order_number": "1014",
           "order_status": "accepted",
           "store": {
             "name": "Ann's Fish Pot",
@@ -87,7 +98,7 @@
             }
           ],
           "note": "Blue gate",
-          "earnings": 27.58,
+          "earnings": 22.13,
           "picked_up": false
         }
       }

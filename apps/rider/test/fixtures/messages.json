@@ -1,0 +1,21 @@
+{
+  "messages": [
+    {
+      "id": 3,
+      "body": "I am by the red door",
+      "mine": true,
+      "sender": "Rita",
+      "at": "2026-10-24T14:23:02+00:00",
+      "read": true
+    },
+    {
+      "id": 4,
+      "body": "On my way",
+      "mine": false,
+      "sender": "Smoke",
+      "at": "2026-10-24T14:23:03+00:00",
+      "read": true
+    }
+  ],
+  "open": true
+}

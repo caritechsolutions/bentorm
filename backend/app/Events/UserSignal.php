@@ -18,6 +18,16 @@ class UserSignal implements ShouldBroadcastNow
     /** @param array<string, mixed> $data */
     public function __construct(public int $userId, public string $type, public array $data) {}
 
+    /** Send it; if the live-update server is down, log and carry on (the apps poll as well). */
+    public static function send(int $userId, string $type, array $data): void
+    {
+        try {
+            event(new self($userId, $type, $data));
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
     public function broadcastOn(): array
     {
         return [new PrivateChannel('user.'.$this->userId)];
@@ -25,7 +35,7 @@ class UserSignal implements ShouldBroadcastNow
 
     public function broadcastAs(): string
     {
-        return $this->type; // chat.message | call.ring | call.signal | call.updated
+        return $this->type; // chat.message | call.ring | call.signal | call.updated | order.updated
     }
 
     public function broadcastWith(): array

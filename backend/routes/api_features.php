@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 /* Included inside the authenticated (auth:sanctum) group of routes/api.php, under /api/v1. */
 
 // Web pages inside the apps: a one-time sign-in link.
-Route::post('app-links', [AppLinkController::class, 'store'])->middleware('throttle:30,1');
+Route::post('app-links', [AppLinkController::class, 'store'])->middleware('throttle:30,1,post-app-links');
 
 // Saved places (Home, Work, others)
 Route::get('me/places', [\App\Http\Controllers\Api\V1\SavedPlaceController::class, 'index']);
@@ -19,7 +19,7 @@ Route::post('trips/{trip}/tip', function (\Illuminate\Http\Request $request, \Ap
     $d = $request->validate(['amount' => ['required', 'numeric'], 'payment_method_id' => ['nullable', 'string', 'max:40']]);
 
     return new \App\Http\Resources\TripResource($tips->tip($trip, $request->user(), (float) $d['amount'], $d['payment_method_id'] ?? null)->load(['driver', 'vehicle']));
-})->middleware('throttle:10,1');
+})->middleware('throttle:10,1,post-trips-trip-tip');
 Route::post('shop/orders/{order}/tip', function (\Illuminate\Http\Request $request, \App\Models\Order $order, \App\Services\TipService $tips) {
     abort_unless($order->customer_id === $request->user()->id, 404);
     $d = $request->validate(['amount' => ['required', 'numeric']]);
@@ -28,7 +28,7 @@ Route::post('shop/orders/{order}/tip', function (\Illuminate\Http\Request $reque
     $tips->tip($trip, $request->user(), (float) $d['amount']);
 
     return new \App\Http\Resources\OrderResource($order->fresh(['items', 'store', 'card', 'payments']));
-})->middleware('throttle:10,1');
+})->middleware('throttle:10,1,post-shop-orders-order-tip');
 
 // Ride credit, invite a friend
 Route::get('me/credit', function (\Illuminate\Http\Request $request) {
@@ -63,7 +63,7 @@ Route::post('me/referral', function (\Illuminate\Http\Request $request, \App\Ser
     $refs->apply($request->user(), $d['code']);
 
     return ['message' => 'Invite code added. You both get ride credit after your first trip or order.'];
-})->middleware('throttle:10,1');
+})->middleware('throttle:10,1,post-me-referral');
 // Check a promo code before booking / checkout
 Route::post('promo-codes/check', function (\Illuminate\Http\Request $request, \App\Services\PromoService $promos) {
     $d = $request->validate(['code' => ['required', 'string', 'max:32'], 'for' => ['required', 'in:rides,shop'], 'amount' => ['nullable', 'numeric', 'min:0']]);
@@ -71,14 +71,14 @@ Route::post('promo-codes/check', function (\Illuminate\Http\Request $request, \A
 
     return ['code' => $p->code, 'summary' => $p->summary(), 'description' => $p->description,
         'discount' => isset($d['amount']) ? $p->discountOn((float) $d['amount']) : null];
-})->middleware('throttle:20,1');
+})->middleware('throttle:20,1,post-promo-codes-check');
 
 // Safety: share my trip, SOS
 Route::post('trips/{trip}/share', function (\Illuminate\Http\Request $request, \App\Models\Trip $trip, \App\Services\SafetyService $safety) {
     $url = $safety->shareLink($trip, $request->user());
 
     return ['url' => $url, 'text' => sprintf('Follow my %s live on Ride Coop: %s', $trip->order_id ? 'delivery' : 'ride', $url)];
-})->middleware('throttle:20,1');
+})->middleware('throttle:20,1,post-trips-trip-share');
 Route::post('sos', function (\Illuminate\Http\Request $request, \App\Services\SafetyService $safety) {
     $d = $request->validate(['trip_id' => ['nullable', 'string'], 'lat' => ['nullable', 'numeric', 'between:-90,90'], 'lng' => ['nullable', 'numeric', 'between:-180,180']]);
     $trip = isset($d['trip_id']) ? \App\Models\Trip::query()->where('public_id', $d['trip_id'])->first() : $request->user()->activeTrip();
@@ -86,7 +86,7 @@ Route::post('sos', function (\Illuminate\Http\Request $request, \App\Services\Sa
 
     return ['alert_id' => $alert->id, 'message' => 'Ride Coop has been alerted and can see where you are. If you are in danger, call the police now.',
         'emergency_numbers' => \App\Services\SafetyService::emergencyNumbers(), 'share_url' => $trip?->share_token ? url('/t/'.$trip->share_token) : null];
-})->middleware('throttle:10,1');
+})->middleware('throttle:10,1,post-sos');
 
 // Chat between rider (or customer) and driver
 Route::get('trips/{trip}/messages', fn (\Illuminate\Http\Request $request, \App\Models\Trip $trip, \App\Services\ChatService $chat) => [
@@ -97,14 +97,14 @@ Route::post('trips/{trip}/messages', function (\Illuminate\Http\Request $request
     $d = $request->validate(['body' => ['required', 'string', 'max:500']]);
 
     return response()->json($chat->send($trip, $request->user(), $d['body'])->load('sender')->toApi($request->user()), 201);
-})->middleware('throttle:30,1');
+})->middleware('throttle:30,1,post-trips-trip-messages');
 
 // In-app calls (WebRTC audio/video) with a phone-bridge fallback
 Route::post('trips/{trip}/calls', function (\Illuminate\Http\Request $request, \App\Models\Trip $trip, \App\Services\CallService $calls) {
     $d = $request->validate(['video' => ['nullable', 'boolean']]);
 
     return response()->json($calls->toApi($calls->start($trip, $request->user(), (bool) ($d['video'] ?? false)), $request->user()), 201);
-})->middleware('throttle:20,1');
+})->middleware('throttle:20,1,post-trips-trip-calls');
 Route::get('calls/incoming', function (\Illuminate\Http\Request $request, \App\Services\CallService $calls) {
     $calls->expireRinging();
     $c = \App\Models\Call::query()->where('callee_id', $request->user()->id)->where('status', 'ringing')->latest('id')->first();
@@ -127,13 +127,13 @@ Route::post('calls/{call}/{action}', function (\Illuminate\Http\Request $request
     };
 
     return $calls->toApi($call, $u);
-})->whereIn('action', ['accept', 'decline', 'end', 'phone'])->middleware('throttle:30,1');
+})->whereIn('action', ['accept', 'decline', 'end', 'phone'])->middleware('throttle:30,1,post-calls-call-action');
 Route::post('calls/{call}/signal', function (\Illuminate\Http\Request $request, \App\Models\Call $call, \App\Services\CallService $calls) {
     $d = $request->validate(['type' => ['required', 'in:offer,answer,candidate'], 'payload' => ['required', 'array']]);
     $calls->signal($call, $request->user(), $d['type'], $d['payload']);
 
     return ['ok' => true];
-})->middleware('throttle:300,1');
+})->middleware('throttle:300,1,post-calls-call-signal');
 Route::get('calls/{call}/signals', fn (\Illuminate\Http\Request $request, \App\Models\Call $call, \App\Services\CallService $calls) => [
     'signals' => $calls->signals($call, $request->user(), (int) $request->query('after', 0)),
     'status' => $call->fresh()->status,

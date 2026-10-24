@@ -161,7 +161,10 @@ class MoneyLine {
 }
 
 class ShopTotals {
-  const ShopTotals({required this.items, required this.itemsTax, required this.delivery, required this.serviceFee, required this.total});
+  const ShopTotals({required this.items, required this.itemsTax, required this.delivery, required this.serviceFee, required this.total, this.tip = 0, this.discount = 0, this.credit = 0});
+  final double tip;
+  final double discount;
+  final double credit;
   final double items;
   final double itemsTax;
   final double delivery;
@@ -174,12 +177,16 @@ class ShopTotals {
         delivery: _d(j['delivery']),
         serviceFee: _d(j['service_fee']),
         total: _d(j['total']),
+        tip: _d(j['tip']),
+        discount: _d(j['discount']),
+        credit: _d(j['credit']),
       );
 }
 
 /// A priced cart, before ordering.
 class ShopQuote {
-  ShopQuote({required this.currency, required this.lines, required this.totals, required this.etaMinutes});
+  ShopQuote({required this.currency, required this.lines, required this.totals, required this.etaMinutes, this.promo});
+  final String? promo; // e.g. "10% off" when a code applied
   final String currency;
   final List<MoneyLine> lines;
   final ShopTotals totals;
@@ -190,6 +197,7 @@ class ShopQuote {
         lines: [for (final l in _l(j['lines'])) MoneyLine.fromJson(_m(l))],
         totals: ShopTotals.fromJson(_m(j['totals'])),
         etaMinutes: _in(j['eta_minutes']),
+        promo: _s(_m(j['promo'])['summary']),
       );
 }
 
@@ -236,7 +244,27 @@ class ChangeRequest {
 
 /// Where the delivery stands, the driver, and the hand-over PIN (only the customer gets it).
 class DeliveryState {
-  DeliveryState({this.status, this.driverName, this.driverPhone, this.vehicle, this.driverLat, this.driverLng, this.pin, required this.noDriverAlert, required this.canCancel});
+  DeliveryState({
+    this.status,
+    this.driverName,
+    this.driverPhone,
+    this.vehicle,
+    this.driverLat,
+    this.driverLng,
+    this.pin,
+    required this.noDriverAlert,
+    required this.canCancel,
+    this.tripId,
+    this.canChat = false,
+    this.canCall = false,
+    this.unreadMessages = 0,
+  });
+
+  /// The delivery trip, for messaging or calling the driver in the app.
+  final String? tripId;
+  final bool canChat;
+  final bool canCall;
+  final int unreadMessages;
 
   /// searching · driver_assigned · at_store · on_the_way · delivered (null before a driver is asked for)
   final String? status;
@@ -272,6 +300,10 @@ class DeliveryState {
       pin: _s(v['pin']),
       noDriverAlert: v['no_driver_alert'] == true,
       canCancel: v['can_cancel'] == true,
+      tripId: _s(v['trip_id']),
+      canChat: v['can_chat'] == true,
+      canCall: v['can_call'] == true,
+      unreadMessages: _in(v['unread_messages']) ?? 0,
     );
   }
 }
@@ -306,7 +338,11 @@ class Order {
     this.storeLng,
     this.dropoffLat,
     this.dropoffLng,
+    this.canTip = false,
   });
+
+  /// Delivered recently and not tipped yet.
+  final bool canTip;
 
   final DeliveryState? delivery;
   final double? storeLat;
@@ -400,6 +436,7 @@ class Order {
       storeLng: store['lng'] == null ? null : _d(store['lng']),
       dropoffLat: _m(j['dropoff'])['lat'] == null ? null : _d(_m(j['dropoff'])['lat']),
       dropoffLng: _m(j['dropoff'])['lng'] == null ? null : _d(_m(j['dropoff'])['lng']),
+      canTip: j['can_tip'] == true,
     );
   }
 }

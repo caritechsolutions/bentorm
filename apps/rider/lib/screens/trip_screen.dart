@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:ridecoop_core/ridecoop_core.dart' show AppPages, CallScreen, ChatScreen, RealtimeEvent, Safety;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api/api_client.dart';
@@ -31,6 +32,8 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
   final _comment = TextEditingController();
   bool _rated = false;
   String? _stopNotice; // the driver's answer to a stop change, until the rider closes it
+  double? _tipChoice;
+  StreamSubscription<RealtimeEvent>? _live;
 
   @override
   void initState() {
@@ -39,6 +42,15 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
     _rated = widget.initial.rated;
     _timer = Timer.periodic(widget.pollEvery, (_) => _refresh());
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Live updates: refresh at once when the server says something changed; the poll slows to a safety net.
+      final rt = AppScope.of(context).realtime;
+      if (rt?.connected == true && _timer != null && _timer!.isActive) {
+        _timer!.cancel();
+        _timer = Timer.periodic(widget.pollEvery * 3, (_) => _refresh());
+      }
+      _live = rt?.events.listen((e) {
+        if (e.data['trip_id']?.toString() == _trip.id || e.name.startsWith('trip.') || e.name == 'chat.message') _refresh();
+      });
       _refresh();
       if (_trip.status == 'pending_payment') _openPaymentAction();
     });
@@ -48,6 +60,7 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    _live?.cancel();
     _comment.dispose();
     super.dispose();
   }
@@ -75,7 +88,7 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
                 ? 'Your driver couldn\'t change the stops. The ride continues as before.'
                 : null);
       }
-      if (!_trip.isActive) _timer?.cancel();
+      if (!_trip.isActive && _trip.status != 'scheduled') _timer?.cancel();
     } on ApiException {
       // Keep showing the last known state; the next tick retries.
     }
@@ -96,7 +109,7 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
         title: const Text('Cancel this ride?'),
         content: Text(fee
             ? 'Your driver is already on the way, so a cancellation fee applies.'
-            : 'No charge — no driver has accepted yet.'),
+            : (_trip.status == 'scheduled' ? 'No charge — your booking is removed.' : 'No charge — no driver has accepted yet.')),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep ride')),
           FilledButton(
@@ -147,6 +160,16 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
         appBar: AppBar(
           automaticallyImplyLeading: !t.isActive,
           title: Text(t.statusTitle, key: const Key('trip-status')),
+          actions: [
+            if (_inRide(t) && AppScope.of(context).config.on('sos'))
+              TextButton.icon(
+                key: const Key('sos'),
+                style: TextButton.styleFrom(foregroundColor: Brand.red),
+                onPressed: _sos,
+                icon: const Icon(Icons.emergency_share),
+                label: const Text('SOS', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+          ],
         ),
         body: Stack(
           children: [
@@ -186,6 +209,22 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
 
   List<Widget> _panel(Trip t) {
     switch (t.status) {
+      case 'scheduled':
+        return [
+          Row(children: [
+            const Icon(Icons.event_available, color: Brand.blue),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(t.scheduledAt == null ? 'Booked for later' : 'Pickup ${scheduleLabel(t.scheduledAt!)}',
+                  key: const Key('scheduled-time'), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+            ),
+          ]),
+          const SizedBox(height: 6),
+          const Text('We start finding your driver shortly before then and let you know when one is on the way.', style: TextStyle(color: Colors.black54)),
+          const SizedBox(height: 12),
+          _routeSummary(t),
+          _cancelButton(t),
+        ];
       case 'pending_payment':
         return [
           const Text('Your bank needs you to confirm this card payment.', style: TextStyle(fontSize: 16)),
@@ -217,6 +256,7 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
               child: const Text('Your driver is waiting at the pickup point.', style: TextStyle(fontWeight: FontWeight.w600)),
             ),
           _driverCard(t),
+          _contactRow(t),
           if (t.pin != null && (t.status == 'accepted' || t.status == 'arrived')) _pinCard(t.pin!),
           _stopChangeBanner(t),
           if (_stopNotice != null)
@@ -389,8 +429,26 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
   List<Widget> _completed(Trip t) => [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           const Text('Total', style: TextStyle(fontSize: 18)),
-          Text(money(t.fare, t.currency), key: const Key('final-fare'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          Text(money(t.payable ?? t.fare, t.currency), key: const Key('final-fare'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
         ]),
+        if (t.discount > 0 || t.credit > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              [
+                'Fare ${money(t.fare, t.currency)}',
+                if (t.discount > 0) 'promo −${money(t.discount, t.currency)}${t.promoCode != null ? ' (${t.promoCode})' : ''}',
+                if (t.credit > 0) 'ride credit −${money(t.credit, t.currency)}',
+              ].join(' · '),
+              key: const Key('fare-savings'),
+              style: const TextStyle(color: Color(0xFF1E9E5A)),
+            ),
+          ),
+        if (t.tip > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text('Tip ${money(t.tip, t.currency)} — thank you!', key: const Key('tip-done'), style: const TextStyle(fontWeight: FontWeight.w600)),
+          ),
         const SizedBox(height: 4),
         Text(
           t.paymentMethod == 'cash'
@@ -415,6 +473,7 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
                 ),
             ],
           ),
+        if (t.canTip && AppScope.of(context).config.on('tips')) _tipBox(t),
         const Divider(height: 24),
         if (!_rated) ...[
           Text('How was your ride with ${t.driver?.firstName ?? 'your driver'}?', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
@@ -435,6 +494,190 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
           const SizedBox(height: 8),
           FilledButton(key: const Key('submit-rating'), onPressed: _stars == 0 || _busy ? null : _rate, child: const Text('Submit rating')),
         ],
+        if (AppScope.of(context).config.on('support'))
+          TextButton.icon(
+            key: const Key('lost-item'),
+            onPressed: () => _openPage('support/new?category=lost_item&trip=${t.id}'),
+            icon: const Icon(Icons.help_outline),
+            label: const Text('Lost an item or need help with this ride?'),
+          ),
         TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(_rated ? 'Done' : 'Skip')),
       ];
+
+  bool _inRide(Trip t) => const ['accepted', 'arrived', 'in_progress'].contains(t.status);
+
+  /// Message, call (voice or video), share and SOS — numbers stay private.
+  Widget _contactRow(Trip t) {
+    final cfg = AppScope.of(context).config;
+    final buttons = <Widget>[
+      if (t.canChat && cfg.on('chat'))
+        _roundButton(
+          key: const Key('open-chat'),
+          icon: Icons.chat_bubble_outline,
+          label: 'Message',
+          badge: t.unreadMessages,
+          onTap: _openChat,
+        ),
+      if (t.canCall)
+        _roundButton(key: const Key('call-driver'), icon: Icons.call, label: 'Call', onTap: () => _call(false)),
+      if (t.canCall)
+        _roundButton(key: const Key('video-call-driver'), icon: Icons.videocam_outlined, label: 'Video', onTap: () => _call(true)),
+      if (cfg.on('share_trip')) _roundButton(key: const Key('share-trip'), icon: Icons.ios_share, label: 'Share', onTap: _share),
+    ];
+    if (buttons.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: buttons),
+    );
+  }
+
+  Widget _roundButton({required Key key, required IconData icon, required String label, required VoidCallback onTap, int badge = 0}) => InkWell(
+        key: key,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Badge(
+              isLabelVisible: badge > 0,
+              label: Text('$badge'),
+              child: CircleAvatar(radius: 24, backgroundColor: Brand.blue.withValues(alpha: 0.1), child: Icon(icon, color: Brand.blue)),
+            ),
+            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(fontSize: 13)),
+          ]),
+        ),
+      );
+
+  Future<void> _openChat() async {
+    final scope = AppScope.of(context);
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ChatScreen(
+        client: scope.api.client,
+        tripId: _trip.id,
+        otherName: _trip.driver?.firstName ?? 'Your driver',
+        realtime: scope.realtime,
+        quickReplies: const ['I\'m on my way out', 'I\'m at the pickup point', 'Please call me', 'Thank you!'],
+      ),
+    ));
+    _refresh();
+  }
+
+  Future<void> _call(bool video) {
+    final scope = AppScope.of(context);
+    return CallScreen.start(context, client: scope.api.client, tripId: _trip.id, video: video, realtime: scope.realtime);
+  }
+
+  Future<void> _share() => Safety.shareTrip(context, client: AppScope.of(context).api.client, tripId: _trip.id);
+
+  Future<void> _sos() {
+    final scope = AppScope.of(context);
+    return Safety.sos(context, client: scope.api.client, config: scope.config, tripId: _trip.id, where: () async {
+      final p = await scope.location.current();
+      return p == null ? null : (lat: p.lat, lng: p.lng);
+    });
+  }
+
+  Future<void> _openPage(String page) async {
+    try {
+      await AppPages.open(AppScope.of(context).api.client, page);
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
+  /// Tip after the ride: 100% to the driver, on the card.
+  Widget _tipBox(Trip t) {
+    final base = t.fare ?? 0;
+    final options = <double>{
+      for (final pct in const [0.10, 0.15, 0.20]) (base * pct < 1 ? 1.0 : base * pct).roundToDouble(),
+    }.toList()
+      ..sort();
+    final max = AppScope.of(context).config.number('tips.max_amount', 100).toDouble();
+    return Container(
+      key: const Key('tip-box'),
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Brand.yellow.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('Add a tip for ${t.driver?.firstName ?? 'your driver'}?', style: const TextStyle(fontWeight: FontWeight.w600)),
+        const Text('100% goes to your driver.', style: TextStyle(color: Colors.black54, fontSize: 13)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, children: [
+          for (final a in options.where((a) => a <= max))
+            ChoiceChip(
+              key: Key('tip-${a.toStringAsFixed(0)}'),
+              label: Text(money(a, t.currency)),
+              selected: _tipChoice == a,
+              onSelected: (_) => setState(() => _tipChoice = a),
+            ),
+          ActionChip(key: const Key('tip-other'), label: const Text('Other'), onPressed: () => _otherTip(max)),
+        ]),
+        if (_tipChoice != null) ...[
+          const SizedBox(height: 8),
+          FilledButton(
+            key: const Key('send-tip'),
+            onPressed: _busy ? null : _sendTip,
+            child: Text('Tip ${money(_tipChoice!, t.currency)}${t.paymentMethod == 'card' && t.cardLabel != null ? ' on ${t.cardLabel}' : ''}'),
+          ),
+        ],
+      ]),
+    );
+  }
+
+  Future<void> _otherTip(double max) async {
+    final ctl = TextEditingController();
+    final v = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Tip amount'),
+        content: TextField(
+          key: const Key('tip-amount'),
+          controller: ctl,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(prefixText: '\$ ', helperText: 'Up to ${max.toStringAsFixed(0)}'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(key: const Key('tip-amount-ok'), onPressed: () => Navigator.pop(ctx, double.tryParse(ctl.text.trim())), child: const Text('OK')),
+        ],
+      ),
+    );
+    if (v != null && v >= 1 && mounted) setState(() => _tipChoice = v);
+  }
+
+  Future<void> _sendTip() async {
+    final amount = _tipChoice;
+    if (amount == null) return;
+    setState(() => _busy = true);
+    try {
+      final t = await AppScope.of(context).api.tip(_trip.id, amount);
+      if (!mounted) return;
+      setState(() {
+        _trip = t;
+        _tipChoice = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Thanks! Your tip goes straight to your driver.')));
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+}
+
+/// "today at 3:30 PM", "tomorrow at 7:05 AM", "Sat 26 Oct at 9:00 AM".
+String scheduleLabel(DateTime at) {
+  final now = DateTime.now();
+  final day = DateTime(at.year, at.month, at.day);
+  final today = DateTime(now.year, now.month, now.day);
+  final h = at.hour % 12 == 0 ? 12 : at.hour % 12;
+  final time = '$h:${at.minute.toString().padLeft(2, '0')} ${at.hour < 12 ? 'AM' : 'PM'}';
+  final diff = day.difference(today).inDays;
+  if (diff == 0) return 'today at $time';
+  if (diff == 1) return 'tomorrow at $time';
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return '${days[at.weekday - 1]} ${at.day} ${months[at.month - 1]} at $time';
 }

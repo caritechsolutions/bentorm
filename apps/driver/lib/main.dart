@@ -18,20 +18,53 @@ void main() {
   session.addListener(() {
     if (session.state == SessionState.signedOut) engine.reset();
   });
-  // Push: a tapped or arriving notification (new ride, stop change, cancellation) refreshes at once.
-  final push = PushRegistrar(api, session, onOpened: (_) => engine.refreshNow());
-  runApp(DriverApp(session: session, location: location, engine: engine, push: push));
+  final live = LiveLink(session);
+  final calls = IncomingCalls(navigator: navigatorKey, client: api.client, session: session, live: live);
+  // Push: a tapped or arriving notification (new ride, stop change, cancellation) refreshes at once; a call rings;
+  // a tapped help reply opens its page.
+  final push = PushRegistrar(
+    api,
+    session,
+    onOpened: (data) {
+      if (data['type'] == 'call') {
+        calls.check();
+      } else {
+        engine.refreshNow();
+      }
+    },
+    onTapped: (data) {
+      final page = data['page'];
+      if (page != null && page.isNotEmpty) AppPages.open(api.client, page).catchError((Object _) {});
+    },
+  );
+  // Live updates: a new offer or a change to the trip refreshes at once instead of waiting for the next poll.
+  live.addListener(() => _listenLive(live, engine));
+  runApp(DriverApp(session: session, location: location, engine: engine, push: push, live: live));
   session.restore();
   push.attach();
+  live.start();
+  calls.start();
+}
+
+/// Lets a call or a tapped notification open a screen from outside the widget tree.
+final navigatorKey = GlobalKey<NavigatorState>();
+
+RealtimeClient? _liveFor;
+void _listenLive(LiveLink live, DriverEngine engine) {
+  final rt = live.realtime;
+  if (rt == null || identical(rt, _liveFor)) return;
+  _liveFor = rt;
+  rt.events.where((e) => e.name.startsWith('trip.') || e.name.startsWith('offer')).listen((_) => engine.refreshNow());
 }
 
 class DriverApp extends StatelessWidget {
-  const DriverApp({super.key, required this.session, required this.location, required this.engine, this.push});
+  const DriverApp({super.key, required this.session, required this.location, required this.engine, this.push, this.live});
 
   final Session session;
   final LocationService location;
   final DriverEngine engine;
   final PushRegistrar? push;
+  final LiveLink? live;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +73,9 @@ class DriverApp extends StatelessWidget {
       location: location,
       engine: engine,
       push: push,
+      live: live,
       child: MaterialApp(
+        navigatorKey: navigatorKey,
         title: 'Ride Coop Driver',
         debugShowCheckedModeBanner: false,
         theme: Brand.theme(primary: Brand.charcoal),

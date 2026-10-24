@@ -1,0 +1,8 @@
+{
+  "message": "You already tipped for this trip. Thank you!",
+  "errors": {
+    "amount": [
+      "You already tipped for this trip. Thank you!"
+    ]
+  }
+}

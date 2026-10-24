@@ -52,6 +52,8 @@ class AppServiceProvider extends ServiceProvider
             if (! $o->wasChanged('status')) {
                 return;
             }
+            // The customer's app refreshes the order at once (it also polls).
+            \App\Events\UserSignal::send($o->customer_id, 'order.updated', ['order_id' => $o->public_id, 'status' => $o->status->value]);
             if (in_array($o->status, [\App\Enums\OrderStatus::Cancelled, \App\Enums\OrderStatus::Declined, \App\Enums\OrderStatus::Expired], true)) {
                 app(\App\Services\PromoService::class)->onOrderEnded($o);
             } elseif ($o->status === \App\Enums\OrderStatus::Delivered) {

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:ridecoop_core/ridecoop_core.dart' show AppPages, CallScreen, ChatScreen, RealtimeEvent;
 
 import '../../api/api_client.dart';
 import '../../api/models.dart' show LatLngPoint;
@@ -27,12 +28,18 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
   Timer? _poll;
   Timer? _clock;
   bool _busy = false;
+  StreamSubscription<RealtimeEvent>? _live;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _schedule();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _live = AppScope.of(context).realtime?.events.listen((e) {
+        if (e.name.startsWith('order.') || e.name.startsWith('trip.') || e.name == 'chat.message') _refresh();
+      });
+    });
   }
 
   @override
@@ -40,6 +47,7 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _poll?.cancel();
     _clock?.cancel();
+    _live?.cancel();
     super.dispose();
   }
 
@@ -121,7 +129,31 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
             if (d.vehicle != null) Text(d.vehicle!, style: const TextStyle(color: Colors.black54)),
           ]),
         ),
-        if (d.driverPhone != null)
+        if (d.canChat && d.tripId != null)
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Badge(
+              isLabelVisible: d.unreadMessages > 0,
+              label: Text('${d.unreadMessages}'),
+              child: IconButton.filledTonal(
+                key: const Key('order-chat'),
+                tooltip: 'Message ${d.driverName}',
+                onPressed: () => _chat(d),
+                icon: const Icon(Icons.chat_bubble_outline),
+              ),
+            ),
+          ),
+        if (d.canCall && d.tripId != null)
+          IconButton.filledTonal(
+            key: const Key('order-call'),
+            tooltip: 'Call ${d.driverName}',
+            onPressed: () {
+              final scope = AppScope.of(context);
+              CallScreen.start(context, client: scope.api.client, tripId: d.tripId!, video: false, realtime: scope.realtime);
+            },
+            icon: const Icon(Icons.call),
+          )
+        else if (d.driverPhone != null)
           IconButton.filledTonal(
             key: const Key('call-driver'),
             tooltip: 'Call ${d.driverName}',
@@ -145,6 +177,64 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
           ),
         ),
     ];
+  }
+
+  Future<void> _chat(DeliveryState d) async {
+    final scope = AppScope.of(context);
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ChatScreen(
+        client: scope.api.client,
+        tripId: d.tripId!,
+        otherName: d.driverName ?? 'Your driver',
+        realtime: scope.realtime,
+        quickReplies: const ['Please call when you arrive', 'Leave it at the door', 'I\'m coming down', 'Thank you!'],
+      ),
+    ));
+    _refresh();
+  }
+
+  double? _tip;
+
+  Widget _tipBox(Order o) {
+    final options = <double>{for (final a in const [2.0, 5.0, 10.0]) a}.toList();
+    return Container(
+      key: const Key('order-tip-box'),
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Brand.yellow.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('Tip your driver?', style: TextStyle(fontWeight: FontWeight.w600)),
+        const Text('100% goes to the driver, on the same card.', style: TextStyle(color: Colors.black54, fontSize: 13)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, children: [
+          for (final a in options)
+            ChoiceChip(
+              key: Key('order-tip-${a.toStringAsFixed(0)}'),
+              label: Text(money(a, o.currency)),
+              selected: _tip == a,
+              onSelected: (_) => setState(() => _tip = a),
+            ),
+        ]),
+        if (_tip != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: FilledButton(
+              key: const Key('order-send-tip'),
+              onPressed: _busy
+                  ? null
+                  : () async {
+                      final amount = _tip!;
+                      await _act(() => AppScope.of(context).api.tipOrder(o.id, amount));
+                      if (mounted && !_order.canTip) {
+                        setState(() => _tip = null);
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Thanks! Your tip goes straight to your driver.')));
+                      }
+                    },
+              child: Text('Tip ${money(_tip!, o.currency)}'),
+            ),
+          ),
+      ]),
+    );
   }
 
   /// The customer reads this to the driver at the door; the driver can't finish without it.
@@ -207,6 +297,7 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
             if ((o.isActive && o.status != 'pending_payment') || o.status == 'delivered') ...[const SizedBox(height: 16), _Progress(step: o.step)],
             if (o.isActive && (o.delivery?.hasDriver ?? false)) ..._driverSection(o),
             if (o.isActive && o.delivery?.pin != null && o.status != 'placed') _pinCard(o.delivery!.pin!),
+            if (o.canTip && AppScope.of(context).config.on('tips')) _tipBox(o),
             if (o.needsBank) ...[
               const SizedBox(height: 16),
               FilledButton.icon(
@@ -280,6 +371,19 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
                 Text(money(o.totals.total, o.currency), key: const Key('order-screen-total'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
               ]),
             ),
+            if (o.totals.tip > 0 || o.totals.discount > 0 || o.totals.credit > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  [
+                    if (o.totals.discount > 0) 'Promo −${money(o.totals.discount, o.currency)}',
+                    if (o.totals.credit > 0) 'Ride credit −${money(o.totals.credit, o.currency)}',
+                    if (o.totals.tip > 0) 'Tip ${money(o.totals.tip, o.currency)} (thank you!)',
+                  ].join(' · '),
+                  key: const Key('order-extras'),
+                  style: const TextStyle(color: Colors.black54),
+                ),
+              ),
             if (o.cardLabel != null)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
@@ -297,6 +401,23 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
               ]),
             ],
             if (o.note != null) Padding(padding: const EdgeInsets.only(top: 6, left: 28), child: Text('“${o.note}”', style: const TextStyle(color: Colors.black54))),
+            if (!o.isActive && AppScope.of(context).config.on('support'))
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: TextButton.icon(
+                  key: const Key('order-help'),
+                  onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    try {
+                      await AppPages.open(AppScope.of(context).api.client, 'support/new?category=delivery&order=${o.id}');
+                    } on ApiException catch (e) {
+                      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+                    }
+                  },
+                  icon: const Icon(Icons.help_outline),
+                  label: const Text('Problem with this order?'),
+                ),
+              ),
             if (o.canCancel) ...[
               const SizedBox(height: 24),
               OutlinedButton(key: const Key('cancel-order'), onPressed: _busy ? null : _cancel, child: const Text('Cancel order')),

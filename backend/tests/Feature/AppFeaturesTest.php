@@ -42,4 +42,16 @@ class AppFeaturesTest extends TestCase
         $this->get('/app/about')->assertRedirect('/app/signed-out');
         $this->get('/app/signed-out')->assertOk()->assertSee('Open this from the app');
     }
+
+    public function test_each_action_has_its_own_rate_limit(): void
+    {
+        // Using up one action's limit (wrong invite codes) must not block another (SOS).
+        $rider = $this->makeUser('rider');
+        $this->actingAs($rider, 'sanctum');
+        for ($i = 0; $i < 10; $i++) {
+            $this->postJson('/api/v1/me/referral', ['code' => 'NOPE'.$i])->assertUnprocessable();
+        }
+        $this->postJson('/api/v1/me/referral', ['code' => 'NOPE'])->assertStatus(429);
+        $this->postJson('/api/v1/sos', ['lat' => 13.1, 'lng' => -59.6])->assertOk();
+    }
 }

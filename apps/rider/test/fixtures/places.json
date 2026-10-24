@@ -1,0 +1,20 @@
+[
+  {
+    "id": 3,
+    "kind": "home",
+    "label": "Home",
+    "address": "Rockley, Christ Church",
+    "lat": 13.0745,
+    "lng": -59.588,
+    "place_id": null
+  },
+  {
+    "id": 4,
+    "kind": "other",
+    "label": "Gym",
+    "address": "Warrens, St Michael",
+    "lat": 13.129,
+    "lng": -59.611,
+    "place_id": null
+  }
+]

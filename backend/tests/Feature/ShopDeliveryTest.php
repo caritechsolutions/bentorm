@@ -161,6 +161,11 @@ class ShopDeliveryTest extends TestCase
         $view = $this->actingAs($this->customer, 'sanctum')->getJson("/api/v1/shop/orders/{$order->public_id}")->assertOk();
         $view->assertJsonPath('delivery.status', 'driver_assigned')->assertJsonPath('delivery.driver.name', $yes->firstName())
             ->assertJsonPath('delivery.driver.vehicle.plate', 'PB'.$yes->id)->assertJsonPath('delivery.pin', $order->fresh()->delivery_pin);
+        $view->assertJsonPath('delivery.trip_id', $trip->public_id)->assertJsonPath('delivery.can_chat', true);
+        // Message the driver through the delivery trip; the driver sees it with an unread count.
+        $this->postJson("/api/v1/trips/{$trip->public_id}/messages", ['body' => 'Gate code 42'])->assertCreated();
+        $this->actingAs($yes, 'sanctum')->getJson("/api/v1/driver/trips/{$trip->public_id}")->assertOk()->assertJsonPath('unread_messages', 1);
+        $this->actingAs($this->customer, 'sanctum');
         $this->getJson('/api/v1/trips/active')->assertOk()->assertJsonPath('trip', null);
         $this->assertSame([], $this->getJson('/api/v1/trips')->json('data'));
 

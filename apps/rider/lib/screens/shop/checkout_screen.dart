@@ -35,6 +35,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _placing = false;
   final _note = TextEditingController();
   int _seq = 0;
+  double _tip = 0;
+  String? _promo;
+  bool _useCredit = false;
+  double _creditBalance = 0;
 
   @override
   void initState() {
@@ -63,6 +67,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _init() async {
     final scope = AppScope.of(context);
     _loadCards();
+    _loadCredit();
     final me = await scope.location.current();
     final point = me ?? const LatLngPoint(AppConfig.defaultLat, AppConfig.defaultLng);
     final here = await scope.api.reverse(point.lat, point.lng);
@@ -81,6 +86,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
     _price();
+  }
+
+  Future<void> _loadCredit() async {
+    try {
+      final c = await AppScope.of(context).api.credit();
+      if (mounted) setState(() => _creditBalance = c.balance);
+    } on ApiException {
+      // No credit shown.
+    }
   }
 
   Future<void> _loadCards() async {
@@ -106,7 +120,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _quoteError = null;
     });
     try {
-      final q = await AppScope.of(context).api.shopQuote(cart.store!.slug, cart.toJson(), to.lat, to.lng);
+      final q = await AppScope.of(context)
+          .api
+          .shopQuote(cart.store!.slug, cart.toJson(), to.lat, to.lng, tip: _tip, promoCode: _promo, useCredit: _useCredit && _creditBalance > 0);
       if (mounted && seq == _seq) setState(() => _quote = q);
     } on ApiException catch (e) {
       if (mounted && seq == _seq) {
@@ -183,7 +199,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
     setState(() => _placing = true);
     try {
-      final order = await scope.api.placeOrder(store: cart.store!.slug, items: cart.toJson(), dropoff: _dropoff!, cardId: _cardId!, note: _note.text);
+      final order = await scope.api.placeOrder(
+        store: cart.store!.slug,
+        items: cart.toJson(),
+        dropoff: _dropoff!,
+        cardId: _cardId!,
+        note: _note.text,
+        tip: _tip,
+        promoCode: _promo,
+        useCredit: _useCredit && _creditBalance > 0,
+      );
       if (!mounted) return;
       if (order.status == 'cancelled') {
         // The bank said no straight away: keep the cart so they can try another card.
@@ -207,6 +232,100 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _snack(String m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+
+  Future<void> _enterPromo() async {
+    final api = AppScope.of(context).api;
+    final ctl = TextEditingController(text: _promo ?? '');
+    String? error;
+    var checking = false;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: const Text('Promo code'),
+          content: TextField(
+            key: const Key('promo-input'),
+            controller: ctl,
+            autofocus: true,
+            textCapitalization: TextCapitalization.characters,
+            decoration: InputDecoration(hintText: 'Code', errorText: error),
+          ),
+          actions: [
+            if (_promo != null) TextButton(onPressed: () => Navigator.pop(ctx, ''), child: const Text('Remove')),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(
+              key: const Key('promo-apply'),
+              onPressed: checking
+                  ? null
+                  : () async {
+                      if (ctl.text.trim().isEmpty) return;
+                      setD(() {
+                        checking = true;
+                        error = null;
+                      });
+                      try {
+                        final p = await api.checkPromo(ctl.text, forWhat: 'shop', amount: _quote?.totals.items);
+                        if (ctx.mounted) Navigator.pop(ctx, p.code);
+                      } on ApiException catch (e) {
+                        setD(() => error = e.field('code') ?? e.message);
+                      } finally {
+                        if (ctx.mounted) setD(() => checking = false);
+                      }
+                    },
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || result == null) return;
+    setState(() => _promo = result.isEmpty ? null : result);
+    _price();
+  }
+
+  List<Widget> _extras(String currency) {
+    final cfg = AppScope.of(context).config;
+    return [
+      if (cfg.on('tips')) ...[
+        const Text('Tip your driver (100% to them)', style: TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Wrap(spacing: 8, children: [
+          for (final a in const [0.0, 2.0, 5.0, 10.0])
+            ChoiceChip(
+              key: Key('checkout-tip-${a.toStringAsFixed(0)}'),
+              label: Text(a == 0 ? 'No tip' : money(a, currency)),
+              selected: _tip == a,
+              onSelected: (_) {
+                setState(() => _tip = a);
+                _price();
+              },
+            ),
+        ]),
+      ],
+      if (cfg.on('promos'))
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: const Key('checkout-promo'),
+            onPressed: _enterPromo,
+            icon: const Icon(Icons.local_offer_outlined, size: 18),
+            label: Text(_promo == null ? 'Add a promo code' : 'Promo $_promo${_quote?.promo != null ? ' · ${_quote!.promo}' : ''}'),
+          ),
+        ),
+      if (_creditBalance > 0)
+        SwitchListTile(
+          key: const Key('checkout-credit'),
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text('Use ride credit (${money(_creditBalance, currency)})'),
+          value: _useCredit,
+          onChanged: (v) {
+            setState(() => _useCredit = v);
+            _price();
+          },
+        ),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -275,6 +394,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: _chooseCard,
                   ),
+                  ..._extras(currency),
                   const Divider(height: 28),
                   if (_quoting) const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator())),
                   if (!_quoting && _quoteError != null)
