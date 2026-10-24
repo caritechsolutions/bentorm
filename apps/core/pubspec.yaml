@@ -16,7 +16,9 @@ dependencies:
   # Live updates over the server's websocket (Laravel Reverb, Pusher protocol).
   web_socket_channel: ^3.0.1
   # In-app audio/video calls between rider and driver (WebRTC).
-  flutter_webrtc: ">=0.12.0 <2.0.0"
+  # Kept below 1.0: from 1.0 the Android WebRTC library (137+) bundles org.jni_zero classes that clash with the
+  # Google Navigation SDK in the driver app ("Duplicate class org.jni_zero..."). 0.14.x uses WebRTC 125.
+  flutter_webrtc: ">=0.14.2 <1.0.0"
 
 dev_dependencies:
   flutter_test:
