@@ -19,7 +19,7 @@ class TripController extends Controller
     /** GET /trips — rider history, newest first. */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $trips = Trip::query()->where('rider_id', $request->user()->id)
+        $trips = Trip::query()->rides()->where('rider_id', $request->user()->id)
             ->with(['driver.driverProfile', 'vehicle'])
             ->latest('id')->paginate(20);
 

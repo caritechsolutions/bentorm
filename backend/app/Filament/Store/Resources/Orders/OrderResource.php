@@ -27,7 +27,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
-/** Incoming orders: accept (with prep time), decline, say what's out of stock, mark ready. */
+/** Incoming orders: accept (with prep time), decline, say what's out of stock, mark ready, hand over to the driver. */
 class OrderResource extends Resource
 {
     protected static ?string $model = Order::class;
@@ -57,7 +57,32 @@ class OrderResource extends Resource
 
     public static function statusColor(OrderStatus $s): string
     {
-        return match ($s) { OrderStatus::Placed => 'danger', OrderStatus::Accepted => 'warning', OrderStatus::Ready => 'success', default => 'gray' };
+        return match ($s) { OrderStatus::Placed => 'danger', OrderStatus::Accepted => 'warning', OrderStatus::Ready => 'success', OrderStatus::PickedUp => 'info', default => 'gray' };
+    }
+
+    /** One line about the driver for this order, for the store. */
+    public static function driverText(Order $o): ?string
+    {
+        if ($o->status === OrderStatus::Delivered) {
+            return 'Delivered '.$o->delivered_at?->diffForHumans();
+        }
+        $t = $o->latestDelivery();
+        $who = fn () => trim(($t->driver?->firstName() ?? 'Driver').($t->vehicle ? " · {$t->vehicle->colour} {$t->vehicle->make} {$t->vehicle->model}, {$t->vehicle->plate}" : ''));
+        if ($o->status === OrderStatus::PickedUp) {
+            return $t?->driver_id ? 'With '.$who().' — on the way to the customer' : 'On the way to the customer';
+        }
+        if (! $o->isActive() || in_array($o->status, [OrderStatus::Placed, OrderStatus::PendingPayment], true)) {
+            return null;
+        }
+        if ($t && $t->isActive() && $t->driver_id) {
+            return $who().($t->status === \App\Enums\TripStatus::Arrived ? ' — at your store' : ' — coming to collect');
+        }
+        if ($o->driver_requested_at) {
+            return $o->driver_alert_at ? 'Still looking for a driver (we keep trying)' : 'Looking for a driver…';
+        }
+        $lead = (int) \App\Filament\Pages\ShopSettings::value('shop.driver_lead_minutes');
+
+        return $o->ready_by ? 'A driver is sent at '.$o->ready_by->copy()->subMinutes($lead)->setTimezone($o->serviceArea?->timezone ?? config('app.timezone'))->format('g:i a') : null;
     }
 
     public static function table(Table $table): Table
@@ -76,6 +101,7 @@ class OrderResource extends Resource
                     }),
                 TextColumn::make('items_summary')->label('Items')->state(fn (Order $r) => $r->items->where('removed', false)->map(fn ($i) => "{$i->quantity}× {$i->name}")->implode(', '))->wrap()->limit(80),
                 TextColumn::make('customer.name')->label('Customer')->formatStateUsing(fn (Order $r) => $r->customer?->firstName()),
+                TextColumn::make('driver')->label('Driver')->state(fn (Order $r) => self::driverText($r))->placeholder('—')->wrap(),
                 TextColumn::make('store_payout')->label('You receive')->formatStateUsing(fn (Order $r) => self::money($r, $r->store_payout)),
                 TextColumn::make('placed_at')->label('Placed')->since(),
             ])
@@ -116,10 +142,27 @@ class OrderResource extends Resource
             Action::make('ready')->label('Mark ready')->icon(Heroicon::OutlinedShoppingBag)->color('success')
                 ->visible(fn (Order $record) => $record->status === OrderStatus::Accepted)
                 ->disabled(fn (Order $record) => $record->hasPendingChange())
-                ->requiresConfirmation()->modalDescription('Packed and ready for pickup? The customer\'s card is charged now.')
+                ->requiresConfirmation()->modalDescription('Packed and ready? If no driver is on the way yet, we send one now.')
                 ->action(function (Order $record) use ($svc, $store, $done) {
                     $svc()->markReady($record, $store());
                     $done('Marked ready.');
+                }),
+            Action::make('needDriver')->label('Need driver now')->icon(Heroicon::OutlinedTruck)->color('info')
+                ->visible(fn (Order $record) => $record->status === OrderStatus::Accepted && $record->driver_requested_at === null)
+                ->disabled(fn (Order $record) => $record->hasPendingChange())
+                ->action(function (Order $record) use ($svc, $store, $done) {
+                    $svc()->requestDriverNow($record, $store());
+                    $done('Looking for a driver now.');
+                }),
+            Action::make('pickedUp')->label('Picked up')->icon(Heroicon::OutlinedHandRaised)->color('success')
+                ->visible(fn (Order $record) => in_array($record->status, [OrderStatus::Accepted, OrderStatus::Ready], true) && (bool) $record->activeDelivery()?->driver_id)
+                ->disabled(fn (Order $record) => $record->hasPendingChange())
+                ->requiresConfirmation()
+                ->modalHeading(fn (Order $record) => 'Hand order '.$record->number().' to the driver?')
+                ->modalDescription(fn (Order $record) => 'Check it is '.(self::driverText($record) ?? 'the right driver').'. The customer is told it\'s on the way.')
+                ->action(function (Order $record) use ($svc, $store, $done) {
+                    $svc()->pickedUp($record, $store());
+                    $done('Handed over — the customer has been told.');
                 }),
             Action::make('decline')->label('Decline')->icon(Heroicon::OutlinedXMark)->color('danger')
                 ->visible(fn (Order $record) => in_array($record->status, [OrderStatus::Placed, OrderStatus::Accepted], true))
@@ -146,6 +189,7 @@ class OrderResource extends Resource
                 TextEntry::make('status')->badge()->formatStateUsing(fn (OrderStatus $state) => $state->label())->color(fn (OrderStatus $state) => self::statusColor($state)),
                 TextEntry::make('customer.name')->label('Customer')->formatStateUsing(fn (Order $record) => $record->customer?->firstName()),
                 TextEntry::make('placed_at')->label('Placed')->since(),
+                TextEntry::make('driver')->label('Driver')->state(fn (Order $record) => self::driverText($record))->placeholder('—')->columnSpanFull(),
                 TextEntry::make('note')->label('Customer note')->placeholder('—')->columnSpanFull(),
                 TextEntry::make('change_request')->label('Item change')->columnSpanFull()->visible(fn (Order $record) => (bool) $record->change_request)
                     ->state(fn (Order $record) => match ($record->change_request['status'] ?? null) {

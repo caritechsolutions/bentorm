@@ -99,16 +99,17 @@ class TripController extends Controller
         return new TripResource($this->trips->reachStop($trip, $request->user(), $index)->load(['rider', 'vehicle']));
     }
 
-    /** POST /driver/trips/{trip}/complete */
+    /** POST /driver/trips/{trip}/complete {lat?, lng?, pin? (deliveries)} */
     public function complete(Request $request, Trip $trip): TripResource
     {
         $data = $request->validate([
             'lat' => ['nullable', 'numeric', 'between:-90,90'],
             'lng' => ['nullable', 'numeric', 'between:-180,180'],
+            'pin' => ['nullable', 'string', 'max:8'], // deliveries: the customer's PIN at the door
         ]);
 
         return new TripResource(
-            $this->trips->complete($trip, $request->user(), $data['lat'] ?? null, $data['lng'] ?? null)->load(['rider', 'vehicle'])
+            $this->trips->complete($trip, $request->user(), $data['lat'] ?? null, $data['lng'] ?? null, $data['pin'] ?? null)->load(['rider', 'vehicle'])
         );
     }
 

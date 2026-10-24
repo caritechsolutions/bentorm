@@ -19,7 +19,8 @@ use UnitEnum;
 /** What Ride Coop earns on shop orders. Delivery fees themselves come from each area's "Delivery" rate card. */
 class ShopSettings extends Page
 {
-    public const DEFAULTS = ['shop.commission_rate' => 0.15, 'shop.delivery_share' => 0.20, 'shop.service_fee_flat' => 0.0, 'shop.service_fee_rate' => 0.0];
+    public const DEFAULTS = ['shop.commission_rate' => 0.15, 'shop.delivery_share' => 0.20, 'shop.service_fee_flat' => 0.0, 'shop.service_fee_rate' => 0.0,
+        'shop.driver_lead_minutes' => 10, 'shop.driver_alert_minutes' => 10];
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedReceiptPercent;
 
@@ -47,6 +48,8 @@ class ShopSettings extends Page
             'delivery_share' => round(self::value('shop.delivery_share') * 100, 2),
             'service_fee_flat' => self::value('shop.service_fee_flat'),
             'service_fee_rate' => round(self::value('shop.service_fee_rate') * 100, 2),
+            'driver_lead_minutes' => (int) self::value('shop.driver_lead_minutes'),
+            'driver_alert_minutes' => (int) self::value('shop.driver_alert_minutes'),
         ]);
     }
 
@@ -64,6 +67,12 @@ class ShopSettings extends Page
             Section::make('From the customer')->columns(2)->schema([
                 TextInput::make('service_fee_flat')->label('Service fee per order')->numeric()->minValue(0)->prefix('$')->required(),
                 $pct('service_fee_rate', 'Service fee (% of items)', 'Added to the customer\'s total. Use either or both; 0 for none.'),
+            ]),
+            Section::make('Drivers for deliveries')->columns(2)->schema([
+                TextInput::make('driver_lead_minutes')->label('Send a driver this many minutes before the food is ready')->numeric()->integer()->minValue(0)->maxValue(120)->suffix('min')->required()
+                    ->helperText('About how long a driver takes to reach a store. "Ready" and "Need driver now" in the store portal send one straight away.'),
+                TextInput::make('driver_alert_minutes')->label('Alert if no driver has taken it after')->numeric()->integer()->minValue(1)->maxValue(120)->suffix('min')->required()
+                    ->helperText('The store, admins and customer are told; the customer may then cancel and nothing is charged. We keep looking.'),
             ]),
         ]);
     }
@@ -83,6 +92,8 @@ class ShopSettings extends Page
         AppSetting::put('shop.delivery_share', round(((float) $d['delivery_share']) / 100, 4));
         AppSetting::put('shop.service_fee_flat', round((float) $d['service_fee_flat'], 2));
         AppSetting::put('shop.service_fee_rate', round(((float) $d['service_fee_rate']) / 100, 4));
+        AppSetting::put('shop.driver_lead_minutes', (int) $d['driver_lead_minutes']);
+        AppSetting::put('shop.driver_alert_minutes', (int) $d['driver_alert_minutes']);
         Notification::make()->title('Saved')->success()->send();
     }
 }

@@ -3,11 +3,15 @@
 namespace App\Services;
 
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod as PayBy;
+use App\Enums\TripStatus;
+use App\Events\TripUpdated;
 use App\Filament\Pages\ShopSettings;
 use App\Models\Order;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\Store;
+use App\Models\Trip;
 use App\Models\User;
 use App\Support\Geo;
 use App\Support\PushMessage;
@@ -16,7 +20,13 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Shop orders: price a cart, place it (card hold), and the store's side — accept, decline, remove items with
- * the customer's OK, mark ready (captures the card). Unanswered orders expire and the hold is released.
+ * the customer's OK, mark ready. Unanswered orders expire and the hold is released.
+ *
+ * Delivery: a driver is sent when the order will be ready within the "driver lead" minutes (or straight away when
+ * the store marks it ready / asks for a driver now). The delivery is a trip (store → customer) offered to drivers
+ * who opted in to deliveries. Nobody takes it → a new job next minute; after the alert time the store, admins and
+ * customer are told (the customer may then cancel). The store confirms the hand-over ("Picked up"); the driver
+ * finishes with the customer's PIN, and only then is the card charged.
  *
  * Money: items (+ VAT when the store's prices exclude it) + delivery fee (delivery rate card, incl. VAT)
  * + service fee (incl. VAT) = total. Commission is kept from the items; the store is paid the rest of the items.
@@ -31,6 +41,7 @@ class OrderService
         private readonly PricingService $pricing,
         private readonly PaymentService $payments,
         private readonly PushService $push,
+        private readonly DispatchService $dispatch,
     ) {}
 
     // ================================================================= pricing
@@ -233,15 +244,33 @@ class OrderService
         ]);
     }
 
-    /** Customers can cancel until the store accepts; after that the store is already preparing it. */
+    /**
+     * Customers can cancel until the store accepts (the store is already preparing it after that) — or when no driver
+     * has taken the delivery for a long time (staff were alerted), as long as no driver is on it.
+     */
     public function cancelByCustomer(Order $order, User $customer): Order
     {
         abort_unless($order->customer_id === $customer->id, 404);
-        $o = $this->transition($order, [OrderStatus::PendingPayment, OrderStatus::Placed], OrderStatus::Cancelled,
+        $from = [OrderStatus::PendingPayment, OrderStatus::Placed];
+        if ($this->customerMayCancelForNoDriver($order)) {
+            $from = [...$from, OrderStatus::Accepted, OrderStatus::Ready];
+        }
+        $o = $this->transition($order, $from, OrderStatus::Cancelled,
             ['cancelled_by' => 'customer', 'cancelled_at' => now()], 'The store has already started on your order — contact the store to cancel.');
+        $this->cancelDeliveryJob($o, 'Customer cancelled');
         $this->payments->releaseOrderHold($o);
+        if ($o->accepted_at) {
+            $this->notifyStore($o, "Order {$o->number()} was cancelled by the customer (no driver was found). Nothing was charged.");
+        }
 
         return $o;
+    }
+
+    /** No driver for a long time and none on the way: the customer may cancel. */
+    public function customerMayCancelForNoDriver(Order $o): bool
+    {
+        return $o->driver_alert_at !== null && in_array($o->status, [OrderStatus::Accepted, OrderStatus::Ready], true)
+            && ! $o->activeDelivery()?->driver_id;
     }
 
     /** Answer the store's request to take items off. No = the order is cancelled and the card released. */
@@ -257,6 +286,7 @@ class OrderService
                 'cancelled_by' => 'customer', 'cancelled_at' => now(), 'decline_reason' => 'Customer did not accept the changes',
                 'change_request' => ['status' => 'declined'] + $change,
             ]);
+            $this->cancelDeliveryJob($o, 'Customer did not accept the changes');
             $this->payments->releaseOrderHold($o);
             $this->notifyStore($o, 'Order '.$o->number().' cancelled: the customer did not accept the changes.');
 
@@ -279,7 +309,8 @@ class OrderService
         $this->assertStore($order, $store);
         $prep = max(1, min(240, $prepMinutes));
         $o = $this->transition($order, [OrderStatus::Placed], OrderStatus::Accepted,
-            ['accepted_at' => now(), 'prep_minutes' => $prep, 'ready_by' => now()->addMinutes($prep), 'expires_at' => null],
+            ['accepted_at' => now(), 'prep_minutes' => $prep, 'ready_by' => now()->addMinutes($prep), 'expires_at' => null,
+                'delivery_pin' => $order->delivery_pin ?? TripService::newPin()],
             'This order can no longer be accepted.');
         $this->notifyCustomer($o, "{$store->name} accepted your order", "Order {$o->number()} will be ready in about {$prep} minutes.");
 
@@ -291,6 +322,7 @@ class OrderService
         $this->assertStore($order, $store);
         $o = $this->transition($order, [OrderStatus::Placed, OrderStatus::Accepted], OrderStatus::Declined,
             ['decline_reason' => mb_substr($reason, 0, 255), 'cancelled_by' => 'store', 'cancelled_at' => now(), 'expires_at' => null]);
+        $this->cancelDeliveryJob($o, 'Store cancelled the order');
         $this->payments->releaseOrderHold($o);
         $this->notifyCustomer($o, "{$store->name} couldn't take your order", $reason.' Your card has not been charged.');
 
@@ -324,7 +356,7 @@ class OrderService
         return $order->fresh(['items', 'store']);
     }
 
-    /** Packed and ready: take the payment (phase 3 then sends a driver). */
+    /** Packed and ready: a driver is sent now if one isn't already on the way. */
     public function markReady(Order $order, Store $store): Order
     {
         $this->assertStore($order, $store);
@@ -332,10 +364,141 @@ class OrderService
             throw ValidationException::withMessages(['status' => ['Wait for the customer to answer the item change first.']]);
         }
         $o = $this->transition($order, [OrderStatus::Accepted], OrderStatus::Ready, ['ready_at' => now()], 'Accept the order before marking it ready.');
-        $this->payments->captureOrder($o);
-        $this->notifyCustomer($o, 'Your order is ready', "{$store->name} has packed order {$o->number()}.");
+        $this->sendDriver($o);
+        $this->notifyCustomer($o, 'Your order is ready', "{$store->name} has packed order {$o->number()}. A driver will bring it to you.");
 
         return $o->fresh(['items', 'store']);
+    }
+
+    /** Store: "Need a driver now" — don't wait for the prep timer. */
+    public function requestDriverNow(Order $order, Store $store): Order
+    {
+        $this->assertStore($order, $store);
+        if (! in_array($order->status, [OrderStatus::Accepted, OrderStatus::Ready], true)) {
+            throw ValidationException::withMessages(['status' => ['Accept the order first.']]);
+        }
+        $this->sendDriver($order);
+
+        return $order->fresh(['items', 'store']);
+    }
+
+    /** The store handed the bag to the driver. */
+    public function pickedUp(Order $order, Store $store): Order
+    {
+        $this->assertStore($order, $store);
+        if ($order->hasPendingChange()) {
+            throw ValidationException::withMessages(['status' => ['Wait for the customer to answer the item change first.']]);
+        }
+        $trip = $order->activeDelivery();
+        if (! $trip?->driver_id) {
+            throw ValidationException::withMessages(['status' => ['No driver has taken this delivery yet.']]);
+        }
+        app(TripService::class)->deliveryPickedUp($trip);
+        $o = $this->transition($order, [OrderStatus::Accepted, OrderStatus::Ready], OrderStatus::PickedUp,
+            ['picked_up_at' => now(), 'ready_at' => $order->ready_at ?? now()], 'This order has already moved on.');
+        $name = $trip->driver?->firstName() ?? 'Your driver';
+        $this->notifyCustomer($o, 'Your order is on the way', "{$name} is bringing order {$o->number()}. Have your PIN ready — it's in the app.", urgent: true);
+
+        return $o->fresh(['items', 'store']);
+    }
+
+    /** The driver entered the customer's PIN: the order is done and the card is charged. */
+    public function onDelivered(Order $order): Order
+    {
+        $o = $this->transition($order, [OrderStatus::PickedUp], OrderStatus::Delivered, ['delivered_at' => now()]);
+        $this->payments->captureOrder($o);
+        $this->notifyCustomer($o, 'Delivered', "Order {$o->number()} from {$o->store->name} was delivered. Enjoy!");
+
+        return $o->fresh(['items', 'store']);
+    }
+
+    /**
+     * Scheduler, every minute: send a driver when the order will be ready within the lead time (or was asked for),
+     * send a fresh job when the last one found nobody or the driver cancelled, and alert people after a while.
+     */
+    public function dispatchDue(): int
+    {
+        $lead = (int) ShopSettings::value('shop.driver_lead_minutes');
+        $sent = 0;
+        Order::query()->whereIn('status', [OrderStatus::Accepted->value, OrderStatus::Ready->value])->with('store')->get()
+            ->each(function (Order $o) use ($lead, &$sent) {
+                $due = $o->driver_requested_at !== null || $o->status === OrderStatus::Ready
+                    || ($o->ready_by !== null && $o->ready_by->lte(now()->addMinutes($lead)));
+                if ($due && ! $o->hasPendingChange() && $this->sendDriver($o)) {
+                    $sent++;
+                }
+                $this->alertIfNoDriver($o->fresh());
+            });
+
+        return $sent;
+    }
+
+    /** Create a delivery job and start offering it, unless one is already running. True when a new one was sent. */
+    public function sendDriver(Order $order): bool
+    {
+        $trip = DB::transaction(function () use ($order) {
+            $o = Order::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
+            if (! in_array($o->status, [OrderStatus::Accepted, OrderStatus::Ready], true) || $o->activeDelivery()) {
+                return null;
+            }
+            $store = $o->store;
+            $o->forceFill(['delivery_pin' => $o->delivery_pin ?? TripService::newPin(), 'driver_requested_at' => $o->driver_requested_at ?? now()])->save();
+
+            return Trip::query()->create([
+                'rider_id' => $o->customer_id, 'order_id' => $o->id, 'service_area_id' => $o->service_area_id,
+                'vehicle_type' => 'delivery', 'status' => TripStatus::Requested,
+                'pickup_lat' => $store->lat, 'pickup_lng' => $store->lng,
+                'pickup_address' => mb_substr(trim($store->name.($store->address ? ', '.$store->address : '')), 0, 255),
+                'dropoff_lat' => $o->dropoff_lat, 'dropoff_lng' => $o->dropoff_lng, 'dropoff_address' => $o->dropoff_address,
+                'pin' => $o->delivery_pin,
+                'estimated_distance_m' => $o->distance_m, 'estimated_duration_s' => $o->duration_s, 'estimated_fare' => $o->delivery_fee,
+                'currency' => $o->currency, 'payment_method' => PayBy::Card, 'payment_status' => 'pending',
+                'passengers' => 1, 'luggage' => 0, 'rider_note' => $o->note, 'requested_at' => now(),
+            ]);
+        });
+        if (! $trip) {
+            return false;
+        }
+        $this->dispatch->start($trip);
+        event(new TripUpdated($trip));
+
+        return true;
+    }
+
+    /** Nobody has taken it for the alert time: tell the store, admins and the customer (once). */
+    private function alertIfNoDriver(Order $o): void
+    {
+        $minutes = (int) ShopSettings::value('shop.driver_alert_minutes');
+        if ($o->driver_alert_at || ! $o->driver_requested_at || $o->driver_requested_at->gt(now()->subMinutes($minutes))
+            || ! in_array($o->status, [OrderStatus::Accepted, OrderStatus::Ready], true) || $o->activeDelivery()?->driver_id) {
+            return;
+        }
+        if (! Order::query()->whereKey($o->id)->whereNull('driver_alert_at')->update(['driver_alert_at' => now()])) {
+            return;
+        }
+        $text = "No driver has taken order {$o->number()} yet ({$minutes} min). We keep looking; the customer may cancel.";
+        $this->notifyStore($o, "Ride Coop: {$text}");
+        $msg = new PushMessage('No driver yet for order '.$o->number(), $text, ['type' => 'store_order', 'order_id' => $o->public_id], urgent: true);
+        foreach ($o->store->users()->pluck('users.id')->merge(User::query()->where('role', 'admin')->pluck('id'))->unique() as $uid) {
+            $this->push->notify($uid, $msg);
+        }
+        $this->notifyCustomer($o, 'Still looking for a driver', "Drivers are busy right now. We keep trying — or you can cancel order {$o->number()} in the app and nothing is charged.");
+    }
+
+    /** Stop a delivery job that is still looking for a driver or on its way to the store. */
+    private function cancelDeliveryJob(Order $o, string $reason): void
+    {
+        $t = $o->activeDelivery();
+        if (! $t || $t->status === TripStatus::InProgress) {
+            return; // the driver already has the bag — staff sort that out
+        }
+        $this->dispatch->withdrawAll($t, 'cancelled');
+        $t->forceFill(['status' => TripStatus::Cancelled, 'cancelled_at' => now(), 'cancelled_by' => 'system',
+            'cancellation_reason' => $reason, 'payment_status' => 'waived'])->save();
+        if ($t->driver && $t->driver->driverProfile?->is_online) {
+            app(DriverLocationService::class)->setState($t->driver, 'idle');
+        }
+        event(new TripUpdated($t));
     }
 
     /** Orders the store never answered: release the card and tell the customer (scheduler, every minute). */

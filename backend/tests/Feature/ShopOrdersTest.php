@@ -41,7 +41,7 @@ class ShopOrdersTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Queue::fake([SendPushJob::class]);
+        Queue::fake([SendPushJob::class, \App\Jobs\DispatchTripJob::class]); // delivery dispatch: ShopDeliveryTest
         $this->bb = $this->seedReference();
         $this->owner = $this->makeUser('rider');
         $this->store = Store::query()->create(['name' => 'Fish Pot', 'shop_category_id' => ShopCategory::query()->where('slug', 'food')->value('id'),
@@ -157,7 +157,7 @@ class ShopOrdersTest extends TestCase
         $this->postJson('/api/v1/shop/quote', $this->cart())->assertUnprocessable()->assertJsonPath('errors.store.0', 'Fish Pot is closed right now.');
     }
 
-    public function test_order_holds_the_card_store_accepts_marks_ready_and_the_card_is_charged(): void
+    public function test_order_holds_the_card_store_accepts_and_marks_ready(): void
     {
         $this->actingAs($this->customer, 'sanctum')->postJson('/api/v1/shop/orders', $this->cart())->assertUnprocessable()->assertJsonValidationErrors('payment_method_id');
 
@@ -189,8 +189,9 @@ class ShopOrdersTest extends TestCase
         $this->asStore();
         Livewire::test(StoreViewOrder::class, ['record' => $order->public_id])->callAction('ready')->assertHasNoActionErrors();
         $order->refresh();
-        $this->assertSame([OrderStatus::Ready, 'paid', 'captured'], [$order->status, $order->payment_status, $order->hold()->status]);
-        $this->assertEqualsWithDelta($order->total, $order->hold()->captured_amount, 0.001);
+        // The card is charged at delivery (ShopDeliveryTest); ready sends a driver.
+        $this->assertSame([OrderStatus::Ready, 'authorized', 'authorized'], [$order->status, $order->payment_status, $order->hold()->status]);
+        $this->assertSame('requested', $order->activeDelivery()?->status->value);
     }
 
     public function test_out_of_stock_items_need_the_customers_ok(): void
@@ -211,10 +212,14 @@ class ShopOrdersTest extends TestCase
         $this->assertEqualsWithDelta($old - 4, $order->total, 0.001);
         $this->assertSame([56.0, 8.4, 47.6], [$order->items_subtotal, $order->commission, $order->store_payout]);
 
-        // Ready charges the smaller amount from the bigger hold.
+        // Delivery charges the smaller amount from the bigger hold.
         $this->asStore();
         app(OrderService::class)->accept($order, $this->store, 10);
         app(OrderService::class)->markReady($order->fresh(), $this->store);
+        $trip = $order->fresh()->activeDelivery();
+        $trip->forceFill(['driver_id' => $this->makeApprovedDriver($this->bb)->id, 'status' => 'accepted'])->save();
+        app(OrderService::class)->pickedUp($order->fresh(), $this->store);
+        app(\App\Services\TripService::class)->complete($trip->fresh(), $trip->driver, pin: $order->fresh()->delivery_pin);
         $this->assertEqualsWithDelta($order->fresh()->total, $order->hold()->captured_amount, 0.001);
     }
 

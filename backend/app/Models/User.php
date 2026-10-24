@@ -112,7 +112,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
 
     public function ridesAsRider(): HasMany
     {
-        return $this->hasMany(Trip::class, 'rider_id');
+        return $this->hasMany(Trip::class, 'rider_id')->whereNull('trips.order_id');
     }
 
     public function ridesAsDriver(): HasMany
@@ -148,6 +148,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
 
         return Trip::query()
             ->where($column, $this->id)
+            ->when($column === 'rider_id', fn ($q) => $q->rides()) // a customer's delivery is not their ride
             ->whereIn('status', array_map(fn ($s) => $s->value, TripStatus::active()))
             ->latest('id')
             ->first();
@@ -156,7 +157,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     /** Trips (as rider) with money still owed — blocks new requests. */
     public function outstandingTrips()
     {
-        return Trip::query()->where('rider_id', $this->id)
+        return Trip::query()->rides()->where('rider_id', $this->id)
             ->where('payment_status', PaymentStatus::Pending->value)
             ->where('amount_due', '>', 0)
             ->whereIn('status', [TripStatus::Completed->value, TripStatus::Cancelled->value]);

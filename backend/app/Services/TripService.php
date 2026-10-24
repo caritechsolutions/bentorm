@@ -205,14 +205,31 @@ class TripService
     /** Start the trip. The driver must enter the rider's PIN (rides created before PINs existed have none). */
     public function start(Trip $trip, User $driver, ?string $pin = null): Trip
     {
+        if ($trip->isDelivery()) {
+            abort(409, 'The store confirms the hand-over in their portal — the job moves on by itself.');
+        }
+
+        return $this->withPin($trip, $driver, $pin, TripStatus::InProgress, 'the rider', function (Trip $t) {
+            $t->forceFill([
+                'status' => TripStatus::InProgress, 'started_at' => now(),
+                'pin_verified_at' => $t->pin ? now() : null, 'pin_attempts' => 0,
+            ])->save();
+        });
+    }
+
+    /**
+     * Checks the PIN for a move to $to, then runs $apply on the locked trip. Wrong PINs are counted (after the
+     * transaction, so the count isn't rolled back); too many lock it for a few minutes.
+     */
+    private function withPin(Trip $trip, User $driver, ?string $pin, TripStatus $to, string $person, \Closure $apply): Trip
+    {
         $max = (int) config('bentorm.pin_max_attempts', 5);
         $lockMinutes = (int) config('bentorm.pin_lock_minutes', 2);
 
-        // The check runs in the transaction; a wrong PIN is recorded after it, so the count isn't rolled back.
-        $result = DB::transaction(function () use ($trip, $driver, $pin, $max, $lockMinutes) {
+        $result = DB::transaction(function () use ($trip, $driver, $pin, $max, $lockMinutes, $to, $apply) {
             /** @var Trip $t */
             $t = Trip::query()->whereKey($trip->id)->lockForUpdate()->firstOrFail();
-            $this->assertDriverCan($t, $driver, TripStatus::InProgress);
+            $this->assertDriverCan($t, $driver, $to);
 
             if ($t->pin) {
                 if ($t->pin_attempts >= $max && $t->pin_failed_at?->gt(now()->subMinutes($lockMinutes))) {
@@ -222,11 +239,7 @@ class TripService
                     return $pin === null || trim($pin) === '' ? 'missing' : 'wrong';
                 }
             }
-
-            $t->forceFill([
-                'status' => TripStatus::InProgress, 'started_at' => now(),
-                'pin_verified_at' => $t->pin ? now() : null, 'pin_attempts' => 0,
-            ])->save();
+            $apply($t);
             event(new TripUpdated($t));
 
             return $t;
@@ -235,12 +248,12 @@ class TripService
         if ($result instanceof Trip) {
             return $result;
         }
+        $name = $person === 'the rider' ? ($trip->rider?->firstName() ?? 'the rider') : $person;
         if ($result === 'locked') {
-            $rider = $trip->rider?->firstName() ?? 'the rider';
-            abort(429, "Too many wrong PINs. Ask {$rider} to read the PIN from their app, and try again in {$lockMinutes} minutes.");
+            abort(429, "Too many wrong PINs. Ask {$name} to read the PIN from their app, and try again in {$lockMinutes} minutes.");
         }
         if ($result === 'missing') {
-            throw ValidationException::withMessages(['pin' => ['Ask the rider for their 4-digit PIN.']]);
+            throw ValidationException::withMessages(['pin' => ["Ask {$person} for their 4-digit PIN."]]);
         }
 
         // Wrong PIN: count it (a lock that has expired starts a fresh count).
@@ -250,7 +263,56 @@ class TripService
         $left = max(0, $max - $attempts);
         throw ValidationException::withMessages(['pin' => [$left > 0
             ? "That PIN is not right. {$left} ".($left === 1 ? 'try' : 'tries').' left.'
-            : "That PIN is not right. Wait {$lockMinutes} minutes, then check it with the rider."]]);
+            : "That PIN is not right. Wait {$lockMinutes} minutes, then check it with {$person}."]]);
+    }
+
+    // ================================================================= deliveries
+
+    /** The store handed the order to the driver (store portal). The driver can tap "arrived" or not. */
+    public function deliveryPickedUp(Trip $trip): Trip
+    {
+        return DB::transaction(function () use ($trip) {
+            /** @var Trip $t */
+            $t = Trip::query()->whereKey($trip->id)->lockForUpdate()->firstOrFail();
+            if (! $t->isDelivery() || ! in_array($t->status, [TripStatus::Accepted, TripStatus::Arrived], true)) {
+                throw ValidationException::withMessages(['status' => ['The driver has to accept the job before collecting the order.']]);
+            }
+            $t->forceFill(['status' => TripStatus::InProgress, 'arrived_at' => $t->arrived_at ?? now(), 'started_at' => now()])->save();
+            event(new TripUpdated($t));
+
+            return $t;
+        });
+    }
+
+    /** At the customer's door: the customer's PIN completes the delivery, then the order is captured. */
+    private function completeDelivery(Trip $trip, User $driver, ?string $pin, ?float $endLat, ?float $endLng): Trip
+    {
+        $t = $this->withPin($trip, $driver, $pin, TripStatus::Completed, 'the customer', function (Trip $t) use ($driver, $endLat, $endLng) {
+            if ($endLat !== null && $endLng !== null) {
+                $this->recordLocation($t, $endLat, $endLng, null, null);
+            }
+            $order = $t->order;
+            $fee = (float) $order->delivery_fee;
+            $ex = (float) $order->delivery_fee_ex_tax;
+            $t->forceFill([
+                'status' => TripStatus::Completed,
+                'completed_at' => now(),
+                'pin_verified_at' => now(), 'pin_attempts' => 0,
+                'actual_distance_m' => $this->trackedDistance($t) ?: ($t->estimated_distance_m ?? 0),
+                'actual_duration_s' => (int) max(0, ($t->started_at ?? now())->diffInSeconds(now(), true)),
+                'wait_duration_s' => ($t->arrived_at && $t->started_at) ? (int) max(0, $t->arrived_at->diffInSeconds($t->started_at, true)) : 0,
+                'subtotal' => $ex, 'tax_amount' => round($fee - $ex, 2), 'final_fare' => $fee,
+                'platform_fee' => (float) $order->delivery_platform_share, 'driver_earnings' => (float) $order->driver_earnings,
+                // The customer paid by card with the order; nothing is owed on the trip itself.
+                'payment_status' => PaymentStatus::Paid, 'amount_due' => 0,
+            ])->save();
+            $driver->driverProfile?->increment('completed_trips');
+            $this->releaseDriver($driver);
+        });
+
+        app(OrderService::class)->onDelivered($t->order);
+
+        return $t->fresh();
     }
 
     // ================================================================= stops
@@ -392,8 +454,11 @@ class TripService
         return str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
     }
 
-    public function complete(Trip $trip, User $driver, ?float $endLat = null, ?float $endLng = null): Trip
+    public function complete(Trip $trip, User $driver, ?float $endLat = null, ?float $endLng = null, ?string $pin = null): Trip
     {
+        if ($trip->isDelivery()) {
+            return $this->completeDelivery($trip, $driver, $pin, $endLat, $endLng);
+        }
         $t = DB::transaction(function () use ($trip, $driver, $endLat, $endLng) {
             /** @var Trip $t */
             $t = Trip::query()->whereKey($trip->id)->lockForUpdate()->firstOrFail();

@@ -15,7 +15,7 @@ class Trip extends Model
     use HasUlids;
 
     protected $fillable = [
-        'rider_id', 'driver_id', 'vehicle_id', 'service_area_id', 'pickup_zone_id', 'dropoff_zone_id', 'vehicle_type', 'status',
+        'rider_id', 'order_id', 'driver_id', 'vehicle_id', 'service_area_id', 'pickup_zone_id', 'dropoff_zone_id', 'vehicle_type', 'status',
         'pickup_lat', 'pickup_lng', 'pickup_address', 'dropoff_lat', 'dropoff_lng', 'dropoff_address', 'stops', 'stop_change',
         'pin', 'pin_attempts', 'pin_failed_at', 'pin_verified_at',
         'estimated_distance_m', 'estimated_duration_s', 'estimated_fare',
@@ -137,12 +137,32 @@ class Trip extends Model
         return $this->rider_id === $user->id || $this->driver_id === $user->id;
     }
 
+    /** The shop order this trip delivers (null for rides). */
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
+    }
+
+    public function isDelivery(): bool
+    {
+        return $this->order_id !== null;
+    }
+
+    /** Rides only (deliveries are trips too, but never shown as the customer's rides). */
+    public function scopeRides($query)
+    {
+        return $query->whereNull('trips.order_id');
+    }
+
     /**
      * What the driver would take home from the estimate (ex VAT, after commission) — shown on offers,
      * before driver_earnings exists. Mirrors PricingService: subtotal = fare / (1 + tax), driver = subtotal × (1 − commission).
      */
     public function estimatedDriverEarnings(): ?float
     {
+        if ($this->order_id) {
+            return $this->order?->driver_earnings;
+        }
         if ($this->estimated_fare === null) {
             return null;
         }

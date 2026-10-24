@@ -47,7 +47,9 @@ class OrderResource extends Resource
                 TextColumn::make('store.name')->label('Store')->searchable(),
                 TextColumn::make('customer.name')->label('Customer')->searchable()->description(fn (Order $r) => $r->customer?->phone),
                 TextColumn::make('status')->badge()->formatStateUsing(fn (OrderStatus $state) => $state->label())
-                    ->color(fn (OrderStatus $state) => match ($state) { OrderStatus::Ready => 'success', OrderStatus::Placed, OrderStatus::Accepted => 'warning', OrderStatus::PendingPayment => 'gray', default => 'danger' }),
+                    ->color(fn (OrderStatus $state) => match ($state) { OrderStatus::Ready, OrderStatus::Delivered => 'success', OrderStatus::PickedUp => 'info', OrderStatus::Placed, OrderStatus::Accepted => 'warning', OrderStatus::PendingPayment => 'gray', default => 'danger' }),
+                TextColumn::make('driver')->label('Driver')->state(fn (Order $r) => \App\Filament\Store\Resources\Orders\OrderResource::driverText($r))->placeholder('—')->wrap()
+                    ->color(fn (Order $r) => $r->driver_alert_at && $r->isActive() && ! $r->activeDelivery()?->driver_id ? 'danger' : null),
                 TextColumn::make('total')->formatStateUsing(fn (Order $r) => self::money($r, $r->total))->sortable(),
                 TextColumn::make('payment_status')->label('Payment')->badge()->color('gray'),
                 TextColumn::make('created_at')->label('Ordered')->since()->sortable(),
@@ -71,6 +73,7 @@ class OrderResource extends Resource
                     ->url(fn (Order $record) => "https://www.google.com/maps?q={$record->dropoff_lat},{$record->dropoff_lng}", shouldOpenInNewTab: true),
                 TextEntry::make('distance_m')->label('Distance')->formatStateUsing(fn ($state) => number_format($state / 1000, 1).' km'),
                 TextEntry::make('prep_minutes')->label('Prep time')->suffix(' min')->placeholder('—'),
+                TextEntry::make('driver')->label('Driver')->state(fn (Order $record) => \App\Filament\Store\Resources\Orders\OrderResource::driverText($record))->placeholder('—')->columnSpan(2),
                 TextEntry::make('note')->label('Customer note')->placeholder('—')->columnSpanFull(),
                 TextEntry::make('decline_reason')->label('Reason')->placeholder('—')->columnSpanFull()->visible(fn (Order $record) => filled($record->decline_reason)),
             ]),

@@ -38,6 +38,7 @@ class ProfileController extends Controller
             'licence_number' => ['sometimes', 'string', 'max:64'],
             'licence_expiry' => ['sometimes', 'date', 'after:today'],
             'psv_permit_number' => ['nullable', 'string', 'max:64'],
+            'accepts_deliveries' => ['sometimes', 'boolean'], // shop deliveries on/off (any approved vehicle)
         ]);
 
         $profile = $request->user()->driverProfile()->firstOrCreate([]);
@@ -45,7 +46,7 @@ class ProfileController extends Controller
             abort(409, 'Go offline before changing your area.');
         }
         // Re-applying after a rejection puts the application back in the queue.
-        if ($profile->status->value === 'rejected') {
+        if ($profile->status->value === 'rejected' && array_diff(array_keys($data), ['accepts_deliveries'])) {
             $data['status'] = 'pending';
             $data['status_note'] = null;
         }

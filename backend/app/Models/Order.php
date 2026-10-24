@@ -26,6 +26,7 @@ class Order extends Model
             'breakdown' => 'array', 'change_request' => 'array',
             'placed_at' => 'datetime', 'expires_at' => 'datetime', 'accepted_at' => 'datetime', 'ready_by' => 'datetime',
             'ready_at' => 'datetime', 'cancelled_at' => 'datetime',
+            'driver_requested_at' => 'datetime', 'driver_alert_at' => 'datetime', 'picked_up_at' => 'datetime', 'delivered_at' => 'datetime',
         ];
     }
 
@@ -73,6 +74,24 @@ class Order extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /** Delivery jobs for this order (a new one is made if a driver cancels or nobody takes it). */
+    public function deliveries(): HasMany
+    {
+        return $this->hasMany(Trip::class);
+    }
+
+    /** The delivery job still in play (looking for a driver, or a driver has it). */
+    public function activeDelivery(): ?Trip
+    {
+        return $this->deliveries()->whereIn('status', array_map(fn ($s) => $s->value, \App\Enums\TripStatus::active()))->latest('id')->first();
+    }
+
+    /** The newest delivery job, finished or not. */
+    public function latestDelivery(): ?Trip
+    {
+        return $this->deliveries()->latest('id')->first();
     }
 
     public function hold(): ?Payment

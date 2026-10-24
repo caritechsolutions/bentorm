@@ -119,7 +119,10 @@ class DispatchService
         $limit = $s->isBroadcast() ? max(1, $s->broadcast_limit) : max(1, $s->batch_size);
         $fetch = $s->isBroadcast() ? $limit * 2 : max($limit * 4, $s->ranking === 'eta' ? $s->eta_candidates : 0, $s->ranking === 'longest_idle' ? 50 : 0);
 
-        $nearby = $this->locations->nearbyIdle($trip->pickup_lat, $trip->pickup_lng, $radius, $trip->vehicle_type, $fetch, $exclude);
+        // Deliveries go to any vehicle, but only drivers who opted in to deliveries.
+        $nearby = $trip->isDelivery()
+            ? $this->deliveryDrivers($this->locations->nearbyIdle($trip->pickup_lat, $trip->pickup_lng, $radius, null, $fetch * 3, $exclude))
+            : $this->locations->nearbyIdle($trip->pickup_lat, $trip->pickup_lng, $radius, $trip->vehicle_type, $fetch, $exclude);
         $fit = $this->fitting($trip, $nearby, PHP_INT_MAX);
 
         $ranked = match ($s->ranking) {
@@ -129,6 +132,18 @@ class DispatchService
         };
 
         return array_slice($ranked, 0, $limit);
+    }
+
+    /** Keep the drivers who said yes to deliveries. */
+    private function deliveryDrivers(array $nearby): array
+    {
+        if (! $nearby) {
+            return [];
+        }
+        $yes = \App\Models\DriverProfile::query()->whereIn('user_id', array_column($nearby, 'driver_id'))
+            ->where('accepts_deliveries', true)->pluck('user_id')->all();
+
+        return array_values(array_filter($nearby, fn ($c) => in_array($c['driver_id'], $yes)));
     }
 
     /** Fastest by road first. Only the nearest $checkCount are routed (cost); the rest follow, nearest first. */

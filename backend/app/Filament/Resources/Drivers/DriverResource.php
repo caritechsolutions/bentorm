@@ -70,6 +70,8 @@ class DriverResource extends Resource
                 TextInput::make('licence_number')->maxLength(64),
                 DatePicker::make('licence_expiry')->native(false),
                 TextInput::make('psv_permit_number')->label('PSV permit number')->maxLength(64),
+                \Filament\Forms\Components\Toggle::make('accepts_deliveries')->label('Does shop deliveries')
+                    ->helperText('Drivers can also switch this in their app. Any approved vehicle can deliver.'),
             ]),
         ]);
     }
@@ -92,6 +94,7 @@ class DriverResource extends Resource
                     TextEntry::make('status')->badge()->color(fn ($state) => Ui::color($state))->formatStateUsing(fn ($state) => Ui::label($state)),
                     TextEntry::make('status_note')->label('Note to driver')->placeholder('—'),
                     IconEntry::make('is_online')->label('Online now')->boolean(),
+                    IconEntry::make('accepts_deliveries')->label('Does deliveries')->boolean(),
                     TextEntry::make('rating_avg')->label('Rating')->formatStateUsing(fn ($state, DriverProfile $record) => number_format((float) $state, 2).' ★ ('.$record->rating_count.')'),
                     TextEntry::make('completed_trips')->label('Completed trips'),
                     TextEntry::make('approved_at')->dateTime()->placeholder('—'),
@@ -120,6 +123,7 @@ class DriverResource extends Resource
                 TextColumn::make('currentVehicle.plate')->label('Vehicle')->placeholder('—')
                     ->description(fn (DriverProfile $record) => $record->currentVehicle ? "{$record->currentVehicle->make} {$record->currentVehicle->model} · {$record->currentVehicle->vehicle_type}" : null),
                 IconColumn::make('is_online')->label('Online')->boolean(),
+                IconColumn::make('accepts_deliveries')->label('Deliveries')->boolean()->toggleable(),
                 TextColumn::make('pending_docs')->label('Docs to review')
                     ->state(fn (DriverProfile $record) => $record->documents()->where('status', 'pending')->count()
                         + \App\Models\Document::query()->where('documentable_type', \App\Models\Vehicle::class)

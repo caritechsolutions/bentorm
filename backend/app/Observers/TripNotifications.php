@@ -25,8 +25,8 @@ class TripNotifications
         $cur = $trip->serviceArea?->currency ?? '';
         $ttl = $offer->expires_at ? max(1, now()->diffInSeconds($offer->expires_at, false)) : 20;
         $this->push->notify($offer->driver_id, new PushMessage(
-            title: 'New ride request',
-            body: trim('Pickup: '.($trip->pickup_address ?: 'see the app').($earn ? " · you earn about {$cur} ".number_format($earn, 2) : '')),
+            title: $trip->isDelivery() ? 'New delivery' : 'New ride request',
+            body: trim(($trip->isDelivery() ? 'Collect at: ' : 'Pickup: ').($trip->pickup_address ?: 'see the app').($earn ? " · you earn about {$cur} ".number_format($earn, 2) : '')),
             data: ['type' => 'offer', 'trip_id' => $trip->public_id, 'offer_id' => $offer->id],
             channel: 'ride_offers',
             ttlSeconds: (int) ceil($ttl),
@@ -47,6 +47,11 @@ class TripNotifications
 
     private function statusChanged(Trip $t): void
     {
+        if ($t->isDelivery()) {
+            $this->deliveryChanged($t);
+
+            return;
+        }
         $driverName = $t->driver?->firstName() ?? 'Your driver';
         $data = ['type' => 'trip', 'trip_id' => $t->public_id, 'status' => $t->status->value];
         $key = 'trip-'.$t->public_id;
@@ -63,6 +68,23 @@ class TripNotifications
             TripStatus::Cancelled => $this->cancelled($t, $data, $key),
             default => null,
         };
+    }
+
+    /**
+     * Deliveries: the customer hears about the order (OrderService sends "on the way" / "delivered"); here only
+     * "a driver is collecting it". A driver whose job was called off is told. Nobody found → a new job is sent.
+     */
+    private function deliveryChanged(Trip $t): void
+    {
+        $data = ['type' => 'trip', 'trip_id' => $t->public_id, 'status' => $t->status->value, 'order_id' => $t->order?->public_id];
+        if ($t->status === TripStatus::Accepted) {
+            $this->push->notify($t->rider_id, new PushMessage(($t->driver?->firstName() ?? 'A driver').' will collect your order',
+                trim(($t->vehicle ? "{$t->vehicle->make} {$t->vehicle->model} · {$t->vehicle->plate}. " : '').'We\'ll tell you when it\'s on the way.'),
+                ['type' => 'order', 'order_id' => $t->order?->public_id, 'status' => 'driver_assigned'], collapseKey: 'order-'.$t->order?->public_id));
+        } elseif ($t->status === TripStatus::Cancelled && $t->driver_id && $t->cancelled_by !== 'driver') {
+            $this->push->notify($t->driver_id, new PushMessage('Delivery cancelled', 'This delivery was called off. You don\'t need to go to the store.',
+                $data, collapseKey: 'trip-'.$t->public_id, urgent: true));
+        }
     }
 
     private function cancelled(Trip $t, array $data, string $key): void

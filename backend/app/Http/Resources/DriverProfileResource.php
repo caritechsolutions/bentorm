@@ -17,6 +17,7 @@ class DriverProfileResource extends Resource
             'status_note' => $this->when($private, $this->status_note),
             'service_area_id' => $this->service_area_id,
             'is_online' => $this->is_online,
+            'accepts_deliveries' => (bool) $this->accepts_deliveries,
             'rating_avg' => (float) $this->rating_avg,
             'rating_count' => $this->rating_count,
             'completed_trips' => $this->completed_trips,

@@ -20,7 +20,8 @@ class ListOrders extends ListRecords
             'new' => Tab::make('New')->modifyQueryUsing($in([OrderStatus::Placed])),
             'preparing' => Tab::make('Preparing')->modifyQueryUsing($in([OrderStatus::Accepted])),
             'ready' => Tab::make('Ready')->modifyQueryUsing($in([OrderStatus::Ready])),
-            'past' => Tab::make('Past')->modifyQueryUsing($in([OrderStatus::Declined, OrderStatus::Cancelled, OrderStatus::Expired])),
+            'out' => Tab::make('On the way')->modifyQueryUsing($in([OrderStatus::PickedUp])),
+            'past' => Tab::make('Past')->modifyQueryUsing($in([OrderStatus::Delivered, OrderStatus::Declined, OrderStatus::Cancelled, OrderStatus::Expired])),
             'all' => Tab::make('All'),
         ];
     }

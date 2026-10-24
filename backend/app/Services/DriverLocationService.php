@@ -89,11 +89,11 @@ class DriverLocationService
     }
 
     /**
-     * Nearest idle, heartbeat-alive drivers of a given vehicle type.
+     * Nearest idle, heartbeat-alive drivers of a given vehicle type (null = any type, e.g. deliveries).
      *
      * @return array<int, array{driver_id: int, distance_m: int, lat: ?float, lng: ?float, idle_since: ?int}>
      */
-    public function nearbyIdle(float $lat, float $lng, int $radiusM, string $vehicleType, int $limit = 10, array $excludeIds = []): array
+    public function nearbyIdle(float $lat, float $lng, int $radiusM, ?string $vehicleType, int $limit = 10, array $excludeIds = []): array
     {
         // Pull a larger candidate set and filter by state/heartbeat/type.
         $raw = Redis::command('georadius', [self::GEO_KEY, $lng, $lat, $radiusM, 'm', ['WITHDIST', 'ASC', 'COUNT' => max($limit * 5, 25)]]);
@@ -113,7 +113,7 @@ class DriverLocationService
             $h = array_values((array) Redis::hmget("driver:{$id}", ['state', 'vehicle_type', 'lat', 'lng', 'idle_since']));
             $state = $h[0] ?: 'idle';
             $type = $h[1] ?: null;
-            if ($state !== 'idle' || $type !== $vehicleType) {
+            if ($state !== 'idle' || ($vehicleType !== null && $type !== $vehicleType)) {
                 continue;
             }
             $results[] = [

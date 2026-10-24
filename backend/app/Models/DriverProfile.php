@@ -12,7 +12,7 @@ class DriverProfile extends Model
 {
     protected $fillable = [
         'user_id', 'service_area_id', 'licence_number', 'licence_expiry', 'psv_permit_number',
-        'status', 'status_note', 'is_online', 'current_vehicle_id', 'rating_avg', 'rating_count',
+        'status', 'status_note', 'is_online', 'accepts_deliveries', 'current_vehicle_id', 'rating_avg', 'rating_count',
         'completed_trips', 'approved_by', 'approved_at',
     ];
 
@@ -21,6 +21,7 @@ class DriverProfile extends Model
         return [
             'status' => DriverStatus::class,
             'is_online' => 'boolean',
+            'accepts_deliveries' => 'boolean',
             'licence_expiry' => 'date',
             'approved_at' => 'datetime',
             'rating_avg' => 'decimal:2',

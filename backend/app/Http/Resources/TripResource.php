@@ -77,6 +77,27 @@ class TripResource extends Resource
                 'cancelled_at' => $this->cancelled_at?->toIso8601String(),
             ],
             'ratings' => RatingResource::collection($this->whenLoaded('ratings')),
+            // Shop deliveries: what to collect where, for whom. The customer's PIN is never sent to the driver.
+            'kind' => $this->order_id ? 'delivery' : 'ride',
+            'delivery' => $this->order_id ? $this->deliveryInfo() : null,
+        ];
+    }
+
+    private function deliveryInfo(): array
+    {
+        $o = $this->order;
+        $store = $o?->store;
+
+        return [
+            'order_id' => $o?->public_id,
+            'order_number' => $o?->number(),
+            'order_status' => $o?->status->value,
+            'store' => ['name' => $store?->name, 'phone' => $store?->phone, 'address' => $store?->address],
+            'customer_name' => $o?->customer?->firstName(),
+            'items' => $o ? $o->items->where('removed', false)->map(fn ($i) => ['name' => $i->name, 'quantity' => $i->quantity, 'options_text' => $i->optionsText()])->values() : [],
+            'note' => $o?->note,
+            'earnings' => $o?->driver_earnings,
+            'picked_up' => $o?->picked_up_at !== null,
         ];
     }
 

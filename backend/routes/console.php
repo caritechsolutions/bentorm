@@ -10,3 +10,5 @@ Schedule::command('trips:expire-stale')->everyMinute();
 Schedule::command('documents:expire')->hourly();
 // Shop: orders a store never answered are released after OrderService::ACCEPT_MINUTES.
 Schedule::call(fn () => app(App\Services\OrderService::class)->expireUnanswered())->everyMinute()->name('orders:expire')->withoutOverlapping();
+// Shop deliveries: send drivers when orders are nearly ready, retry jobs nobody took, alert after a while.
+Schedule::call(fn () => app(App\Services\OrderService::class)->dispatchDue())->everyMinute()->name('orders:dispatch')->withoutOverlapping();

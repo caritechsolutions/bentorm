@@ -268,3 +268,13 @@ Signed in:
 - **Statuses:** `pending_payment` → `placed` (the store has 5 minutes to answer, else `expired` and the hold is released) → `accepted` (with prep time) → `ready` (card captured for now; phase 3 moves capture to delivery). Also `declined`, `cancelled`.
 - **Money split:** store receives items − commission; Ride Coop keeps commission + service fee + its share of the delivery fee; the rest of the delivery fee goes to the driver (phase 3).
 - **Store portal → Orders:** tabs New / Preparing / Ready / Past. A new order rings (after "Turn on sound" is tapped once) and shows a red banner on every page; the store also gets an SMS. Actions: Accept (prep minutes), Decline (reason), Out of stock (remove items → customer approves), Mark ready.
+
+## Shop (phase 3: deliveries)
+
+- **A delivery is a trip** (`kind: "delivery"`, store → customer, `vehicle_type: delivery`) linked to its order. It is offered with the same dispatch strategy as rides, but only to drivers with **`accepts_deliveries`** on (any approved vehicle). Drivers switch it with `PATCH /driver/profile {accepts_deliveries: true}`; admins can too (Drivers → Edit).
+- **When:** the scheduler (`orders:dispatch`, every minute) sends a driver once the order will be ready within *driver lead* minutes (Shop → Fees & commission, default 10). "Mark ready" and "Need driver now" in the store portal send one straight away. If a job ends with nobody (`no_drivers`) or the driver cancels, a new job goes out the next minute.
+- **No driver for *alert* minutes** (default 10): the store (SMS + push), admins (push) and the customer (push) are told once; the customer may then cancel (`POST /shop/orders/{id}/cancel`) and the hold is released.
+- **Driver flow:** accept → `arrive` (at the store) → the **store** taps **Picked up** in the portal (order `picked_up`, trip `in_progress`; drivers can't `start` a delivery) → at the door `POST /driver/trips/{id}/complete {pin, lat, lng}` with the **customer's 4-digit PIN** (same lock-out rules as rides). Completing captures the card and marks the order `delivered`. The driver earns `order.driver_earnings` (delivery fee ex VAT − Ride Coop share).
+- **Driver sees** `trip.delivery`: `order_number`, `store {name, phone, address}`, `customer_name`, `items[]`, `note`, `earnings`, `picked_up`. Never the PIN.
+- **Customer sees** `order.delivery`: `status` (`searching` · `driver_assigned` · `at_store` · `on_the_way` · `delivered`), `driver {name, phone, vehicle}`, `driver_position`, `pin`, `no_driver_alert`, `can_cancel`. Deliveries never appear in the customer's rides (`/trips`, `/trips/active`).
+- Order statuses add `picked_up` ("On the way") and `delivered`. The card is charged at delivery (no longer at "ready").
