@@ -17,3 +17,5 @@ Schedule::call(fn () => app(App\Services\TripService::class)->startDueScheduled(
 // Safety: calls nobody answered become "missed"; chat is kept 30 days.
 Schedule::call(fn () => app(App\Services\CallService::class)->expireRinging())->everyMinute()->name('calls:expire')->withoutOverlapping();
 Schedule::call(fn () => App\Models\TripMessage::query()->where('created_at', '<', now()->subDays(30))->delete())->daily()->name('chat:prune');
+// Automatic surge: requests vs free drivers per area (App features → Automatic surge).
+Schedule::call(fn () => app(App\Services\AutoSurgeService::class)->compute())->everyMinute()->name('surge:auto')->withoutOverlapping();

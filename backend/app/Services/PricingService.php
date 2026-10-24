@@ -181,6 +181,10 @@ class PricingService
         } else {
             $timeMult = $lockedMultiplier === null ? $this->maxMultiplier($rules, FareRuleKind::TimeMultiplier, $at, $local) : 1.0;
             $surge = $lockedMultiplier === null ? $this->maxMultiplier($rules, FareRuleKind::Surge, $at, $local) : 1.0;
+            // Automatic surge (busy now): only for rides priced for about now, never for bookings later.
+            if ($lockedMultiplier === null && abs($at->diffInMinutes(now(), true)) <= 10) {
+                $surge = max($surge, app(AutoSurgeService::class)->multiplier($area->id));
+            }
             $multiplier = $lockedMultiplier ?? round($timeMult * $surge, 2);
 
             $distanceCost = round($km * $cfg->per_km, 2);
