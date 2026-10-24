@@ -26,7 +26,10 @@ class CartBar extends StatelessWidget {
               child: InkWell(
                 key: const Key('view-cart'),
                 borderRadius: BorderRadius.circular(14),
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CheckoutScreen())),
+                onTap: () {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar(); // "Added …" would sit over the Place order button
+                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CheckoutScreen()));
+                },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   child: Row(children: [

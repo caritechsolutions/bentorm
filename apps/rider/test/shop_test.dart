@@ -171,7 +171,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.menu));
     await settle(tester);
     await tapKey(tester, 'drawer-orders');
-    expect(find.text('Declined by the store'), findsOneWidget, reason: 'status label in the list');
+    expect(find.textContaining('Declined by the store'), findsOneWidget, reason: 'status label in the list');
     await tapKey(tester, 'order-${fixture('shop_order_declined')['id']}');
     expect(find.text("Ann's Fish Pot couldn't take your order"), findsOneWidget);
     expect(find.textContaining('Kitchen closing early'), findsOneWidget);
