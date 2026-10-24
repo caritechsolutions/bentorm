@@ -527,7 +527,7 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
     if (buttons.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: 12),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: buttons),
+      child: Row(children: [for (final b in buttons) Expanded(child: b)]),
     );
   }
 
@@ -544,7 +544,7 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
               child: CircleAvatar(radius: 24, backgroundColor: Brand.blue.withValues(alpha: 0.1), child: Icon(icon, color: Brand.blue)),
             ),
             const SizedBox(height: 4),
-            Text(label, style: const TextStyle(fontSize: 13)),
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
           ]),
         ),
       );

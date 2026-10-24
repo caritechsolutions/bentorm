@@ -342,9 +342,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           final card = _cards.where((c) => c.id == _cardId).firstOrNull;
           return Column(children: [
             Expanded(
-              child: ListView(
+              // Not a lazy ListView: everything (totals, the minimum-order note) is built, whatever the scroll.
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                children: [
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   Text(store.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   for (var i = 0; i < cart.lines.length; i++)
@@ -416,7 +417,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         child: Text('Arrives in about ${q.etaMinutes} min', style: const TextStyle(color: Colors.black54)),
                       ),
                   ],
-                ],
+                ]),
               ),
             ),
             SafeArea(

@@ -90,7 +90,8 @@ void main() {
     // One tap on "Home" (saved place) prices the ride there.
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Gym'), findsOneWidget);
-    await tapKey(tester, 'saved-1');
+    final home = (fixture('places') as List).firstWhere((p) => p['kind'] == 'home');
+    await tapKey(tester, 'saved-${home['id']}');
     expect(server.calls('POST /fares/estimate').last.body, contains('"dropoff_lat":13.0745'));
 
     // Later: tomorrow, the first time offered.

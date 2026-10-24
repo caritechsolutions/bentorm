@@ -154,6 +154,11 @@ Offers record `wave`, `radius_m` and, for `eta` ranking, `eta_s` (also sent to t
 | `private-user.{userId}` | `trip.updated` `{trip}` | rider + driver |
 | `private-trip.{tripId}` | `trip.updated` `{trip}` | rider, driver, admin |
 | `private-trip.{tripId}` | `driver.location` `{lat, lng, heading, speed, at}` | rider, admin |
+| `private-user.{userId}` | `chat.message` `{trip_id, id, body, sender}` | the other side of the trip |
+| `private-user.{userId}` | `call.ring` `{call_id, trip_id, from, video}` · `call.signal` `{call_id, seq, type, payload}` · `call.updated` `{call_id, status}` | caller / callee |
+| `private-user.{userId}` | `order.updated` `{order_id, status}` | shop customer |
+
+The apps connect with the settings from `GET /config → realtime` and keep a slower poll as a safety net. If the WebSocket server is down, chat and calls still work (the server logs the failure and the apps poll).
 
 ## Geofences
 
@@ -278,3 +283,29 @@ Signed in:
 - **Driver sees** `trip.delivery`: `order_number`, `store {name, phone, address}`, `customer_name`, `items[]`, `note`, `earnings`, `picked_up`. Never the PIN.
 - **Customer sees** `order.delivery`: `status` (`searching` · `driver_assigned` · `at_store` · `on_the_way` · `delivered`), `driver {name, phone, vehicle}`, `driver_position`, `pin`, `no_driver_alert`, `can_cancel`. Deliveries never appear in the customer's rides (`/trips`, `/trips/active`).
 - Order statuses add `picked_up` ("On the way") and `delivered`. The card is charged at delivery (no longer at "ready").
+- Customers also get `delivery.trip_id`, `can_chat`, `can_call`, `unread_messages` (message or call the driver through the app; with masked calls on, `driver.phone` is null).
+
+## App features (switches, pages, safety, money)
+
+Every feature below has an on/off switch (and numbers) in **Admin → Settings → App features**. `GET /config` returns them as `features` (e.g. `"tips": true`, `"scheduled.min_minutes": 30`) plus `emergency_numbers`; the apps hide what is off, the server refuses it (`403`), and no app update is needed.
+
+**Pages inside the apps.** `POST /app-links {page}` → `{url, expires_in: 120}`: a one-time sign-in link the app opens in an in-app browser. Pages: `help`, `help/{slug}`, `support/new?category=…&trip=…&order=…`, `support/tickets`, `support/tickets/{id}`, `statement` (drivers), `about`. They are server pages, so they change without an app update.
+
+| Feature | Endpoints | Notes |
+|---|---|---|
+| Saved places | `GET/POST /me/places`, `PATCH/DELETE /me/places/{id}` `{kind: home\|work\|other, label, address, lat, lng, place_id}` | Saving Home/Work again replaces it; up to 12. |
+| Book for later | `scheduled_at` (ISO 8601) on `POST /fares/estimate` and `POST /trips`; `GET /trips/scheduled` | Status `scheduled` until *dispatch lead* minutes before pickup (scheduler `trips:scheduled`), then normal dispatch. Cancel is free until a driver accepts. Window: `scheduled.min_minutes` … `scheduled.max_days`. |
+| Tips | `POST /trips/{id}/tip {amount, payment_method_id?}`; `POST /shop/orders/{id}/tip {amount}`; `tip` at shop checkout | Card only, once per trip, within `tips.window_hours`, up to `tips.max_amount`. 100% to the driver (ledger + earnings `tips`). Trip has `tip`, `can_tip`; order has `can_tip`, `totals.tip`. |
+| Promo codes | `POST /promo-codes/check {code, for: rides\|shop, amount?}`; `promo_code` on estimate, `POST /trips`, shop quote/place | Admin → Marketing → Promo codes. Ride Coop pays the discount: drivers and stores are paid on the full price. Trip has `discount`, `promo_code`, `payable`. |
+| Ride credit | `GET /me/credit`; `use_credit: true` on `POST /trips` and shop quote/place | Up to `credit.max_share` × the fare. Admins add credit (Users → Ride credit). Trip has `credit`; cash drivers collect `payable`. |
+| Invite a friend | `GET /me/referral` (code, share text, counts, `can_enter_code`); `POST /me/referral {code}` | Both get credit after the new customer's first completed ride or delivered order. |
+| Share my trip | `POST /trips/{id}/share` → `{url, text}` | Public live map at `/t/{token}` until an hour after the trip. |
+| SOS | `POST /sos {trip_id?, lat?, lng?}` | Alerts admins (push + Admin → Operations → Safety alerts); apps show `emergency_numbers` (211 / 511 / 311). |
+| Chat | `GET /trips/{id}/messages?after=`, `POST /trips/{id}/messages {body}` | Open while a driver is on the way and during the trip; trip has `can_chat`, `unread_messages`. Push type `chat`. |
+| Calls (audio / video) | `POST /trips/{id}/calls {video}`; `GET /calls/incoming`; `GET /calls/{id}`; `POST /calls/{id}/accept\|decline\|end\|phone`; `POST /calls/{id}/signal {type: offer\|answer\|candidate, payload}`; `GET /calls/{id}/signals?after=` | WebRTC in the apps, signalling through the server, relay through coturn (`TURN_HOST` in the installer; short-lived credentials in `ice_servers`). `phone` = fall back to a Twilio call that rings the caller and connects the other side (numbers stay private). Rings for 45 s; push type `call`. |
+| Help & support | app pages above; Admin → Support (articles, tickets) | Lost-item tickets tell the driver; staff replies push with `data.page`. |
+| Payouts | Admin → Finance → Payouts; driver page `statement`; store portal → Statement | Ledger: + = Ride Coop owes the driver/store. Record payouts with a reference; CSV export. |
+| Automatic surge | Admin → Settings → Automatic surge | Per area, every minute: demand ÷ free drivers → multiplier (capped), applied to prices quoted for now and locked at request. |
+
+**Rate limits.** Each throttled action has its own counter (for example, wrong invite codes never block SOS or a tip). All API calls also share the general limit of 120 a minute per user.
+

@@ -41,7 +41,7 @@ void main() {
     await tester.pump(const Duration(seconds: 4));
     await settle(tester);
     expect(find.text('New delivery'), findsOneWidget);
-    expect(find.text('You earn about BBD 27.58'), findsOneWidget);
+    expect(find.text('You earn about BBD ${(fixture('offers_delivery')['offers'][0]['estimated_earnings'] as num).toStringAsFixed(2)}'), findsOneWidget);
     expect(find.text('Order $order · 2 items · paid by card'), findsOneWidget);
     expect(find.text("Collect at Ann's Fish Pot, Oistins Bay Gardens"), findsOneWidget);
     expect(find.textContaining('PIN'), findsNothing, reason: 'drivers never see the PIN');
@@ -95,7 +95,7 @@ void main() {
     await tapKey(tester, 'pin-submit');
     expect(jsonDecode(server.calls('POST /driver/trips/$tripId/complete').last.body)['pin'], '8582');
     expect(find.text('Order delivered'), findsOneWidget);
-    expect(find.text('You earned BBD 27.58'), findsOneWidget);
+    expect(find.text('You earned BBD ${(fixture('delivery_completed')['driver_earnings'] as num).toStringAsFixed(2)}'), findsOneWidget);
     await unmount(tester, app);
   });
 

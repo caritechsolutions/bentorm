@@ -83,7 +83,7 @@ class FeatureSettings extends Page
             ]),
             Section::make('Help & pricing')->columns(2)->schema([
                 $on('support', 'Help pages and support tickets in the apps'),
-                $on('auto_surge', 'Automatic surge', 'Per-area limits under Pricing → Automatic surge.'),
+                $on('auto_surge', 'Automatic surge', 'Per-area limits under Settings → Automatic surge.'),
             ]),
         ]);
     }
