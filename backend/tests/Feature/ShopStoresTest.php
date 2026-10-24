@@ -339,4 +339,26 @@ class ShopStoresTest extends TestCase
         $this->assertSame([0.1, StoreStatus::Pending], [$store->fresh()->commission_rate, $store->fresh()->status]);
         $this->assertNull(AppSetting::query()->find('nothing'));
     }
+
+    public function test_a_pin_on_a_repeated_copy_of_the_world_map_is_brought_back(): void
+    {
+        // The real case: a store pinned at 13.08323, -779.5673078 (Oistins, two worlds to the west).
+        [$store] = $this->storeWithOwner('Courts', 'electronics', ['lat' => 13.08323, 'lng' => -779.5673078]);
+        $this->assertEqualsWithDelta(-59.5673078, $store->lng, 1e-6);
+        $this->assertSame($this->bb->id, $store->service_area_id);
+        $this->assertNotContains('The store is outside the areas we serve.', app(ComplianceService::class)->storeIssues($store));
+
+        // Rows saved before the fix are repaired by the migration.
+        \Illuminate\Support\Facades\DB::table('stores')->where('id', $store->id)->update(['lng' => 300.4326922, 'service_area_id' => null]);
+        (require database_path('migrations/2026_10_24_000130_wrap_store_longitudes.php'))->up();
+        $this->assertEqualsWithDelta(-59.5673078, $store->fresh()->lng, 1e-6);
+        $this->assertSame($this->bb->id, $store->fresh()->service_area_id);
+
+        // Area shapes drawn on a copy of the world move back in one piece instead of failing.
+        $shape = \App\Support\GeoJson::normalise(['type' => 'Polygon', 'coordinates' => [[[-779.7, 13.0], [-779.4, 13.0], [-779.4, 13.3], [-779.7, 13.3]]]]);
+        $this->assertEqualsWithDelta(-59.7, $shape['coordinates'][0][0][0], 1e-6);
+        $this->assertTrue(\App\Support\GeoJson::contains($shape, 13.1, -59.55));
+        $this->assertSame(179.5, \App\Support\GeoJson::wrapLng(-180.5));
+        $this->assertSame(-59.5, \App\Support\GeoJson::wrapLng(-59.5));
+    }
 }

@@ -56,6 +56,9 @@ class Store extends Model
         });
         // The pin decides which service area (currency, tax, delivery rate card) the store belongs to.
         static::saving(function (Store $s) {
+            if ($s->lng !== null) {
+                $s->lng = \App\Support\GeoJson::wrapLng((float) $s->lng);
+            }
             if (($s->isDirty('lat') || $s->isDirty('lng')) && $s->lat !== null && $s->lng !== null) {
                 $s->service_area_id = app(GeoService::class)->resolve((float) $s->lat, (float) $s->lng)->service?->id;
             }

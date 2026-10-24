@@ -115,14 +115,31 @@ final class GeoJson
         return array_map(fn ($ring) => self::ring($ring), $rings);
     }
 
+    /**
+     * Wrap a longitude into -180…180. Map widgets let you pan into repeated copies of the world, where a click
+     * reads e.g. -779.57 for Barbados (-59.57 - 2 × 360).
+     */
+    public static function wrapLng(float $lng): float
+    {
+        if ($lng >= -180 && $lng <= 180) {
+            return $lng;
+        }
+        $w = fmod($lng + 180, 360);
+
+        return round(($w < 0 ? $w + 360 : $w) - 180, 7);
+    }
+
     private static function ring(array $ring): array
     {
         $out = [];
+        // A shape drawn on a repeated copy of the world: move the whole ring back (keeps it in one piece).
+        $first = is_array($ring[0] ?? null) && is_numeric($ring[0][0] ?? null) ? (float) $ring[0][0] : 0.0;
+        $shift = ($first < -180 || $first > 180) ? self::wrapLng($first) - $first : 0.0;
         foreach ($ring as $pos) {
             if (! is_array($pos) || count($pos) < 2 || ! is_numeric($pos[0]) || ! is_numeric($pos[1])) {
                 throw new InvalidArgumentException('Each position must be [lng, lat].');
             }
-            [$lng, $lat] = [(float) $pos[0], (float) $pos[1]];
+            [$lng, $lat] = [round((float) $pos[0] + $shift, 7), (float) $pos[1]];
             if ($lat < -90 || $lat > 90 || $lng < -180 || $lng > 180) {
                 throw new InvalidArgumentException("Position out of range: [{$lng}, {$lat}]. GeoJSON order is [lng, lat].");
             }

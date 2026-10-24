@@ -27,20 +27,21 @@ window.bentormPin = window.bentormPin || function ({ lat, lng }) {
             const start = () => {
                 if (!window.L) return;
                 const has = this.lat && this.lng;
-                const map = L.map(el).setView(has ? [this.lat, this.lng] : [13.17, -59.55], has ? 16 : 10);
+                const map = L.map(el, { worldCopyJump: true }).setView(has ? [this.lat, this.lng] : [13.17, -59.55], has ? 16 : 10);
                 el._pinMap = map;
                 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
                 const place = (ll) => {
                     if (!this.marker) {
                         this.marker = L.marker(ll, { draggable: true }).addTo(map);
-                        this.marker.on('dragend', () => { const p = this.marker.getLatLng(); this.lat = +p.lat.toFixed(7); this.lng = +p.lng.toFixed(7); });
+                        this.marker.on('dragend', () => { const p = this.marker.getLatLng().wrap(); this.lat = +p.lat.toFixed(7); this.lng = +p.lng.toFixed(7); });
                     } else {
                         this.marker.setLatLng(ll);
                     }
                     this.lat = +ll.lat.toFixed(7); this.lng = +ll.lng.toFixed(7);
                 };
                 if (has) place(L.latLng(this.lat, this.lng));
-                map.on('click', (e) => place(e.latlng));
+                // wrap(): a click on a repeated copy of the world must still give a real longitude
+                map.on('click', (e) => place(e.latlng.wrap()));
                 setTimeout(() => map.invalidateSize(), 200);
             };
             let tries = 0;

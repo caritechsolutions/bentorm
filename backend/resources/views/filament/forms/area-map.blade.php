@@ -31,7 +31,7 @@ window.bentormAreaMap = window.bentormAreaMap || function ({ state, others }) {
             const start = () => {
                 if (!window.L || !window.L.PM) { this.ready = false; return; }
                 this.ready = true;
-                const map = this.map = L.map(el, { zoomControl: true }).setView([13.17, -59.55], 10);
+                const map = this.map = L.map(el, { zoomControl: true, worldCopyJump: true }).setView([13.17, -59.55], 10);
                 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
                 const styles = { service: '#0d9488', zone: '#d97706', blocked: '#dc2626' };
                 (this.others || []).forEach(o => {
