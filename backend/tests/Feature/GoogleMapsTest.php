@@ -115,4 +115,22 @@ class GoogleMapsTest extends TestCase
         Http::fake(['places.googleapis.com/*' => Http::response(['error' => ['code' => 403, 'message' => 'API key not valid']], 403)]);
         $this->actingAs($this->makeUser())->getJson('/api/v1/places/autocomplete?q=airport')->assertStatus(503);
     }
+
+    public function test_nearby_places_for_saving_a_place(): void
+    {
+        $this->seedReference();
+        $this->useGoogle();
+        Http::fake(['places.googleapis.com/v1/places:searchNearby' => Http::response(['places' => [
+            ['id' => 'ChIJcafe', 'displayName' => ['text' => 'Café Luna'], 'formattedAddress' => 'Bay Street, Bridgetown', 'location' => ['latitude' => 13.0971, 'longitude' => -59.6141]],
+            ['displayName' => ['text' => 'No id']], // incomplete results are dropped
+        ]])]);
+        $rider = $this->makeUser();
+        $this->actingAs($rider)->getJson('/api/v1/places/nearby?lat=13.0969&lng=-59.6145')->assertOk()->assertJsonCount(1)
+            ->assertJsonPath('0.name', 'Café Luna')->assertJsonPath('0.lat', 13.0971);
+        Http::assertSent(fn (HttpRequest $r) => $r['rankPreference'] === 'DISTANCE' && $r['locationRestriction']['circle']['radius'] === 250
+            && $r->header('X-Goog-FieldMask') === ['places.id,places.displayName,places.formattedAddress,places.location']);
+        // Cached: a second look nearby costs nothing.
+        $this->getJson('/api/v1/places/nearby?lat=13.09692&lng=-59.61441')->assertOk();
+        Http::assertSentCount(1);
+    }
 }

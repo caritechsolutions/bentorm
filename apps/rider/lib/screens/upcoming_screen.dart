@@ -42,7 +42,7 @@ class _UpcomingScreenState extends State<UpcomingScreen> {
                 ? const Center(
                     child: Padding(
                       padding: EdgeInsets.all(24),
-                      child: Text('No rides booked. Choose "Now" → a later time when you book.', key: Key('no-upcoming'), textAlign: TextAlign.center),
+                      child: Text('No rides booked. Tap "Schedule a later ride" when you book.', key: Key('no-upcoming'), textAlign: TextAlign.center),
                     ),
                   )
                 : ListView.separated(

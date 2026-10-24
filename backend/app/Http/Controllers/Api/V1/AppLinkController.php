@@ -23,6 +23,9 @@ class AppLinkController extends Controller
         $token = Str::random(48);
         Cache::put('applink:'.$token, ['user_id' => $request->user()->id, 'page' => $data['page']], self::TTL_SECONDS);
 
-        return response()->json(['url' => url('/app/enter/'.$token), 'expires_in' => self::TTL_SECONDS]);
+        $host = config('bentorm.support_host');
+        $base = $host ? 'https://'.$host : url('/');
+
+        return response()->json(['url' => $base.'/app/enter/'.$token, 'expires_in' => self::TTL_SECONDS]);
     }
 }

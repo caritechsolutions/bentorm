@@ -54,4 +54,17 @@ class AppFeaturesTest extends TestCase
         $this->postJson('/api/v1/me/referral', ['code' => 'NOPE'])->assertStatus(429);
         $this->postJson('/api/v1/sos', ['lat' => 13.1, 'lng' => -59.6])->assertOk();
     }
+
+    public function test_app_pages_can_live_on_their_own_support_host(): void
+    {
+        config(['bentorm.support_host' => 'support.ridecoop.test']);
+        $rider = $this->makeUser('rider', ['name' => 'Rita Rider']);
+        $url = $this->actingAs($rider, 'sanctum')->postJson('/api/v1/app-links', ['page' => 'about'])->assertOk()->json('url');
+        $this->assertStringStartsWith('https://support.ridecoop.test/app/enter/', $url);
+
+        $this->app['auth']->forgetGuards();
+        $this->get($url)->assertRedirect('/app/about');
+        $this->get('https://support.ridecoop.test/app/about')->assertOk()->assertSee('Rita Rider');
+        $this->get('https://support.ridecoop.test/')->assertRedirect('/app/help');
+    }
 }

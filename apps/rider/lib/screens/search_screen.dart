@@ -10,7 +10,7 @@ import '../state/scope.dart';
 
 /// Address search. Pops with the chosen [Place].
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key, required this.title, this.near, this.currentLocation, this.saved = const []});
+  const SearchScreen({super.key, required this.title, this.near, this.currentLocation, this.saved = const [], this.showNearby = false});
 
   final String title;
 
@@ -22,6 +22,9 @@ class SearchScreen extends StatefulWidget {
 
   /// Home, Work and other saved places, offered before typing.
   final List<SavedPlace> saved;
+
+  /// Offer places around [near] before typing (saving a place: "the shop I'm at").
+  final bool showNearby;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -36,6 +39,19 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _loading = false;
   String? _error;
   int _seq = 0;
+  List<Place> _nearby = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    final at = widget.near;
+    if (widget.showNearby && at != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final list = await AppScope.of(context).api.nearbyPlaces(at.lat, at.lng);
+        if (mounted) setState(() => _nearby = list);
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -118,11 +134,26 @@ class _SearchScreenState extends State<SearchScreen> {
               children: [
                 if (current != null && _query.text.trim().length < 2)
                   ListTile(
+                    key: const Key('pick-current'),
                     leading: const Icon(Icons.my_location, color: Brand.blue),
                     title: const Text('Current location'),
                     subtitle: Text(current.label, maxLines: 1, overflow: TextOverflow.ellipsis),
                     onTap: () => Navigator.of(context).pop(current),
                   ),
+                if (_query.text.trim().length < 2 && _nearby.isNotEmpty) ...[
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Text('Nearby', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black54)),
+                  ),
+                  for (var i = 0; i < _nearby.length; i++)
+                    ListTile(
+                      key: Key('nearby-$i'),
+                      leading: const Icon(Icons.storefront_outlined),
+                      title: Text(_nearby[i].name),
+                      subtitle: _nearby[i].address == null ? null : Text(_nearby[i].address!, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      onTap: () => Navigator.of(context).pop(_nearby[i]),
+                    ),
+                ],
                 if (_query.text.trim().length < 2)
                   for (final p in widget.saved)
                     ListTile(

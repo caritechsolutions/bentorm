@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Storage;
 Route::get('/', fn () => match (request()->getHost()) {
     config('bentorm.admin_host') => redirect('/admin'),
     config('bentorm.store_host') => redirect('/store'),
+    config('bentorm.support_host') => redirect('/app/help'),
     default => response()->json(['service' => 'bentorm-api', 'health' => '/api/v1/health']),
 });
 

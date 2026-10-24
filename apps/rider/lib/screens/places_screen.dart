@@ -59,9 +59,19 @@ class _PlacesScreenState extends State<PlacesScreen> {
 
   /// [kind] home | work | other.
   Future<void> _add(String kind) async {
-    final api = AppScope.of(context).api;
+    final scope = AppScope.of(context);
+    final api = scope.api;
+    // Offer where the rider is now, and named places around it, before they type.
+    final me = await scope.location.current();
+    final here = me == null ? null : await api.reverse(me.lat, me.lng);
+    if (!mounted) return;
     final place = await Navigator.of(context).push<Place>(MaterialPageRoute(
-      builder: (_) => SearchScreen(title: kind == 'home' ? 'Set Home' : (kind == 'work' ? 'Set Work' : 'Save a place')),
+      builder: (_) => SearchScreen(
+        title: kind == 'home' ? 'Set Home' : (kind == 'work' ? 'Set Work' : 'Save a place'),
+        near: me,
+        currentLocation: me == null ? null : (here ?? Place(name: 'Current location', lat: me.lat, lng: me.lng)),
+        showNearby: true,
+      ),
     ));
     if (place == null || !mounted) return;
     String? label;

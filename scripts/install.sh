@@ -11,6 +11,8 @@
 #   WS_HOST=ws.ridecoop.net     public hostname NPM uses for WebSockets (sets REVERB_HOST)
 #   ADMIN_HOST=newadmin.ridecoop.net  public hostname NPM uses for the admin panel (nginx :8082)
 #   STORE_HOST=store.ridecoop.net     optional hostname for the store portal (same :8082, opens /store)
+#   SUPPORT_HOST=support.ridecoop.net optional hostname for the help / support / statement pages the apps open
+#                               (NPM → this server's API port :8080, like API_HOST)
 #   GOOGLE_MAPS_KEY=AIza...      Google Maps Platform key: road distances (Routes API) + address search (Places)
 #   SMTP_HOST, SMTP_PORT (465), SMTP_ENCRYPTION (ssl|tls|none), SMTP_USER, SMTP_PASSWORD, SMTP_FROM, SMTP_FROM_NAME
 #                               email sender for sign-in codes and receipts (stored encrypted in the gateways table)
@@ -138,6 +140,9 @@ if [[ -n "${API_HOST:-}" ]]; then
 fi
 if [[ -n "${STORE_HOST:-}" ]]; then
   set_env STORE_HOST "$STORE_HOST"
+fi
+if [[ -n "${SUPPORT_HOST:-}" ]]; then
+  set_env SUPPORT_HOST "$SUPPORT_HOST"
 fi
 if [[ -n "${ADMIN_HOST:-}" ]]; then
   set_env ADMIN_HOST "$ADMIN_HOST"

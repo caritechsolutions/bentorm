@@ -41,6 +41,15 @@ class PlaceController extends Controller
         return $place ? response()->json($place) : response()->json(['message' => 'No address found here.'], 404);
     }
 
+    /** GET /places/nearby?lat=&lng= — named places within ~250 m, nearest first. */
+    public function nearby(Request $request): JsonResponse
+    {
+        $data = $request->validate(['lat' => ['required', 'numeric', 'between:-90,90'], 'lng' => ['required', 'numeric', 'between:-180,180']]);
+        $this->ensureConfigured();
+
+        return response()->json($this->places->nearby((float) $data['lat'], (float) $data['lng']));
+    }
+
     /** GET /places/{placeId}?session= — coordinates and address for a chosen suggestion. */
     public function show(Request $request, string $placeId): JsonResponse
     {

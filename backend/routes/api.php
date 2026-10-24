@@ -111,6 +111,7 @@ Route::prefix('v1')->group(function () {
         Route::prefix('places')->middleware('throttle:places')->group(function () {
             Route::get('autocomplete', [PlaceController::class, 'autocomplete']);
             Route::get('reverse', [PlaceController::class, 'reverse']);
+            Route::get('nearby', [PlaceController::class, 'nearby']);
             Route::get('{placeId}', [PlaceController::class, 'show']);
         });
 

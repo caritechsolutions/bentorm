@@ -19,6 +19,7 @@ class PlacesService
     public const AUTOCOMPLETE_URL = 'https://places.googleapis.com/v1/places:autocomplete';
     public const DETAILS_URL = 'https://places.googleapis.com/v1/places/';
     public const GEOCODE_URL = 'https://maps.googleapis.com/maps/api/geocode/json';
+    public const NEARBY_URL = 'https://places.googleapis.com/v1/places:searchNearby';
 
     private const AUTOCOMPLETE_FIELDS = 'suggestions.placePrediction.placeId,suggestions.placePrediction.text.text,'
         .'suggestions.placePrediction.structuredFormat,suggestions.placePrediction.distanceMeters';
@@ -69,6 +70,36 @@ class PlacesService
                 'lat' => (float) $res->json('location.latitude'),
                 'lng' => (float) $res->json('location.longitude'),
             ];
+        });
+    }
+
+    /**
+     * Named places around a point, nearest first (e.g. "save this place" offers the shop or building you're at).
+     * Cached per ~100 m so opening the screen again doesn't cost another lookup.
+     *
+     * @return array<int, array{place_id: string, name: string, address: ?string, lat: float, lng: float}>
+     */
+    public function nearby(float $lat, float $lng, int $radius = 250): array
+    {
+        $key = sprintf('nearby:%.3f,%.3f,%d', $lat, $lng, $radius);
+
+        return Cache::remember($key, now()->addDay(), function () use ($lat, $lng, $radius) {
+            $res = $this->http('places.id,places.displayName,places.formattedAddress,places.location')->post(self::NEARBY_URL, [
+                'locationRestriction' => ['circle' => ['center' => ['latitude' => $lat, 'longitude' => $lng], 'radius' => $radius]],
+                'rankPreference' => 'DISTANCE',
+                'maxResultCount' => 10,
+                'languageCode' => 'en',
+            ]);
+            $this->guard($res, 'nearby');
+
+            return collect($res->json('places', []))->filter(fn ($p) => isset($p['id'], $p['location']))
+                ->map(fn (array $p) => [
+                    'place_id' => $p['id'],
+                    'name' => $p['displayName']['text'] ?? ($p['formattedAddress'] ?? 'Place'),
+                    'address' => $p['formattedAddress'] ?? null,
+                    'lat' => (float) $p['location']['latitude'],
+                    'lng' => (float) $p['location']['longitude'],
+                ])->values()->all();
         });
     }
 

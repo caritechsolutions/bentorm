@@ -32,6 +32,9 @@ return [
     'admin_host' => env('ADMIN_HOST'),
     // Optional friendly hostname for the store portal (/store); NPM points it at the same :8082 as the admin panel.
     'store_host' => env('STORE_HOST'),
+    // Help, support and statement pages opened from the apps (e.g. support.ridecoop.net, proxied to the API port).
+    // Unset: the API's own address is used.
+    'support_host' => env('SUPPORT_HOST'),
     // Deep-link scheme the mobile apps register, used to bounce back from payment pages.
     'app_scheme' => env('APP_DEEPLINK_SCHEME', 'ridecoop'),
 

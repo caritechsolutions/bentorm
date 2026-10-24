@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="csrf-token" content="{{ csrf_token() }}">
+@include('partials.favicon')
 <title>@yield('title', 'Ride Coop')</title>
 <style>
   :root { --bg:#f6f7f9; --card:#fff; --ink:#1f2328; --muted:#6b7280; --line:#e5e7eb; --brand:#0e7bb6; --yellow:#febd25; --red:#ea483b; --ok:#15803d; }

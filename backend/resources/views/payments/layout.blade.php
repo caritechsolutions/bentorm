@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+@include('partials.favicon')
 <title>@yield('title', 'Ride Coop')</title>
 <style>
   :root { --bg:#f6f7f9; --card:#fff; --ink:#111827; --muted:#6b7280; --ok:#15803d; --bad:#b91c1c; --brand:#0f766e; }

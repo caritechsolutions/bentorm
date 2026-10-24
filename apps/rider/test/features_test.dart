@@ -95,6 +95,7 @@ void main() {
     expect(server.calls('POST /fares/estimate').last.body, contains('"dropoff_lat":13.0745'));
 
     // Later: tomorrow, the first time offered.
+    expect(find.text('Schedule a later ride'), findsOneWidget, reason: 'now is the default; the button says how to book later');
     await tapKey(tester, 'when');
     await tapKey(tester, 'when-day-1');
     final firstTime = find.byWidgetPredicate((w) => w.key is ValueKey<String> && (w.key as ValueKey<String>).value.startsWith('when-time-')).first;
@@ -288,6 +289,20 @@ void main() {
     await tapKey(tester, 'drawer-places');
     expect(find.text('Rockley, Christ Church'), findsWidgets);
     expect(find.text('Gym'), findsOneWidget);
+    // Set Work: where the rider is now and the places around it are offered before typing.
+    server
+      ..on('GET /places/nearby', [
+        {'place_id': 'ChIJcafe', 'name': 'Café Luna', 'address': 'Bay Street, Bridgetown', 'lat': 13.0971, 'lng': -59.6141},
+      ])
+      ..on('POST /me/places', fixture('place_saved'), status: 201);
+    await tapKey(tester, 'slot-work');
+    expect(find.byKey(const Key('pick-current')), findsOneWidget);
+    expect(find.text('Nearby'), findsOneWidget);
+    await tapKey(tester, 'nearby-0');
+    final saved = server.calls('POST /me/places').single.body;
+    expect(saved, contains('"kind":"work"'));
+    expect(saved, contains('"lat":13.0971'));
+    expect(server.calls('GET /places/nearby').single.url.queryParameters['lat'], '13.0969');
     await tester.pageBack();
     await settle(tester);
 

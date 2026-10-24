@@ -593,7 +593,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 key: const Key('when'),
                 onPressed: _pickWhen,
                 icon: Icon(_when == null ? Icons.schedule : Icons.event, size: 18),
-                label: Text(_when == null ? 'Now' : scheduleLabel(_when!)),
+                label: Text(_when == null ? 'Schedule a later ride' : 'Pickup ${scheduleLabel(_when!)}'),
               ),
             if (AppScope.of(context).config.on('promos'))
               TextButton.icon(
@@ -973,7 +973,7 @@ class _WhenSheetState extends State<_WhenSheet> {
           ListTile(
             key: const Key('when-now'),
             leading: const Icon(Icons.bolt),
-            title: const Text('Now'),
+            title: const Text('Now — find a driver straight away'),
             onTap: () => Navigator.pop(context, DateTime.fromMillisecondsSinceEpoch(0)),
           ),
           SingleChildScrollView(
