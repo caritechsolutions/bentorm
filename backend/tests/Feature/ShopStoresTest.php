@@ -361,4 +361,42 @@ class ShopStoresTest extends TestCase
         $this->assertSame(179.5, \App\Support\GeoJson::wrapLng(-180.5));
         $this->assertSame(-59.5, \App\Support\GeoJson::wrapLng(-59.5));
     }
+
+    public function test_find_the_store_with_address_search_like_the_rider_app(): void
+    {
+        config(['services.google_maps.server_key' => 'test-key']);
+        $googleDown = false;
+        \Illuminate\Support\Facades\Http::fake([
+            \App\Services\Google\PlacesService::AUTOCOMPLETE_URL => function () use (&$googleDown) {
+                return $googleDown
+                    ? \Illuminate\Support\Facades\Http::response(['error' => ['status' => 'PERMISSION_DENIED']], 403)
+                    : \Illuminate\Support\Facades\Http::response(['suggestions' => [
+                        ['placePrediction' => ['placeId' => 'courts-oistins', 'text' => ['text' => 'Courts, Oistins'],
+                            'structuredFormat' => ['mainText' => ['text' => 'Courts'], 'secondaryText' => ['text' => 'Oistins, Christ Church']]]],
+                    ]]);
+            },
+            \App\Services\Google\PlacesService::DETAILS_URL.'courts-oistins*' => \Illuminate\Support\Facades\Http::response([
+                'id' => 'courts-oistins', 'displayName' => ['text' => 'Courts'], 'formattedAddress' => 'Oistins Main Rd, Christ Church, Barbados',
+                'location' => ['latitude' => 13.0671, 'longitude' => -59.5372],
+            ]),
+        ]);
+        $this->assertSame(['courts-oistins' => 'Courts — Oistins, Christ Church'], \App\Filament\Store\StoreForm::placeOptions('courts', 'sess-1'));
+        \Illuminate\Support\Facades\Http::assertSent(fn ($r) => $r->url() === \App\Services\Google\PlacesService::AUTOCOMPLETE_URL && $r['input'] === 'courts' && $r['sessionToken'] === 'sess-1');
+
+        $user = $this->makeUser('rider');
+        $this->actingAs($user);
+        Filament::setCurrentPanel(Filament::getPanel('store'));
+        Livewire::test(RegisterStore::class)
+            ->assertFormFieldExists('place_search')
+            ->fillForm(['place_search' => 'courts-oistins'])
+            ->assertSchemaStateSet(['address' => 'Oistins Main Rd, Christ Church, Barbados', 'lat' => 13.0671, 'lng' => -59.5372, 'place_search' => null])
+            ->fillForm(['name' => 'Courts', 'shop_category_id' => $this->category('electronics')->id, 'phone' => '2464180000'])
+            ->call('register')->assertHasNoFormErrors();
+        $store = Store::query()->where('name', 'Courts')->firstOrFail();
+        $this->assertSame([13.0671, -59.5372, $this->bb->id], [$store->lat, $store->lng, $store->service_area_id]);
+
+        // Google down: the search just shows nothing; the map still works.
+        $googleDown = true;
+        $this->assertSame([], \App\Filament\Store\StoreForm::placeOptions('courts', null));
+    }
 }

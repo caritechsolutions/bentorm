@@ -40,6 +40,16 @@ window.bentormPin = window.bentormPin || function ({ lat, lng }) {
                     this.lat = +ll.lat.toFixed(7); this.lng = +ll.lng.toFixed(7);
                 };
                 if (has) place(L.latLng(this.lat, this.lng));
+                // The address search (or a reload) can move the pin from the server side: follow it.
+                const follow = () => {
+                    if (!this.lat || !this.lng) return;
+                    const ll = L.latLng(this.lat, this.lng);
+                    if (this.marker && this.marker.getLatLng().distanceTo(ll) < 1) return;
+                    place(ll);
+                    map.setView(ll, Math.max(map.getZoom(), 17));
+                };
+                this.$watch('lat', follow);
+                this.$watch('lng', follow);
                 // wrap(): a click on a repeated copy of the world must still give a real longitude
                 map.on('click', (e) => place(e.latlng.wrap()));
                 setTimeout(() => map.invalidateSize(), 200);
