@@ -1,0 +1,104 @@
+{
+  "id": "01m5p1nnzk71sqfkv63qwe9emx",
+  "status": "cancelled",
+  "vehicle_type": "delivery",
+  "service_area_id": 1,
+  "rider": {
+    "id": 24,
+    "name": "Rita Rider",
+    "role": "rider",
+    "avatar_url": null
+  },
+  "vehicle": {
+    "id": 3,
+    "driver_id": 3,
+    "make": "Toyota",
+    "model": "Corolla",
+    "year": null,
+    "colour": null,
+    "plate": "ZR101",
+    "seats": 4,
+    "luggage_capacity": 2,
+    "features": [
+      "child_seat"
+    ],
+    "vehicle_type": "standard",
+    "status": "approved",
+    "status_note": null,
+    "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/45"
+  },
+  "pickup": {
+    "lat": 13.0667,
+    "lng": -59.5333,
+    "address": "Ann's Fish Pot, Oistins Bay Gardens",
+    "zone_id": null
+  },
+  "dropoff": {
+    "lat": 13.0969,
+    "lng": -59.6145,
+    "address": "Bay Street, Bridgetown",
+    "zone_id": null
+  },
+  "stops": [],
+  "stop_change": null,
+  "pin_verified": false,
+  "estimate": {
+    "distance_m": 12238,
+    "duration_s": 1469,
+    "fare": 40.5
+  },
+  "actual": {
+    "distance_m": null,
+    "duration_s": null,
+    "wait_s": null,
+    "fare": null,
+    "subtotal": null,
+    "tax": null
+  },
+  "driver_earnings": null,
+  "currency": "BBD",
+  "fare_breakdown": null,
+  "surge_multiplier": 1.0,
+  "payment_method": "card",
+  "payment_status": "waived",
+  "amount_due": 0.0,
+  "passengers": 1,
+  "luggage": 0,
+  "required_features": [],
+  "hold_amount": null,
+  "payment_action": null,
+  "rider_note": null,
+  "cancelled_by": "system",
+  "cancellation_reason": "Store cancelled the order",
+  "cancellation_fee": 0.0,
+  "timestamps": {
+    "requested_at": "2026-10-24T04:11:00+00:00",
+    "accepted_at": "2026-10-24T04:11:01+00:00",
+    "arrived_at": null,
+    "started_at": null,
+    "completed_at": null,
+    "cancelled_at": "2026-10-24T04:11:02+00:00"
+  },
+  "kind": "delivery",
+  "delivery": {
+    "order_id": "01m5p1nncbq3yqgcyn1wg9vney",
+    "order_number": "1011",
+    "order_status": "declined",
+    "store": {
+      "name": "Ann's Fish Pot",
+      "phone": "2464281234",
+      "address": "Oistins Bay Gardens"
+    },
+    "customer_name": "Rita",
+    "items": [
+      {
+        "name": "Fried flying fish",
+        "quantity": 2,
+        "options_text": "Side: Breadfruit"
+      }
+    ],
+    "note": null,
+    "earnings": 27.58,
+    "picked_up": false
+  }
+}

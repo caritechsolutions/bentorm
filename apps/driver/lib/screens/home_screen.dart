@@ -125,10 +125,11 @@ class _HomeScreenState extends State<HomeScreen> {
       return const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()));
     }
     if (e.activeTrip != null) {
+      final job = e.activeTrip!.isDelivery ? 'delivery' : 'ride';
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const Text('You have a ride in progress', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text('You have a $job in progress', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
-        FilledButton(onPressed: () => _openTrip(e.activeTrip!), child: const Text('Open ride')),
+        FilledButton(onPressed: () => _openTrip(e.activeTrip!), child: Text('Open $job')),
       ]);
     }
     if (e.online && e.offers.isNotEmpty) {
@@ -147,10 +148,12 @@ class _HomeScreenState extends State<HomeScreen> {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const Text('You\'re online', key: Key('online-title'), style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        const Text('Looking for rides near you. Keep the app open.', style: TextStyle(color: Colors.black54)),
+        Text(e.status!.profile.acceptsDeliveries ? 'Looking for rides and deliveries near you.' : 'Looking for rides near you.',
+            style: const TextStyle(color: Colors.black54)),
         const SizedBox(height: 12),
         const LinearProgressIndicator(),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
+        _deliveriesSwitch(e),
         OutlinedButton(
           key: const Key('go-offline'),
           style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
@@ -187,6 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: const Text('Finish setting up'),
         ),
       ],
+      if (p.status == 'approved') _deliveriesSwitch(e),
       const SizedBox(height: 12),
       FilledButton(
         key: const Key('go-online'),
@@ -197,6 +201,16 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     ]);
   }
+
+  Widget _deliveriesSwitch(DriverEngine e) => SwitchListTile(
+        key: const Key('deliveries-switch'),
+        contentPadding: EdgeInsets.zero,
+        secondary: const Icon(Icons.shopping_bag_outlined),
+        title: const Text('Shop deliveries'),
+        subtitle: const Text('Collect orders from stores and bring them to customers'),
+        value: e.status!.profile.acceptsDeliveries,
+        onChanged: e.setDeliveries,
+      );
 
   String _statusLine(String status) => switch (status) {
         'pending' => 'Your application is being reviewed.',
@@ -263,9 +277,10 @@ class _OfferCardState extends State<OfferCard> {
   Widget build(BuildContext context) {
     final o = widget.offer;
     final t = o.trip;
+    final d = t.delivery;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [
-        const Expanded(child: Text('New ride request', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
+        Expanded(child: Text(d != null ? 'New delivery' : 'New ride request', key: const Key('offer-title'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
         CircleAvatar(
           radius: 20,
           backgroundColor: Brand.yellow,
@@ -276,14 +291,18 @@ class _OfferCardState extends State<OfferCard> {
       if (o.estimatedEarnings != null)
         Text('You earn about ${money(o.estimatedEarnings, t.currency.isEmpty ? null : t.currency)}',
             key: const Key('offer-earnings'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E9E5A))),
-      Text('Fare ${money(t.estimatedFare, t.currency.isEmpty ? null : t.currency)} · ${t.isCash ? 'Cash' : 'Card'}', style: const TextStyle(color: Colors.black54)),
+      if (d == null)
+        Text('Fare ${money(t.estimatedFare, t.currency.isEmpty ? null : t.currency)} · ${t.isCash ? 'Cash' : 'Card'}', style: const TextStyle(color: Colors.black54))
+      else
+        Text('Order ${d.orderNumber} · ${d.itemCount} ${d.itemCount == 1 ? 'item' : 'items'} · paid by card', style: const TextStyle(color: Colors.black54)),
       const Divider(height: 20),
-      _line(Icons.trip_origin, Brand.blue, t.pickup.address ?? 'Pickup', '${distanceText(o.distanceM)} away'),
+      _line(d != null ? Icons.storefront : Icons.trip_origin, Brand.blue, d != null ? 'Collect at ${t.pickup.address ?? d.storeName}' : (t.pickup.address ?? 'Pickup'),
+          '${distanceText(o.distanceM)} away'),
       for (var i = 0; i < t.stops.length; i++) _line(Icons.adjust, Colors.orange, t.stops[i].address ?? 'Stop', 'Stop ${i + 1}'),
       _line(Icons.place, Brand.red, t.dropoff.address ?? 'Drop-off',
           [if (t.estimatedDistanceM != null) distanceText(t.estimatedDistanceM), if (t.estimatedDurationS != null) durationText(t.estimatedDurationS)].join(' · ')),
       const SizedBox(height: 6),
-      Wrap(spacing: 8, runSpacing: 4, children: [
+      if (d == null) Wrap(spacing: 8, runSpacing: 4, children: [
         Chip(avatar: const Icon(Icons.person, size: 18), label: Text('${t.passengers}')),
         if (t.luggage > 0) Chip(avatar: const Icon(Icons.luggage, size: 18), label: Text('${t.luggage}')),
         for (final f in t.features) Chip(label: Text(f.replaceAll('_', ' '))),

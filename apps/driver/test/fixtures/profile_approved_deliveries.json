@@ -1,0 +1,37 @@
+{
+  "profile": {
+    "status": "approved",
+    "status_note": null,
+    "service_area_id": 1,
+    "is_online": false,
+    "accepts_deliveries": true,
+    "rating_avg": 5.0,
+    "rating_count": 13,
+    "completed_trips": 21,
+    "licence_number": "L1",
+    "licence_expiry": "2030-01-01",
+    "psv_permit_number": null,
+    "current_vehicle_id": 3,
+    "current_vehicle": {
+      "id": 3,
+      "driver_id": 3,
+      "make": "Toyota",
+      "model": "Corolla",
+      "year": null,
+      "colour": null,
+      "plate": "ZR101",
+      "seats": 4,
+      "luggage_capacity": 2,
+      "features": [
+        "child_seat"
+      ],
+      "vehicle_type": "standard",
+      "status": "approved",
+      "status_note": null,
+      "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/45"
+    },
+    "approved_at": "2026-10-24T02:47:04+00:00"
+  },
+  "can_go_online": true,
+  "issues": []
+}

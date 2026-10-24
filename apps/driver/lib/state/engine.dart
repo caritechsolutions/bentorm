@@ -56,6 +56,18 @@ class DriverEngine extends ChangeNotifier {
     _notify();
   }
 
+  /// Shop deliveries on/off. Takes effect for the next job offered.
+  Future<void> setDeliveries(bool on) async {
+    try {
+      await api.updateProfile(acceptsDeliveries: on);
+      await refreshStatus();
+      message = on ? 'You\'ll get shop deliveries too.' : 'Deliveries off — rides only.';
+    } on ApiException catch (e) {
+      message = e.message;
+    }
+    _notify();
+  }
+
   Future<void> goOnline() async {
     toggling = true;
     message = null;

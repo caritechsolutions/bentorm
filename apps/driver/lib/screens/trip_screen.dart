@@ -106,10 +106,35 @@ class _TripScreenState extends State<TripScreen> {
     final started = await showDialog<DriverTrip>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => _PinDialog(riderName: _trip.riderFirstName, submit: (pin) => api.start(_trip.id, pin)),
+      builder: (_) => _PinDialog(
+        title: 'PIN from ${_trip.riderFirstName}',
+        body: 'Ask the rider for the 4-digit PIN shown in their app. This makes sure you have the right person.',
+        action: 'Start trip',
+        submit: (pin) => api.start(_trip.id, pin),
+      ),
     );
     if (started != null) _set(started);
   }
+
+  /// At the customer's door: their PIN finishes the delivery (and charges their card).
+  Future<void> _deliver() async {
+    final scope = AppScope.of(context);
+    final fix = await scope.location.current();
+    if (!mounted) return;
+    final done = await showDialog<DriverTrip>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _PinDialog(
+        title: 'PIN from ${_trip.riderFirstName}',
+        body: 'Hand over the order, then ask ${_trip.riderFirstName} for the 4-digit PIN shown in their app.',
+        action: 'Delivered',
+        submit: (pin) => scope.api.complete(_trip.id, lat: fix?.lat, lng: fix?.lng, pin: pin),
+      ),
+    );
+    if (done != null) _set(done);
+  }
+
+  Future<void> _callStore(String phone) => TripScreen.openUrl(Uri.parse('tel:${phone.replaceAll(RegExp(r'[^0-9+]'), '')}'));
 
   Future<void> _complete() async {
     final ok = await showDialog<bool>(
@@ -130,7 +155,9 @@ class _TripScreenState extends State<TripScreen> {
   }
 
   Future<void> _cancel() async {
-    const reasons = ['Rider didn\'t show up', 'Rider asked me to cancel', 'Problem with my vehicle', 'Other'];
+    final reasons = _trip.isDelivery
+        ? const ['Store is taking too long', 'Store is closed', 'Problem with my vehicle', 'Other']
+        : const ['Rider didn\'t show up', 'Rider asked me to cancel', 'Problem with my vehicle', 'Other'];
     final reason = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -190,7 +217,16 @@ class _TripScreenState extends State<TripScreen> {
     );
   }
 
-  String _title(DriverTrip t) => switch (t.status) {
+  String _title(DriverTrip t) => t.isDelivery
+      ? switch (t.status) {
+          'accepted' => 'Collect order ${t.delivery!.orderNumber}',
+          'arrived' => 'At ${t.delivery!.storeName}',
+          'in_progress' => 'Deliver to ${t.riderFirstName}',
+          'completed' => 'Delivered',
+          'cancelled' => 'Delivery cancelled',
+          _ => t.status,
+        }
+      : switch (t.status) {
         'accepted' => 'Pick up ${t.riderFirstName}',
         'arrived' => 'Waiting for ${t.riderFirstName}',
         'in_progress' => 'Taking ${t.riderFirstName}',
@@ -200,6 +236,7 @@ class _TripScreenState extends State<TripScreen> {
       };
 
   List<Widget> _panel(DriverTrip t) {
+    if (t.isDelivery) return _deliveryPanel(t);
     final cur = t.currency.isEmpty ? null : t.currency;
     final riderInfo = <Widget>[
       Row(children: [
@@ -311,6 +348,83 @@ class _TripScreenState extends State<TripScreen> {
     }
   }
 
+  /// Delivery: go to the store → the store taps "Picked up" → go to the customer → their PIN finishes it.
+  List<Widget> _deliveryPanel(DriverTrip t) {
+    final d = t.delivery!;
+    final cur = t.currency.isEmpty ? null : t.currency;
+    final order = <Widget>[
+      Text('Order ${d.orderNumber} for ${d.customerName}', key: const Key('delivery-order'), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 4),
+      for (final i in d.items) Text(i, style: const TextStyle(fontSize: 15)),
+      if (d.note != null && d.note!.isNotEmpty)
+        Padding(padding: const EdgeInsets.only(top: 6), child: Text('Note: ${d.note}', key: const Key('rider-note'), style: const TextStyle(fontStyle: FontStyle.italic))),
+      if (d.earnings != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text('You earn ${money(d.earnings, cur)} · paid by card', style: const TextStyle(color: Colors.black54))),
+      const Divider(height: 20),
+    ];
+    final callStore = d.storePhone == null
+        ? const <Widget>[]
+        : [TextButton.icon(key: const Key('call-store'), onPressed: () => _callStore(d.storePhone!), icon: const Icon(Icons.phone), label: Text('Call ${d.storeName}'))];
+
+    switch (t.status) {
+      case 'accepted':
+        return [
+          ...order,
+          _stop(Icons.storefront, Brand.blue, 'Collect at', t.pickup.address),
+          Padding(padding: const EdgeInsets.only(top: 8), child: _stop(Icons.place, Brand.red, 'Then deliver to', t.dropoff.address)),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(key: const Key('navigate'), onPressed: () => _navigate(t.pickup, 'pickup', 'Store'), icon: const Icon(Icons.navigation), label: const Text('Navigate to the store')),
+          const SizedBox(height: 8),
+          FilledButton(key: const Key('arrived'), onPressed: _busy ? null : () => _act(() => AppScope.of(context).api.arrive(t.id)), child: const Text('I\'m at the store')),
+          ...callStore,
+          _cancelButton(),
+        ];
+      case 'arrived':
+        return [
+          ...order,
+          Container(
+            key: const Key('waiting-store'),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: Brand.yellow.withValues(alpha: 0.25), borderRadius: BorderRadius.circular(14)),
+            child: Row(children: [
+              const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5)),
+              const SizedBox(width: 12),
+              Expanded(child: Text('Ask for order ${d.orderNumber}. When ${d.storeName} hands it over they tap "Picked up" — this screen moves on by itself.')),
+            ]),
+          ),
+          ...callStore,
+          _cancelButton(),
+        ];
+      case 'in_progress':
+        return [
+          ...order,
+          _stop(Icons.place, Brand.red, 'Deliver to ${d.customerName}', t.dropoff.address),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(key: const Key('navigate'), onPressed: () => _navigate(t.dropoff, 'dropoff', 'Customer'), icon: const Icon(Icons.navigation), label: const Text('Navigate to the customer')),
+          const SizedBox(height: 8),
+          FilledButton.icon(key: const Key('deliver'), onPressed: _busy ? null : _deliver, icon: const Icon(Icons.lock_open), label: const Text('Enter PIN — delivered')),
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text('${d.customerName} reads you a 4-digit PIN from their app.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54)),
+          ),
+        ];
+      case 'completed':
+        return [
+          const Text('Order delivered', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          if (t.earnings != null) Text('You earned ${money(t.earnings, cur)}', key: const Key('earned'), style: const TextStyle(fontSize: 18, color: Color(0xFF1E9E5A), fontWeight: FontWeight.w600)),
+          const SizedBox(height: 16),
+          FilledButton(key: const Key('done'), onPressed: () => Navigator.of(context).pop(), child: const Text('Done')),
+        ];
+      default:
+        return [
+          Text(t.cancelledBy == 'driver' ? 'You cancelled this delivery.' : 'This delivery was called off. You don\'t need to go to the store.',
+              key: const Key('cancelled-message'), style: const TextStyle(fontSize: 16)),
+          const SizedBox(height: 16),
+          FilledButton(key: const Key('done'), onPressed: () => Navigator.of(context).pop(), child: const Text('Done')),
+        ];
+    }
+  }
+
   /// Stops still to come, then the drop-off.
   List<Widget> _onward(DriverTrip t) => [
         for (var i = 0; i < t.stops.length; i++)
@@ -367,14 +481,16 @@ class _TripScreenState extends State<TripScreen> {
 
   Widget _cancelButton() => Padding(
         padding: const EdgeInsets.only(top: 8),
-        child: TextButton(key: const Key('cancel-ride'), onPressed: _busy ? null : _cancel, style: TextButton.styleFrom(foregroundColor: Brand.red), child: const Text('Cancel ride')),
+        child: TextButton(key: const Key('cancel-ride'), onPressed: _busy ? null : _cancel, style: TextButton.styleFrom(foregroundColor: Brand.red), child: Text(_trip.isDelivery ? 'Cancel delivery' : 'Cancel ride')),
       );
 }
 
-/// Four-digit PIN entry. Calls [submit]; closes with the started trip, or shows the server's reason.
+/// Four-digit PIN entry. Calls [submit]; closes with the updated trip, or shows the server's reason.
 class _PinDialog extends StatefulWidget {
-  const _PinDialog({required this.riderName, required this.submit});
-  final String riderName;
+  const _PinDialog({required this.title, required this.body, required this.action, required this.submit});
+  final String title;
+  final String body;
+  final String action;
   final Future<DriverTrip> Function(String pin) submit;
 
   @override
@@ -417,9 +533,9 @@ class _PinDialogState extends State<_PinDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: Text('PIN from ${widget.riderName}'),
+        title: Text(widget.title),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('Ask the rider for the 4-digit PIN shown in their app. This makes sure you have the right person.'),
+          Text(widget.body),
           const SizedBox(height: 12),
           TextField(
             key: const Key('pin-input'),
@@ -436,7 +552,7 @@ class _PinDialogState extends State<_PinDialog> {
         ]),
         actions: [
           TextButton(key: const Key('pin-cancel'), onPressed: _busy ? null : () => Navigator.of(context).pop(), child: const Text('Back')),
-          FilledButton(key: const Key('pin-submit'), onPressed: _busy ? null : _go, child: const Text('Start trip')),
+          FilledButton(key: const Key('pin-submit'), onPressed: _busy ? null : _go, child: Text(widget.action)),
         ],
       );
 }

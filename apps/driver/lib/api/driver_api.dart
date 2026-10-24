@@ -32,8 +32,9 @@ class DriverApi extends AuthApi {
   // ---------------------------------------------------------------- profile
   Future<DriverStatus> status() async => DriverStatus.fromJson(_map(await client.get('/driver/profile')));
 
-  Future<DriverProfile> updateProfile({int? serviceAreaId, String? licenceNumber, String? licenceExpiry, String? psvPermit}) async =>
+  Future<DriverProfile> updateProfile({int? serviceAreaId, String? licenceNumber, String? licenceExpiry, String? psvPermit, bool? acceptsDeliveries}) async =>
       DriverProfile.fromJson(_map(await client.patch('/driver/profile', {
+        if (acceptsDeliveries != null) 'accepts_deliveries': acceptsDeliveries,
         if (serviceAreaId != null) 'service_area_id': serviceAreaId,
         if (licenceNumber != null) 'licence_number': licenceNumber,
         if (licenceExpiry != null) 'licence_expiry': licenceExpiry,
@@ -126,8 +127,9 @@ class DriverApi extends AuthApi {
   Future<DriverTrip> reachStop(String tripId, int index) async =>
       DriverTrip.fromJson(_map(await client.post('/driver/trips/$tripId/stops/$index/reached')));
 
-  Future<DriverTrip> complete(String tripId, {double? lat, double? lng}) async => DriverTrip.fromJson(
-      _map(await client.post('/driver/trips/$tripId/complete', {if (lat != null) 'lat': lat, if (lng != null) 'lng': lng})));
+  /// Deliveries need the customer's [pin] (wrong/missing → 422 errors.pin; too many tries → 429).
+  Future<DriverTrip> complete(String tripId, {double? lat, double? lng, String? pin}) async => DriverTrip.fromJson(_map(await client
+      .post('/driver/trips/$tripId/complete', {if (lat != null) 'lat': lat, if (lng != null) 'lng': lng, if (pin != null) 'pin': pin})));
 
   Future<DriverTrip> cancel(String tripId, String reason) async =>
       DriverTrip.fromJson(_map(await client.post('/driver/trips/$tripId/cancel', {'reason': reason})));

@@ -99,9 +99,12 @@ class DriverProfile {
     this.licenceExpiry,
     this.psvPermit,
     this.currentVehicle,
+    this.acceptsDeliveries = false,
   });
 
   final String status; // pending | approved | suspended | rejected
+  /// Shop deliveries on/off (any approved vehicle can deliver).
+  final bool acceptsDeliveries;
   final String? statusNote;
   final int? serviceAreaId;
   final bool isOnline;
@@ -125,6 +128,7 @@ class DriverProfile {
         licenceExpiry: _s(j['licence_expiry']),
         psvPermit: _s(j['psv_permit_number']),
         currentVehicle: j['current_vehicle'] is Map<String, dynamic> ? Vehicle.fromJson(j['current_vehicle']) : null,
+        acceptsDeliveries: j['accepts_deliveries'] == true,
       );
 }
 
@@ -228,6 +232,55 @@ class StopChange {
   }
 }
 
+/// A shop delivery: collect the order at the store, take it to the customer, finish with their PIN.
+class DeliveryInfo {
+  DeliveryInfo({
+    required this.orderNumber,
+    required this.storeName,
+    this.storePhone,
+    this.storeAddress,
+    required this.customerName,
+    required this.items,
+    this.note,
+    this.earnings,
+    required this.pickedUp,
+    this.itemCount = 0,
+  });
+
+  /// Pieces to collect (quantities added up).
+  final int itemCount;
+
+  final String orderNumber;
+  final String storeName;
+  final String? storePhone;
+  final String? storeAddress;
+  final String customerName;
+  final List<String> items; // "2× Fried flying fish (Side: Breadfruit)"
+  final String? note;
+  final double? earnings;
+  final bool pickedUp;
+
+  static DeliveryInfo? fromJson(dynamic v) {
+    if (v is! Map<String, dynamic>) return null;
+    final store = _m(v['store']);
+    return DeliveryInfo(
+      orderNumber: _s(v['order_number']) ?? '',
+      storeName: _s(store['name']) ?? 'the store',
+      storePhone: _s(store['phone']),
+      storeAddress: _s(store['address']),
+      customerName: _s(v['customer_name']) ?? 'Customer',
+      items: [
+        for (final i in _l(v['items']))
+          '${_in(_m(i)['quantity']) ?? 1}× ${_s(_m(i)['name']) ?? ''}${(_s(_m(i)['options_text']) ?? '').isEmpty ? '' : ' (${_s(_m(i)['options_text'])})'}',
+      ],
+      note: _s(v['note']),
+      earnings: _dn(v['earnings']),
+      pickedUp: v['picked_up'] == true,
+      itemCount: _l(v['items']).fold<int>(0, (n, i) => n + (_in(_m(i)['quantity']) ?? 1)),
+    );
+  }
+}
+
 /// A trip as the driver sees it.
 class DriverTrip {
   DriverTrip({
@@ -255,7 +308,12 @@ class DriverTrip {
     this.stops = const [],
     this.stopChange,
     this.pinVerified = false,
+    this.delivery,
   });
+
+  /// Set for shop deliveries (null for rides).
+  final DeliveryInfo? delivery;
+  bool get isDelivery => delivery != null;
 
   final String id;
   final String status;
@@ -311,6 +369,7 @@ class DriverTrip {
       stops: _l(j['stops']).map((e) => TripStop.fromJson(_m(e))).toList(),
       stopChange: StopChange.fromJson(j['stop_change']),
       pinVerified: j['pin_verified'] == true,
+      delivery: j['kind'] == 'delivery' ? DeliveryInfo.fromJson(j['delivery']) : null,
     );
   }
 
@@ -331,6 +390,7 @@ class DriverTrip {
   bool get canCancel => const ['accepted', 'arrived'].contains(status);
   bool get isCash => paymentMethod == 'cash';
   String get riderFirstName {
+    if (delivery != null) return delivery!.customerName;
     final n = (riderName ?? '').trim();
     return n.isEmpty ? 'Rider' : n.split(' ').first;
   }
