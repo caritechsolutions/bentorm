@@ -6,7 +6,7 @@
         class="grid gap-4 lg:grid-cols-4"
     >
         <div class="lg:col-span-3 rounded-xl overflow-hidden border border-gray-200 dark:border-white/10">
-            <div x-ref="map" style="height: 70vh; min-height: 420px; width: 100%;"></div>
+            <div x-ref="map" style="height: 70vh; min-height: 420px; width: 100%; position: relative; z-index: 0; isolation: isolate;"></div>
         </div>
         <div class="space-y-3 text-sm">
             <div class="rounded-xl border border-gray-200 dark:border-white/10 p-4 bg-white dark:bg-gray-900">

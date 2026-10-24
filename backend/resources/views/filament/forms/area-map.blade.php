@@ -13,7 +13,7 @@
         x-init="boot($refs.map)"
         class="rounded-xl overflow-hidden border border-gray-200 dark:border-white/10"
     >
-        <div x-ref="map" style="height: 520px; width: 100%;"></div>
+        <div x-ref="map" style="height: 520px; width: 100%; position: relative; z-index: 0; isolation: isolate;"></div>
         <div class="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-white/5">
             <span>Draw with the polygon or rectangle tool (top left). Drag corners to adjust. Several shapes = one area with several parts.</span>
             <span x-show="!state" class="font-medium text-danger-600">No shape drawn yet.</span>
