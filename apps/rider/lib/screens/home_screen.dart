@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
 import '../api/models.dart';
+import '../api/shop_models.dart';
 import '../brand.dart';
 import '../config.dart';
 import '../state/scope.dart';
@@ -9,6 +10,9 @@ import '../widgets/ride_map.dart';
 import 'cards_screen.dart';
 import 'history_screen.dart';
 import 'search_screen.dart';
+import 'shop/order_screen.dart';
+import 'shop/orders_screen.dart';
+import 'shop/shop_screen.dart';
 import 'trip_screen.dart';
 
 /// Book a ride: pickup → where to → choose a vehicle → pay → request.
@@ -36,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _payment = 'cash'; // 'cash' or a card id
   bool _requesting = false;
   bool _started = false;
+  List<Order> _orders = const [];
 
   @override
   void didChangeDependencies() {
@@ -58,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // Offline: carry on to booking; the request will surface the problem.
     }
     _loadCards();
+    _loadOrders();
     final me = await scope.location.current();
     if (!mounted) return;
     final point = me ?? const LatLngPoint(AppConfig.defaultLat, AppConfig.defaultLng);
@@ -80,6 +86,26 @@ class _HomeScreenState extends State<HomeScreen> {
     } on ApiException {
       // Cash still works.
     }
+  }
+
+  /// Shop orders still in progress, shown as banners on the start panel.
+  Future<void> _loadOrders() async {
+    try {
+      final orders = await AppScope.of(context).api.activeOrders();
+      if (mounted) setState(() => _orders = orders);
+    } on ApiException {
+      // Not essential: the banner just doesn't show.
+    }
+  }
+
+  Future<void> _openShop() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ShopScreen()));
+    if (mounted) _loadOrders();
+  }
+
+  Future<void> _openOrder(Order o) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => OrderScreen(initial: o)));
+    if (mounted) _loadOrders();
   }
 
   Future<void> _choosePickup() async {
@@ -274,7 +300,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final pickupPt = _pickup == null ? null : LatLngPoint(_pickup!.lat, _pickup!.lng);
     final dropPt = _dropoff == null ? null : LatLngPoint(_dropoff!.lat, _dropoff!.lng);
     return Scaffold(
-      drawer: _AccountDrawer(onChanged: _loadCards),
+      drawer: _AccountDrawer(onChanged: _loadCards, onOrders: _loadOrders),
       body: Stack(
         children: [
           Positioned.fill(
@@ -327,6 +353,39 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _start(String? firstName) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Row(children: [
+            const _ModeChip(key: Key('mode-ride'), icon: Icons.local_taxi, label: 'Ride', selected: true),
+            const SizedBox(width: 8),
+            _ModeChip(key: const Key('mode-shop'), icon: Icons.shopping_bag_outlined, label: 'Shop', selected: false, onTap: _openShop),
+          ]),
+          for (final o in _orders)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Material(
+                color: o.hasPendingChange ? Brand.yellow.withValues(alpha: 0.25) : Brand.blue.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  key: Key('active-order-${o.id}'),
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => _openOrder(o),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(children: [
+                      const Icon(Icons.shopping_bag, color: Brand.blue),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('${o.storeName} · order ${o.number}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          Text(o.hasPendingChange ? 'The store needs your answer' : o.statusLabel, style: const TextStyle(color: Colors.black54)),
+                        ]),
+                      ),
+                      const Icon(Icons.chevron_right),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
           Text(firstName == null ? 'Where are you going?' : 'Hi $firstName, where to?', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           _StopRow(icon: Icons.trip_origin, color: Brand.blue, label: _pickup?.label ?? 'Finding your location…', onTap: _choosePickup),
@@ -435,6 +494,33 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+/// Ride / Shop switch at the top of the start panel.
+class _ModeChip extends StatelessWidget {
+  const _ModeChip({super.key, required this.icon, required this.label, required this.selected, this.onTap});
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: selected ? Brand.charcoal : const Color(0xFFF5F6F7),
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(icon, size: 18, color: selected ? Colors.white : Brand.charcoal),
+              const SizedBox(width: 6),
+              Text(label, style: TextStyle(fontWeight: FontWeight.w600, color: selected ? Colors.white : Brand.charcoal)),
+            ]),
+          ),
+        ),
+      );
+}
+
 class _StopRow extends StatelessWidget {
   const _StopRow({required this.icon, required this.color, required this.label, required this.onTap});
   final IconData icon;
@@ -530,8 +616,9 @@ class _QuoteTile extends StatelessWidget {
 }
 
 class _AccountDrawer extends StatelessWidget {
-  const _AccountDrawer({required this.onChanged});
+  const _AccountDrawer({required this.onChanged, required this.onOrders});
   final VoidCallback onChanged;
+  final VoidCallback onOrders;
 
   @override
   Widget build(BuildContext context) {
@@ -566,6 +653,16 @@ class _AccountDrawer extends StatelessWidget {
               onTap: () {
                 Navigator.pop(context);
                 Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HistoryScreen()));
+              },
+            ),
+            ListTile(
+              key: const Key('drawer-orders'),
+              leading: const Icon(Icons.shopping_bag_outlined),
+              title: const Text('Your orders'),
+              onTap: () async {
+                Navigator.pop(context);
+                await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const OrdersScreen()));
+                onOrders();
               },
             ),
             ListTile(

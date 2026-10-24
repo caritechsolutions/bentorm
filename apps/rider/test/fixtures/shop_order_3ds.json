@@ -1,0 +1,106 @@
+{
+  "id": "01m5nztxagkkwpdh9s8b8cckga",
+  "number": "1009",
+  "status": "pending_payment",
+  "status_label": "Waiting for card confirmation",
+  "store": {
+    "slug": "anns-fish-pot",
+    "name": "Ann's Fish Pot",
+    "phone": "2464281234",
+    "logo_url": null,
+    "address": "Oistins Bay Gardens",
+    "lat": 13.0667,
+    "lng": -59.5333
+  },
+  "items": [
+    {
+      "id": 16,
+      "name": "Fried flying fish",
+      "quantity": 2,
+      "unit_price": 26,
+      "line_total": 52,
+      "options": [
+        {
+          "group": "Side",
+          "choices": [
+            {
+              "name": "Breadfruit",
+              "price": 3
+            }
+          ]
+        },
+        {
+          "group": "Extras",
+          "choices": [
+            {
+              "name": "Pepper sauce",
+              "price": 0.5
+            }
+          ]
+        }
+      ],
+      "options_text": "Side: Breadfruit · Extras: Pepper sauce",
+      "note": "No onions",
+      "removed": false
+    },
+    {
+      "id": 17,
+      "name": "Mauby",
+      "quantity": 1,
+      "unit_price": 4,
+      "line_total": 4,
+      "options": [],
+      "options_text": "",
+      "note": null,
+      "removed": false
+    }
+  ],
+  "currency": "BBD",
+  "totals": {
+    "items": 56,
+    "items_tax": 0,
+    "delivery": 40.5,
+    "service_fee": 0,
+    "total": 96.5
+  },
+  "lines": [
+    {
+      "code": "items",
+      "label": "Items",
+      "amount": 56
+    },
+    {
+      "code": "delivery",
+      "label": "Delivery (12.2 km)",
+      "amount": 40.5
+    }
+  ],
+  "dropoff": {
+    "lat": 13.0969,
+    "lng": -59.6145,
+    "address": "Bay Street, Bridgetown"
+  },
+  "distance_m": 12238,
+  "note": null,
+  "prep_minutes": null,
+  "change_request": null,
+  "decline_reason": null,
+  "cancelled_by": null,
+  "payment": {
+    "status": "pending",
+    "card": {
+      "brand": "visa",
+      "last4": "3220"
+    },
+    "redirect_url": "http://127.0.0.1:8099/api/v1/payments/test/01m5nztxav9hw1e32006pzjyje?expires=1792814935&signature=bc877023aa7171e5caf987404291e2493efd3fc93b9d28646890f1daae2b90ab"
+  },
+  "timestamps": {
+    "created_at": "2026-10-24T03:38:55+00:00",
+    "placed_at": null,
+    "expires_at": null,
+    "accepted_at": null,
+    "ready_by": null,
+    "ready_at": null,
+    "cancelled_at": null
+  }
+}

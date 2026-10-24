@@ -2,6 +2,7 @@ import 'package:ridecoop_core/ridecoop_core.dart' show AuthApi;
 
 import 'api_client.dart';
 import 'models.dart';
+import 'shop_models.dart';
 
 /// Every call the rider app makes, typed. Sign-in calls come from [AuthApi] (shared core).
 class RiderApi extends AuthApi {
@@ -132,4 +133,60 @@ class RiderApi extends AuthApi {
   Future<void> deleteCard(String id) async {
     await client.delete('/me/payment-methods/$id');
   }
+
+  // ---------------------------------------------------------------- shop
+  static Map<String, String> _near(double? lat, double? lng) => {if (lat != null) 'lat': '$lat', if (lng != null) 'lng': '$lng'};
+
+  Future<List<ShopCategory>> shopCategories({double? lat, double? lng}) async =>
+      (await client.get('/shop/categories', query: _near(lat, lng)) as List).map((e) => ShopCategory.fromJson(e as Map<String, dynamic>)).toList();
+
+  Future<List<StoreSummary>> shopStores({String? category, String? q, double? lat, double? lng}) async =>
+      (await client.get('/shop/stores', query: {
+        ..._near(lat, lng),
+        if (category != null) 'category': category,
+        if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
+      }) as List)
+          .map((e) => StoreSummary.fromJson(e as Map<String, dynamic>))
+          .toList();
+
+  Future<StoreMenu> shopStore(String slug, {double? lat, double? lng}) async =>
+      StoreMenu.fromJson(await client.get('/shop/stores/${Uri.encodeComponent(slug)}', query: _near(lat, lng)) as Map<String, dynamic>);
+
+  Future<ShopQuote> shopQuote(String store, List<Map<String, dynamic>> items, double lat, double lng) async =>
+      ShopQuote.fromJson(await client.post('/shop/quote', {'store': store, 'lat': lat, 'lng': lng, 'items': items}) as Map<String, dynamic>);
+
+  /// Places the order and holds the card. A card that needs 3-D Secure comes back pending_payment with a redirect_url.
+  Future<Order> placeOrder({
+    required String store,
+    required List<Map<String, dynamic>> items,
+    required Place dropoff,
+    required String cardId,
+    String? note,
+  }) async =>
+      Order.fromJson(await client.post('/shop/orders', {
+        'store': store,
+        'lat': dropoff.lat,
+        'lng': dropoff.lng,
+        'address': dropoff.label,
+        'items': items,
+        'payment_method_id': cardId,
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      }) as Map<String, dynamic>);
+
+  Future<Order> order(String id) async => Order.fromJson(await client.get('/shop/orders/$id') as Map<String, dynamic>);
+
+  Future<List<Order>> activeOrders() async =>
+      (await client.get('/shop/orders/active') as List).map((e) => Order.fromJson(e as Map<String, dynamic>)).toList();
+
+  Future<({List<Order> orders, bool hasMore})> orders({int page = 1}) async {
+    final r = await client.get('/shop/orders', query: {'page': '$page'}) as Map<String, dynamic>;
+    final links = r['links'];
+    return (orders: (r['data'] as List).map((e) => Order.fromJson(e as Map<String, dynamic>)).toList(), hasMore: links is Map && links['next'] != null);
+  }
+
+  Future<Order> cancelOrder(String id) async => Order.fromJson(await client.post('/shop/orders/$id/cancel') as Map<String, dynamic>);
+
+  /// Answer the store's "we're out of something" request. No cancels the order.
+  Future<Order> answerOrderChange(String id, bool accept) async =>
+      Order.fromJson(await client.post('/shop/orders/$id/change', {'accept': accept}) as Map<String, dynamic>);
 }

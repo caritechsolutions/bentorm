@@ -6,6 +6,7 @@ import 'brand.dart';
 import 'config.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'state/cart.dart';
 import 'state/location.dart';
 import 'state/scope.dart';
 import 'state/session.dart';
@@ -17,16 +18,18 @@ void main() {
 }
 
 class RideCoopApp extends StatelessWidget {
-  const RideCoopApp({super.key, required this.session, required this.location});
+  RideCoopApp({super.key, required this.session, required this.location, Cart? cart}) : cart = cart ?? Cart();
 
   final Session session;
   final LocationService location;
+  final Cart cart;
 
   @override
   Widget build(BuildContext context) {
     return AppScope(
       session: session,
       location: location,
+      cart: cart,
       child: MaterialApp(
         title: Brand.name,
         debugShowCheckedModeBanner: false,

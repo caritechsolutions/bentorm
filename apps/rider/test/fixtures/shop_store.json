@@ -1,0 +1,94 @@
+{
+  "slug": "anns-fish-pot",
+  "name": "Ann's Fish Pot",
+  "description": "Fresh fish from the Oistins boats",
+  "category": "food",
+  "logo_url": null,
+  "cover_url": null,
+  "open_now": true,
+  "prep_minutes": 20,
+  "min_order": 10.0,
+  "currency": "BBD",
+  "distance_km": 9.4,
+  "delivers_here": true,
+  "phone": "2464281234",
+  "address": "Oistins Bay Gardens",
+  "lat": 13.0667,
+  "lng": -59.5333,
+  "hours": null,
+  "sections": [
+    {
+      "id": 5,
+      "name": "Mains",
+      "products": [
+        {
+          "id": 8,
+          "name": "Fried flying fish",
+          "description": "Two fillets, seasoned Bajan style",
+          "price": 22.5,
+          "photo_url": null,
+          "size": "small",
+          "available": true,
+          "options": [
+            {
+              "name": "Side",
+              "choices": [
+                {
+                  "name": "Macaroni pie",
+                  "price": 0
+                },
+                {
+                  "name": "Breadfruit",
+                  "price": 3
+                }
+              ],
+              "multiple": false,
+              "required": true
+            },
+            {
+              "name": "Extras",
+              "choices": [
+                {
+                  "name": "Pepper sauce",
+                  "price": 0.5
+                },
+                {
+                  "name": "Salad",
+                  "price": 2
+                }
+              ],
+              "multiple": true,
+              "required": false
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "name": "Grilled marlin",
+          "description": null,
+          "price": 30.0,
+          "photo_url": null,
+          "size": "small",
+          "available": false,
+          "options": []
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Drinks",
+      "products": [
+        {
+          "id": 10,
+          "name": "Mauby",
+          "description": null,
+          "price": 4.0,
+          "photo_url": null,
+          "size": "small",
+          "available": true,
+          "options": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "store": "anns-fish-pot",
+  "currency": "BBD",
+  "items": [
+    {
+      "product_id": 8,
+      "name": "Fried flying fish",
+      "quantity": 2,
+      "unit_price": 26.0,
+      "line_total": 52.0,
+      "options": [
+        {
+          "group": "Side",
+          "choices": [
+            {
+              "name": "Breadfruit",
+              "price": 3.0
+            }
+          ]
+        },
+        {
+          "group": "Extras",
+          "choices": [
+            {
+              "name": "Pepper sauce",
+              "price": 0.5
+            }
+          ]
+        }
+      ],
+      "size": "small",
+      "note": "No onions"
+    },
+    {
+      "product_id": 10,
+      "name": "Mauby",
+      "quantity": 1,
+      "unit_price": 4.0,
+      "line_total": 4.0,
+      "options": null,
+      "size": "small",
+      "note": null
+    }
+  ],
+  "lines": [
+    {
+      "code": "items",
+      "label": "Items",
+      "amount": 56.0
+    },
+    {
+      "code": "delivery",
+      "label": "Delivery (12.2 km)",
+      "amount": 40.5
+    }
+  ],
+  "totals": {
+    "items": 56.0,
+    "items_tax": 0.0,
+    "delivery": 40.5,
+    "service_fee": 0.0,
+    "total": 96.5
+  },
+  "prices_include_vat": false,
+  "distance_m": 12238,
+  "prep_minutes": 20,
+  "eta_minutes": 55
+}

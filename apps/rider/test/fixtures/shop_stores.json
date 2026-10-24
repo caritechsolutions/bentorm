@@ -1,0 +1,16 @@
+[
+  {
+    "slug": "anns-fish-pot",
+    "name": "Ann's Fish Pot",
+    "description": "Fresh fish from the Oistins boats",
+    "category": "food",
+    "logo_url": null,
+    "cover_url": null,
+    "open_now": true,
+    "prep_minutes": 20,
+    "min_order": 10,
+    "currency": "BBD",
+    "distance_km": 9.4,
+    "delivers_here": true
+  }
+]

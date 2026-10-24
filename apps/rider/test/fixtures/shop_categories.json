@@ -1,0 +1,74 @@
+[
+  {
+    "slug": "food",
+    "name": "Food & Restaurants",
+    "description": "Meals, snacks and drinks",
+    "icon": "🍔",
+    "image_url": null,
+    "stores": 1,
+    "open_now": 1
+  },
+  {
+    "slug": "groceries",
+    "name": "Groceries",
+    "description": "Supermarkets and corner shops",
+    "icon": "🛒",
+    "image_url": null,
+    "stores": 0,
+    "open_now": 0
+  },
+  {
+    "slug": "pharmacy",
+    "name": "Pharmacy & Health",
+    "description": "Over-the-counter medicines and personal care",
+    "icon": "💊",
+    "image_url": null,
+    "stores": 0,
+    "open_now": 0
+  },
+  {
+    "slug": "electronics",
+    "name": "Electronics",
+    "description": "Phones, accessories and gadgets",
+    "icon": "📱",
+    "image_url": null,
+    "stores": 0,
+    "open_now": 0
+  },
+  {
+    "slug": "hardware",
+    "name": "Hardware & Home",
+    "description": "Tools, household and garden",
+    "icon": "🔧",
+    "image_url": null,
+    "stores": 0,
+    "open_now": 0
+  },
+  {
+    "slug": "fashion",
+    "name": "Fashion",
+    "description": "Clothes, shoes and accessories",
+    "icon": "👕",
+    "image_url": null,
+    "stores": 0,
+    "open_now": 0
+  },
+  {
+    "slug": "beauty",
+    "name": "Beauty",
+    "description": "Cosmetics, hair and skin care",
+    "icon": "💄",
+    "image_url": null,
+    "stores": 0,
+    "open_now": 0
+  },
+  {
+    "slug": "gifts",
+    "name": "Gifts & Flowers",
+    "description": "Flowers, cakes and presents",
+    "icon": "💐",
+    "image_url": null,
+    "stores": 0,
+    "open_now": 0
+  }
+]

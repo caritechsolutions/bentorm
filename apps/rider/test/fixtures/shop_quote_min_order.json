@@ -1,0 +1,8 @@
+{
+  "message": "Ann's Fish Pot has a minimum order of BBD 10.00.",
+  "errors": {
+    "items": [
+      "Ann's Fish Pot has a minimum order of BBD 10.00."
+    ]
+  }
+}
