@@ -1,0 +1,19 @@
+Analyzing driver...                                             
+
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/driver_api.dart:37:9 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/driver_api.dart:38:9 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/driver_api.dart:39:9 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/driver_api.dart:40:9 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/driver_api.dart:41:9 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/driver_api.dart:132:48 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/driver_api.dart:132:77 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/driver_api.dart:132:106 • use_null_aware_elements
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/history_screen.dart:62:35 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/trip_screen.dart:214:28 • unnecessary_underscores
+   info • 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/screens/vehicle_form.dart:142:15 • deprecated_member_use
+   info • 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/screens/vehicle_form.dart:143:15 • deprecated_member_use
+   info • 'getToken' is deprecated and shouldn't be used. Use register() and onRegistered instead. Try replacing the use of the deprecated member with the replacement • lib/state/push.dart:151:57 • deprecated_member_use
+   info • 'onTokenRefresh' is deprecated and shouldn't be used. Use onRegistered instead. Try replacing the use of the deprecated member with the replacement • lib/state/push.dart:154:65 • deprecated_member_use
+   info • 'deleteToken' is deprecated and shouldn't be used. Use unregister() and onUnregistered instead. Try replacing the use of the deprecated member with the replacement • lib/state/push.dart:191:60 • deprecated_member_use
+
+15 issues found. (ran in 10.7s)

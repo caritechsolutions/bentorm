@@ -1,0 +1,34 @@
+00:00 +0: loading /home/runner/work/bentorm/bentorm/apps/driver/test/navigation_test.dart
+00:00 +0: /home/runner/work/bentorm/bentorm/apps/driver/test/navigation_test.dart: admin switched it on: navigation opens inside the app and the start is counted
+00:00 +1: /home/runner/work/bentorm/bentorm/apps/driver/test/features_test.dart: on a ride: message the rider, share the trip, SOS; then collect what the rider owes and see the tip
+00:01 +2: /home/runner/work/bentorm/bentorm/apps/driver/test/features_test.dart: on a ride: message the rider, share the trip, SOS; then collect what the rider owes and see the tip
+00:01 +3: /home/runner/work/bentorm/bentorm/apps/driver/test/features_test.dart: on a ride: message the rider, share the trip, SOS; then collect what the rider owes and see the tip
+00:01 +4: /home/runner/work/bentorm/bentorm/apps/driver/test/features_test.dart: on a ride: message the rider, share the trip, SOS; then collect what the rider owes and see the tip
+00:02 +5: /home/runner/work/bentorm/bentorm/apps/driver/test/ride_test.dart: online → offer with earnings → accept → arrive → start → complete → collect cash
+00:02 +6: /home/runner/work/bentorm/bentorm/apps/driver/test/ride_test.dart: online → offer with earnings → accept → arrive → start → complete → collect cash
+00:03 +7: /home/runner/work/bentorm/bentorm/apps/driver/test/ride_test.dart: online → offer with earnings → accept → arrive → start → complete → collect cash
+00:04 +8: /home/runner/work/bentorm/bentorm/apps/driver/test/stops_pin_test.dart: an offer lists the rider's stops
+00:04 +9: /home/runner/work/bentorm/bentorm/apps/driver/test/stops_pin_test.dart: an offer lists the rider's stops
+00:04 +10: /home/runner/work/bentorm/bentorm/apps/driver/test/stops_pin_test.dart: an offer lists the rider's stops
+00:04 +11: /home/runner/work/bentorm/bentorm/apps/driver/test/stops_pin_test.dart: an offer lists the rider's stops
+00:05 +12: /home/runner/work/bentorm/bentorm/apps/driver/test/stops_pin_test.dart: an offer lists the rider's stops
+00:05 +13: /home/runner/work/bentorm/bentorm/apps/driver/test/ride_test.dart: earnings screen shows today, week and month
+00:05 +14: /home/runner/work/bentorm/bentorm/apps/driver/test/stops_pin_test.dart: stop change → accept → arrive → PIN (wrong, then right) → each stop → complete
+00:06 +15: /home/runner/work/bentorm/bentorm/apps/driver/test/stops_pin_test.dart: stop change → accept → arrive → PIN (wrong, then right) → each stop → complete
+00:06 +16: /home/runner/work/bentorm/bentorm/apps/driver/test/stops_pin_test.dart: stop change → accept → arrive → PIN (wrong, then right) → each stop → complete
+00:06 +17: /home/runner/work/bentorm/bentorm/apps/driver/test/stops_pin_test.dart: stop change → accept → arrive → PIN (wrong, then right) → each stop → complete
+00:06 +18: /home/runner/work/bentorm/bentorm/apps/driver/test/stops_pin_test.dart: stop change → accept → arrive → PIN (wrong, then right) → each stop → complete
+00:06 +19: /home/runner/work/bentorm/bentorm/apps/driver/test/stops_pin_test.dart: declining a stop change keeps the route
+00:06 +20: /home/runner/work/bentorm/bentorm/apps/driver/test/push_test.dart: registers the phone when signed in, and again when Firebase rotates the token
+00:06 +21: /home/runner/work/bentorm/bentorm/apps/driver/test/push_test.dart: an offer arriving while the app is open rings (loud) and checks for offers at once
+00:06 +22: /home/runner/work/bentorm/bentorm/apps/driver/test/push_test.dart: signing out tells the server to stop pushing to this phone
+00:06 +23: /home/runner/work/bentorm/bentorm/apps/driver/test/push_test.dart: notifications refused or Firebase not configured: nothing registered, nothing breaks
+00:07 +24: /home/runner/work/bentorm/bentorm/apps/driver/test/delivery_test.dart: switch deliveries on, get a delivery offer, accept it
+00:08 +25: /home/runner/work/bentorm/bentorm/apps/driver/test/onboarding_test.dart: new driver: create an account as a driver, then sees what is blocking them
+00:08 +26: /home/runner/work/bentorm/bentorm/apps/driver/test/delivery_test.dart: at the store → store hands over → customer PIN (missing, wrong, right) → delivered
+00:08 +27: /home/runner/work/bentorm/bentorm/apps/driver/test/delivery_test.dart: at the store → store hands over → customer PIN (missing, wrong, right) → delivered
+00:09 +28: /home/runner/work/bentorm/bentorm/apps/driver/test/delivery_test.dart: at the store → store hands over → customer PIN (missing, wrong, right) → delivered
+00:09 +29: /home/runner/work/bentorm/bentorm/apps/driver/test/onboarding_test.dart: account screen: add the vehicle with seats, luggage and features
+00:09 +30: /home/runner/work/bentorm/bentorm/apps/driver/test/onboarding_test.dart: account screen: add the vehicle with seats, luggage and features
+00:10 +31: /home/runner/work/bentorm/bentorm/apps/driver/test/onboarding_test.dart: documents: upload a photo with number and expiry for review
+00:10 +32: All tests passed!
