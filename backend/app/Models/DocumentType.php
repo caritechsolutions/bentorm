@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class DocumentType extends Model
 {
     protected $fillable = [
-        'key', 'name', 'description', 'applies_to', 'service_area_id', 'is_required', 'requires_expiry',
+        'key', 'name', 'description', 'applies_to', 'service_area_id', 'shop_category_id', 'is_required', 'requires_expiry',
         'requires_number', 'is_image_only', 'visible_to_riders', 'sort_order', 'is_active',
     ];
 

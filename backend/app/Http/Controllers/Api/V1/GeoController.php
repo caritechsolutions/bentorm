@@ -41,7 +41,7 @@ class GeoController extends Controller
     /** GET /vehicle-types?service_area_id= — types with an active rate card in the area (or all). */
     public function vehicleTypes(Request $request): AnonymousResourceCollection
     {
-        $q = VehicleType::query()->where('is_active', true)->orderBy('sort_order');
+        $q = VehicleType::query()->rides()->where('is_active', true)->orderBy('sort_order');
         if ($areaId = $request->integer('service_area_id')) {
             $q->whereIn('key', FareConfig::query()->where('service_area_id', $areaId)->where('is_active', true)->pluck('vehicle_type'));
         }

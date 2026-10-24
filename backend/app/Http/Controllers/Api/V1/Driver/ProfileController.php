@@ -73,7 +73,7 @@ class ProfileController extends Controller
             'luggage_capacity' => ['nullable', 'integer', 'min:0', 'max:20'],
             'features' => ['nullable', 'array'],
             'features.*' => ['string', Rule::in(array_keys(config('bentorm.vehicle_features')))],
-            'vehicle_type' => ['required', Rule::exists('vehicle_types', 'key')->where('is_active', true)],
+            'vehicle_type' => ['required', Rule::exists('vehicle_types', 'key')->where('is_active', true)->where('service', 'ride')],
         ]);
         $data['plate'] = strtoupper(preg_replace('/[\s-]+/', '', $data['plate']));
         validator($data, ['plate' => ['unique:vehicles,plate']], ['plate.unique' => 'This plate is already registered.'])->validate();
@@ -101,7 +101,7 @@ class ProfileController extends Controller
             'luggage_capacity' => ['nullable', 'integer', 'min:0', 'max:20'],
             'features' => ['nullable', 'array'],
             'features.*' => ['string', Rule::in(array_keys(config('bentorm.vehicle_features')))],
-            'vehicle_type' => ['sometimes', Rule::exists('vehicle_types', 'key')->where('is_active', true)],
+            'vehicle_type' => ['sometimes', Rule::exists('vehicle_types', 'key')->where('is_active', true)->where('service', 'ride')],
         ]);
         if ($request->user()->driverProfile?->is_online && $request->user()->driverProfile->current_vehicle_id === $vehicle->id) {
             abort(409, 'Go offline before editing your current vehicle.');

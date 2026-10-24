@@ -52,7 +52,7 @@ class Document extends Model
         return match (true) {
             $d instanceof DriverProfile => $d->user_id,
             $d instanceof Vehicle => $d->driver_id,
-            default => null,
+            default => null, // stores: see Store::users()
         };
     }
 }

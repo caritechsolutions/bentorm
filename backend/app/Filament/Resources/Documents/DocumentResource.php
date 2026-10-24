@@ -112,6 +112,7 @@ class DocumentResource extends Resource
         return match (true) {
             $owner instanceof DriverProfile => ($owner->user?->name ?? 'Driver').' · '.($owner->user?->phone ?? ''),
             $owner instanceof Vehicle => "{$owner->plate} · {$owner->make} {$owner->model} (".($owner->driver?->name ?? '?').')',
+            $owner instanceof \App\Models\Store => 'Store · '.$owner->name,
             default => '—',
         };
     }
@@ -123,6 +124,7 @@ class DocumentResource extends Resource
         return match (true) {
             $owner instanceof DriverProfile => \App\Filament\Resources\Drivers\DriverResource::getUrl('view', ['record' => $owner]),
             $owner instanceof Vehicle => \App\Filament\Resources\Vehicles\VehicleResource::getUrl('view', ['record' => $owner]),
+            $owner instanceof \App\Models\Store => \App\Filament\Resources\Stores\StoreResource::getUrl('view', ['record' => $owner]),
             default => null,
         };
     }

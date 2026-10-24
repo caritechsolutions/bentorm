@@ -44,7 +44,7 @@ class PricingService
         $route = $this->distance->route(self::points($pLat, $pLng, $stops, $dLat, $dLng));
 
         $configs = FareConfig::query()->where('service_area_id', $pickup->service->id)->where('is_active', true)->get()->keyBy('vehicle_type');
-        $types = VehicleType::query()->where('is_active', true)->whereIn('key', $configs->keys())
+        $types = VehicleType::query()->rides()->where('is_active', true)->whereIn('key', $configs->keys())
             ->where('max_passengers', '>=', $passengers)->where('max_luggage', '>=', $luggage)
             ->orderBy('sort_order')->get();
 
@@ -64,7 +64,7 @@ class PricingService
         [$pickup, $dropoff] = $this->geo->assertTripAllowed($pLat, $pLng, $dLat, $dLng);
         $this->geo->assertStopsAllowed($pickup, $stops);
 
-        $type = VehicleType::query()->where('key', $vehicleType)->where('is_active', true)->first();
+        $type = VehicleType::query()->rides()->where('key', $vehicleType)->where('is_active', true)->first();
         if (! $type) {
             throw ValidationException::withMessages(['vehicle_type' => ['Unknown vehicle type.']]);
         }

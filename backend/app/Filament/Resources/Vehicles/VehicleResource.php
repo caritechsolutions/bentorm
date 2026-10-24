@@ -56,7 +56,7 @@ class VehicleResource extends Resource
                 TextInput::make('model')->required(),
                 TextInput::make('year')->numeric()->minValue(1990)->maxValue(now()->year + 1),
                 TextInput::make('colour'),
-                Select::make('vehicle_type')->label('Type')->required()->options(fn () => VehicleType::query()->orderBy('sort_order')->pluck('name', 'key')),
+                Select::make('vehicle_type')->label('Type')->required()->options(fn () => VehicleType::query()->rides()->orderBy('sort_order')->pluck('name', 'key')),
                 TextInput::make('seats')->label('Passenger seats')->numeric()->required()->minValue(1)->maxValue(16),
                 TextInput::make('luggage_capacity')->label('Luggage (bags)')->numeric()->required()->minValue(0)->maxValue(20),
                 CheckboxList::make('features')->options(Ui::features())->columns(2)->columnSpanFull(),

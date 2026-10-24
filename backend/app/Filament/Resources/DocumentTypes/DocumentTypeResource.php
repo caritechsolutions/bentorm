@@ -37,8 +37,11 @@ class DocumentTypeResource extends Resource
         return $schema->columns(2)->components([
             TextInput::make('name')->required()->maxLength(128),
             TextInput::make('key')->required()->maxLength(64)->alphaDash()->unique(ignoreRecord: true)->disabledOn('edit'),
-            TextInput::make('description')->label('Instructions for drivers')->maxLength(255)->columnSpanFull(),
-            Radio::make('applies_to')->label('Belongs to')->options(['driver' => 'Driver', 'vehicle' => 'Vehicle'])->inline()->required(),
+            TextInput::make('description')->label('Instructions')->maxLength(255)->columnSpanFull(),
+            Radio::make('applies_to')->label('Belongs to')->options(['driver' => 'Driver', 'vehicle' => 'Vehicle', 'store' => 'Store'])->inline()->required()->live(),
+            Select::make('shop_category_id')->label('Only for stores in')->placeholder('Every store category')
+                ->options(fn () => \App\Models\ShopCategory::query()->orderBy('sort_order')->pluck('name', 'id'))
+                ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => $get('applies_to') === 'store'),
             Select::make('service_area_id')->label('Only in')->placeholder('Every area')
                 ->options(fn () => ServiceArea::query()->where('type', 'service')->pluck('name', 'id')),
             Toggle::make('is_required')->label('Required')->default(true),
@@ -66,7 +69,7 @@ class DocumentTypeResource extends Resource
                 IconColumn::make('visible_to_riders')->label('Rider-visible')->boolean(),
                 IconColumn::make('is_active')->label('Active')->boolean(),
             ])
-            ->filters([SelectFilter::make('applies_to')->options(['driver' => 'Driver', 'vehicle' => 'Vehicle'])])
+            ->filters([SelectFilter::make('applies_to')->options(['driver' => 'Driver', 'vehicle' => 'Vehicle', 'store' => 'Store'])])
             ->recordActions([EditAction::make()]);
     }
 

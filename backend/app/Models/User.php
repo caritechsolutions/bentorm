@@ -6,7 +6,11 @@ use App\Enums\PaymentStatus;
 use App\Enums\TripStatus;
 use App\Enums\UserRole;
 use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -14,7 +18,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-class User extends Authenticatable implements FilamentUser
+class User extends Authenticatable implements FilamentUser, HasTenants
 {
     use HasApiTokens, Notifiable, SoftDeletes;
 
@@ -39,10 +43,37 @@ class User extends Authenticatable implements FilamentUser
         ];
     }
 
-    /** Only active admins may use the web admin panel. */
+    /**
+     * Admin panel: active admins only. Store portal: any active account (one with no store yet is taken
+     * to "Register your store"); each store's data is only reachable by its own members (HasTenants).
+     */
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->isAdmin() && $this->is_active;
+        return match ($panel->getId()) {
+            'store' => (bool) $this->is_active,
+            default => $this->isAdmin() && $this->is_active,
+        };
+    }
+
+    /** Stores this person owns or works at. */
+    public function stores(): BelongsToMany
+    {
+        return $this->belongsToMany(Store::class, 'store_users')->withPivot('role')->withTimestamps();
+    }
+
+    public function getTenants(Panel $panel): Collection
+    {
+        return $this->stores()->orderBy('name')->get();
+    }
+
+    public function canAccessTenant(Model $tenant): bool
+    {
+        return $tenant instanceof Store && $this->stores()->whereKey($tenant->getKey())->exists();
+    }
+
+    public function isStoreOwner(Store $store): bool
+    {
+        return $this->stores()->whereKey($store->getKey())->wherePivot('role', 'owner')->exists();
     }
 
     public function firstName(): string

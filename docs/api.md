@@ -240,3 +240,11 @@ Run the test suite on the server (clones `main` into a temp dir, never touches `
 ```bash
 curl -fsSL "https://raw.githubusercontent.com/caritechsolutions/bentorm/main/scripts/test.sh?$(date +%s)" | sudo bash
 ```
+
+## Shop (phase 1: stores and catalogue)
+
+- **Store portal** at `/store` (same app as the admin panel; optional `STORE_HOST` for a friendly hostname). One login can belong to several stores; every page is scoped to the store in the URL and only its members can open it (Filament tenancy).
+- **Sign-up:** name, mobile, email, password → a code by SMS + email proves the phone → "Register your store" (category, address, map pin, logo). An existing rider account with that phone is reused; admin phones are refused. Log in with phone or email + password; "Forgot password" resets with a code to the phone.
+- **Stores** start `pending`; an admin approves / rejects / suspends them (Shop → Stores). Store documents use the document system (`applies_to = store`, optionally only for one shop category, e.g. the food permit). Customers will only see approved stores that are switched open and within their hours.
+- **Catalogue:** menu sections, products (price, photo, size small/medium/large, options groups with priced choices, sold-out switch). **Staff:** owners add people by mobile; staff manage the catalogue but not settings or staff.
+- **Money settings** (Shop → Fees & commission): commission on items (per-store override), Ride Coop share of the delivery fee, service fee (flat and/or %). Delivery fees come from each area's **Delivery** rate card (vehicle type `delivery`, `service = delivery`, never offered as a ride).

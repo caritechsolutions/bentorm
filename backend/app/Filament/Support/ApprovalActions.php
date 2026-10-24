@@ -79,7 +79,7 @@ final class ApprovalActions
             });
     }
 
-    private static function issuesHtml(array $issues, ?string $extra = null): HtmlString
+    public static function issuesHtml(array $issues, ?string $extra = null): HtmlString
     {
         $html = $issues
             ? '<p style="margin-bottom:.5rem"><strong>Not everything required is approved:</strong></p><ul style="list-style:disc;padding-left:1.25rem">'

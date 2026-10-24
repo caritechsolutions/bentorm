@@ -29,6 +29,9 @@ class ReferenceDataSeeder extends Seeder
         ] as $vt) {
             VehicleType::query()->firstOrCreate(['key' => $vt['key']], $vt);
         }
+        // Prices shop deliveries (store → customer) like a trip; never offered as a ride.
+        VehicleType::query()->firstOrCreate(['key' => 'delivery'], ['service' => 'delivery', 'name' => 'Delivery',
+            'description' => 'Shop orders, store to customer', 'max_passengers' => 0, 'max_luggage' => 0, 'sort_order' => 90]);
 
         // ---------------------------------------------------------------- Barbados
         // Generous outline of the island (sea margin is harmless); refine in the admin map editor.
@@ -59,6 +62,25 @@ class ReferenceDataSeeder extends Seeder
         ] as $type => $rates) {
             FareConfig::query()->firstOrCreate(['service_area_id' => $bb->id, 'vehicle_type' => $type], $rates + ['free_wait_minutes' => 3]);
         }
+        FareConfig::query()->firstOrCreate(['service_area_id' => $bb->id, 'vehicle_type' => 'delivery'], [
+            'base_fare' => 4.00, 'per_km' => 1.50, 'per_minute' => 0.20, 'minimum_fare' => 6.00, 'booking_fee' => 0.00, 'stop_fee' => 0.00,
+            'cancellation_fee' => 0.00, 'wait_per_minute' => 0.25, 'free_wait_minutes' => 5,
+        ]);
+
+        // ---------------------------------------------------------------- shop categories
+        foreach ([
+            ['slug' => 'food', 'name' => 'Food & Restaurants', 'icon' => '🍔', 'description' => 'Meals, snacks and drinks'],
+            ['slug' => 'groceries', 'name' => 'Groceries', 'icon' => '🛒', 'description' => 'Supermarkets and corner shops'],
+            ['slug' => 'pharmacy', 'name' => 'Pharmacy & Health', 'icon' => '💊', 'description' => 'Over-the-counter medicines and personal care'],
+            ['slug' => 'electronics', 'name' => 'Electronics', 'icon' => '📱', 'description' => 'Phones, accessories and gadgets'],
+            ['slug' => 'hardware', 'name' => 'Hardware & Home', 'icon' => '🔧', 'description' => 'Tools, household and garden'],
+            ['slug' => 'fashion', 'name' => 'Fashion', 'icon' => '👕', 'description' => 'Clothes, shoes and accessories'],
+            ['slug' => 'beauty', 'name' => 'Beauty', 'icon' => '💄', 'description' => 'Cosmetics, hair and skin care'],
+            ['slug' => 'gifts', 'name' => 'Gifts & Flowers', 'icon' => '💐', 'description' => 'Flowers, cakes and presents'],
+        ] as $i => $c) {
+            \App\Models\ShopCategory::query()->firstOrCreate(['slug' => $c['slug']], $c + ['sort_order' => $i + 1]);
+        }
+        $food = \App\Models\ShopCategory::query()->where('slug', 'food')->value('id');
 
         // ---------------------------------------------------------------- BB fare rules
         FareRule::query()->firstOrCreate(['service_area_id' => $bb->id, 'name' => 'Airport pickup fee'], [
@@ -85,6 +107,13 @@ class ReferenceDataSeeder extends Seeder
             ['key' => 'vehicle_photo_rear', 'name' => 'Vehicle photo — rear', 'applies_to' => 'vehicle', 'is_image_only' => true, 'sort_order' => 13],
             ['key' => 'vehicle_photo_side', 'name' => 'Vehicle photo — side', 'applies_to' => 'vehicle', 'is_image_only' => true, 'sort_order' => 14],
             ['key' => 'vehicle_photo_interior', 'name' => 'Vehicle photo — interior', 'applies_to' => 'vehicle', 'is_image_only' => true, 'sort_order' => 15],
+            // store
+            ['key' => 'business_registration', 'name' => 'Business registration', 'applies_to' => 'store', 'requires_number' => true, 'sort_order' => 30,
+                'description' => 'Certificate of incorporation or business name registration.'],
+            ['key' => 'vat_certificate', 'name' => 'VAT certificate', 'applies_to' => 'store', 'is_required' => false, 'requires_number' => true, 'sort_order' => 31,
+                'description' => 'If your business is VAT registered.'],
+            ['key' => 'food_handling_permit', 'name' => 'Food handling / health permit', 'applies_to' => 'store', 'shop_category_id' => $food, 'requires_expiry' => true, 'sort_order' => 32,
+                'description' => 'From the Ministry of Health, for businesses that prepare or sell food.'],
             ['key' => 'vehicle_inspection', 'name' => 'Inspection / fitness certificate', 'applies_to' => 'vehicle', 'is_required' => false, 'requires_expiry' => true, 'sort_order' => 16],
         ];
         foreach ($docs as $d) {

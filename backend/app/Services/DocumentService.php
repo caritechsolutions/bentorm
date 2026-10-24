@@ -23,7 +23,7 @@ class DocumentService
     /** @param DriverProfile|Vehicle $owner */
     public function upload(Model $owner, DocumentType $type, UploadedFile $file, ?string $number, ?string $expiresAt, User $by): Document
     {
-        $appliesTo = $owner instanceof Vehicle ? 'vehicle' : 'driver';
+        $appliesTo = $owner instanceof Vehicle ? 'vehicle' : ($owner instanceof \App\Models\Store ? 'store' : 'driver');
         if ($type->applies_to !== $appliesTo) {
             throw ValidationException::withMessages(['document_type' => ["'{$type->name}' is a {$type->applies_to} document."]]);
         }

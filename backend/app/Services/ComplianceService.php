@@ -7,6 +7,7 @@ use App\Enums\DriverStatus;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\DriverProfile;
+use App\Models\Store;
 use App\Models\User;
 use App\Models\Vehicle;
 use Illuminate\Database\Eloquent\Model;
@@ -26,10 +27,13 @@ class ComplianceService
      */
     public function checklist(Model $owner): array
     {
-        $appliesTo = $owner instanceof Vehicle ? 'vehicle' : 'driver';
+        $appliesTo = $owner instanceof Vehicle ? 'vehicle' : ($owner instanceof Store ? 'store' : 'driver');
         $areaId = $owner instanceof Vehicle ? $owner->driver?->driverProfile?->service_area_id : $owner->service_area_id;
 
-        $types = DocumentType::query()->applicable($appliesTo, $areaId)->get();
+        $types = DocumentType::query()->applicable($appliesTo, $areaId)
+            // Store documents can be for one shop category only (e.g. a food-handling permit for restaurants).
+            ->when($owner instanceof Store, fn ($q) => $q->where(fn ($w) => $w->whereNull('shop_category_id')->orWhere('shop_category_id', $owner->shop_category_id)))
+            ->get();
         $docs = $owner->documents()->where('status', '!=', DocumentStatus::Superseded->value)
             ->orderByDesc('id')->get()->groupBy('document_type_id');
 
@@ -62,6 +66,22 @@ class ComplianceService
         }
 
         return array_merge($issues, $this->missing($this->checklist($profile)));
+    }
+
+    /** What's still missing before a store can be approved. @return string[] */
+    public function storeIssues(Store $store): array
+    {
+        $issues = [];
+        if ($store->lat === null || $store->lng === null) {
+            $issues[] = 'Pin the store\'s location on the map.';
+        } elseif (! $store->service_area_id) {
+            $issues[] = 'The store is outside the areas we serve.';
+        }
+        if (! $store->products()->exists()) {
+            $issues[] = 'Add at least one product.';
+        }
+
+        return array_merge($issues, $this->missing($this->checklist($store)));
     }
 
     /** @return string[] */

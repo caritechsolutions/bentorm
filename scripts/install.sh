@@ -10,6 +10,7 @@
 #   API_HOST=api.ridecoop.net   public hostname NPM uses for the API  (sets APP_URL)
 #   WS_HOST=ws.ridecoop.net     public hostname NPM uses for WebSockets (sets REVERB_HOST)
 #   ADMIN_HOST=newadmin.ridecoop.net  public hostname NPM uses for the admin panel (nginx :8082)
+#   STORE_HOST=store.ridecoop.net     optional hostname for the store portal (same :8082, opens /store)
 #   GOOGLE_MAPS_KEY=AIza...      Google Maps Platform key: road distances (Routes API) + address search (Places)
 #   SMTP_HOST, SMTP_PORT (465), SMTP_ENCRYPTION (ssl|tls|none), SMTP_USER, SMTP_PASSWORD, SMTP_FROM, SMTP_FROM_NAME
 #                               email sender for sign-in codes and receipts (stored encrypted in the gateways table)
@@ -132,6 +133,9 @@ set_env DB_PASSWORD "$DB_PASS"
 if [[ -n "${API_HOST:-}" ]]; then
   set_env APP_URL "https://$API_HOST"
 fi
+if [[ -n "${STORE_HOST:-}" ]]; then
+  set_env STORE_HOST "$STORE_HOST"
+fi
 if [[ -n "${ADMIN_HOST:-}" ]]; then
   set_env ADMIN_HOST "$ADMIN_HOST"
 fi
@@ -176,6 +180,8 @@ else
   php artisan migrate --force --no-interaction
 fi
 php artisan db:seed --force --no-interaction
+# Store logos and product photos are public files (storage/app/public → public/storage).
+php artisan storage:link --force --quiet 2>/dev/null || true
 ADMIN_LOGIN=$(php artisan bentorm:admin-password --if-missing 2>&1 || true)
 
 # ---------------------------------------------------------------- gateways (optional, from env)
@@ -260,6 +266,7 @@ echo "  WebSockets  : ws://$IP:$WS_PORT  ($(systemctl is-active bentorm-reverb))
 echo "  Queue       : $(systemctl is-active bentorm-queue)"
 echo "  Scheduler   : $(systemctl is-active bentorm-scheduler)"
 echo "  Admin panel : http://$IP:8082/admin  ($(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8082/admin/login"))${ADMIN_HOST:+  ->  https://$ADMIN_HOST}"
+echo "  Store portal: http://$IP:8082/store  ($(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8082/store/login"))${ADMIN_HOST:+  ->  https://$ADMIN_HOST/store}"
 echo "  Google Maps : $(grep -q '^GOOGLE_MAPS_SERVER_KEY=.\+' "$ENV_FILE" && echo "configured (distance: $(grep '^DISTANCE_PROVIDER=' "$ENV_FILE" | cut -d= -f2))" || echo "not set — pass GOOGLE_MAPS_KEY=... (address search off, straight-line distances)")"
 echo "  SMS         : $(php artisan tinker --execute='$g=app(App\Plugins\PluginManager::class)->gatewayFor(App\Enums\GatewayType::Sms); echo $g ? "{$g->name} ({$g->plugin})".($g->last_test_result ? " - last test {$g->last_test_result}" : "") : "none (codes only in the log)";' 2>/dev/null | tail -1)"
 echo "  Email       : $(php artisan tinker --execute='$g=app(App\Plugins\PluginManager::class)->gatewayFor(App\Enums\GatewayType::Email); echo $g ? "{$g->name} ({$g->plugin})".($g->last_test_result ? " - last test {$g->last_test_result}" : "") : "none";' 2>/dev/null | tail -1)"

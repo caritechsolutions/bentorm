@@ -36,6 +36,7 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make('Operations'),
                 NavigationGroup::make('Drivers'),
                 NavigationGroup::make('Riders & payments'),
+                NavigationGroup::make('Shop'),
                 NavigationGroup::make('Pricing & areas'),
                 NavigationGroup::make('Settings'),
             ])

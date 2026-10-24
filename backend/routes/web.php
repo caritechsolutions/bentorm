@@ -4,13 +4,18 @@ use App\Models\Document;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 
-Route::get('/', fn () => request()->getHost() === config('bentorm.admin_host')
-    ? redirect('/admin')
-    : response()->json(['service' => 'bentorm-api', 'health' => '/api/v1/health']));
+Route::get('/', fn () => match (request()->getHost()) {
+    config('bentorm.admin_host') => redirect('/admin'),
+    config('bentorm.store_host') => redirect('/store'),
+    default => response()->json(['service' => 'bentorm-api', 'health' => '/api/v1/health']),
+});
 
 // Private document files for the admin panel (session auth; the apps use /api/v1/files/documents/{id}).
 Route::middleware(['web', 'auth'])->get('/admin-files/documents/{document}', function (Document $document) {
-    abort_unless(auth()->user()?->isAdmin(), 403);
+    $user = auth()->user();
+    // Admins see every document; store staff see their own store's.
+    $own = $document->documentable instanceof App\Models\Store && $user?->canAccessTenant($document->documentable);
+    abort_unless($user?->isAdmin() || $own, 403);
     abort_unless(Storage::disk($document->disk)->exists($document->path), 404);
 
     return Storage::disk($document->disk)->response($document->path, $document->original_name, [
