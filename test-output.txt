@@ -1,0 +1,39 @@
+00:00 +0: loading /home/runner/work/bentorm/bentorm/apps/rider/test/features_test.dart
+00:00 +0: /home/runner/work/bentorm/bentorm/apps/rider/test/features_test.dart: book later from a saved place, with a promo code and ride credit
+00:01 +1: /home/runner/work/bentorm/bentorm/apps/rider/test/shop_test.dart: shop: store → options → cart → checkout → order placed → store accepts
+00:01 +2: /home/runner/work/bentorm/bentorm/apps/rider/test/features_test.dart: during a ride: message the driver, share the trip, SOS
+00:01 +3: /home/runner/work/bentorm/bentorm/apps/rider/test/features_test.dart: during a ride: message the driver, share the trip, SOS
+00:01 +4: /home/runner/work/bentorm/bentorm/apps/rider/test/shop_test.dart: cancel before the store answers releases the card
+00:01 +5: /home/runner/work/bentorm/bentorm/apps/rider/test/features_test.dart: video call the driver in the app; it connects and ends
+00:01 +6: /home/runner/work/bentorm/bentorm/apps/rider/test/shop_test.dart: a card needing 3-D Secure opens the bank page
+00:02 +7: /home/runner/work/bentorm/bentorm/apps/rider/test/shop_test.dart: a card needing 3-D Secure opens the bank page
+00:02 +8: /home/runner/work/bentorm/bentorm/apps/rider/test/features_test.dart: features the admin turned off are hidden
+00:02 +9: /home/runner/work/bentorm/bentorm/apps/rider/test/shop_test.dart: below the minimum order: the server reason shows and ordering is blocked
+00:02 +10: /home/runner/work/bentorm/bentorm/apps/rider/test/features_test.dart: invite friends, ride credit and saved places from the menu
+00:02 +11: /home/runner/work/bentorm/bentorm/apps/rider/test/features_test.dart: invite friends, ride credit and saved places from the menu
+00:02 +12: /home/runner/work/bentorm/bentorm/apps/rider/test/shop_test.dart: delivery: driver assigned (PIN, call) → on the way → delivered
+00:02 +13: /home/runner/work/bentorm/bentorm/apps/rider/test/shop_test.dart: delivery: driver assigned (PIN, call) → on the way → delivered
+00:02 +14: /home/runner/work/bentorm/bentorm/apps/rider/test/shop_test.dart: no driver for a long time: the customer is told and may cancel
+00:03 +15: /home/runner/work/bentorm/bentorm/apps/rider/test/stops_pin_test.dart: book with a stop: the fare includes it, and the PIN shows once a driver accepts
+00:03 +16: /home/runner/work/bentorm/bentorm/apps/rider/test/stops_pin_test.dart: book with a stop: the fare includes it, and the PIN shows once a driver accepts
+00:03 +17: /home/runner/work/bentorm/bentorm/apps/rider/test/stops_pin_test.dart: book with a stop: the fare includes it, and the PIN shows once a driver accepts
+00:03 +18: /home/runner/work/bentorm/bentorm/apps/rider/test/stops_pin_test.dart: book with a stop: the fare includes it, and the PIN shows once a driver accepts
+00:04 +19: /home/runner/work/bentorm/bentorm/apps/rider/test/stops_pin_test.dart: book with a stop: the fare includes it, and the PIN shows once a driver accepts
+00:04 +20: /home/runner/work/bentorm/bentorm/apps/rider/test/stops_pin_test.dart: remove a stop before booking
+00:04 +21: /home/runner/work/bentorm/bentorm/apps/rider/test/login_test.dart: first screen offers Create an account and Sign in
+00:05 +22: /home/runner/work/bentorm/bentorm/apps/rider/test/stops_pin_test.dart: add a stop mid-ride: waits for the driver, who declines
+00:05 +23: /home/runner/work/bentorm/bentorm/apps/rider/test/login_test.dart: create an account: name + email + phone → code by SMS and email → signed in
+00:05 +24: /home/runner/work/bentorm/bentorm/apps/rider/test/login_test.dart: create an account: name + email + phone → code by SMS and email → signed in
+00:05 +25: /home/runner/work/bentorm/bentorm/apps/rider/test/login_test.dart: create an account: name + email + phone → code by SMS and email → signed in
+00:05 +26: /home/runner/work/bentorm/bentorm/apps/rider/test/login_test.dart: create an account: name + email + phone → code by SMS and email → signed in
+00:05 +27: /home/runner/work/bentorm/bentorm/apps/rider/test/login_test.dart: sign in: registered number gets a code straight away
+00:05 +28: /home/runner/work/bentorm/bentorm/apps/rider/test/login_test.dart: sign in with an unknown number moves to create an account, keeping the number
+00:05 +29: /home/runner/work/bentorm/bentorm/apps/rider/test/login_test.dart: create an account for a number that already has one just signs in
+00:05 +30: /home/runner/work/bentorm/bentorm/apps/rider/test/login_test.dart: email already used shows the server message
+00:06 +31: /home/runner/work/bentorm/bentorm/apps/rider/test/booking_test.dart: book a cash ride: search → quotes → request → driver → complete → rate
+00:06 +32: /home/runner/work/bentorm/bentorm/apps/rider/test/booking_test.dart: book a cash ride: search → quotes → request → driver → complete → rate
+00:06 +33: /home/runner/work/bentorm/bentorm/apps/rider/test/booking_test.dart: book a cash ride: search → quotes → request → driver → complete → rate
+00:06 +34: /home/runner/work/bentorm/bentorm/apps/rider/test/booking_test.dart: drop-off outside the service area shows the reason
+00:07 +35: /home/runner/work/bentorm/bentorm/apps/rider/test/booking_test.dart: cancel while searching is free and confirmed
+00:07 +36: /home/runner/work/bentorm/bentorm/apps/rider/test/booking_test.dart: an active trip is resumed on launch
+00:07 +37: All tests passed!

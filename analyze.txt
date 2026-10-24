@@ -1,0 +1,32 @@
+Analyzing rider...                                              
+
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:21:48 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:21:80 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:29:7 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:35:90 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:60:9 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:89:9 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:96:9 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:106:80 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:117:9 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:132:85 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:153:61 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:174:56 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:207:9 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:223:9 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:247:9 • use_null_aware_elements
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/history_screen.dart:65:33 • unnecessary_underscores
+   info • Statements in an if should be enclosed in a block. Try wrapping the statement in a block • lib/screens/shop/order_screen.dart:64:36 • curly_braces_in_flow_control_structures
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/shop/orders_screen.dart:64:35 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/shop/shop_widgets.dart:77:98 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/shop/shop_widgets.dart:77:102 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/shop/store_screen.dart:89:109 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/shop/store_screen.dart:89:113 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/shop/store_screen.dart:235:109 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/shop/store_screen.dart:235:113 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/upcoming_screen.dart:50:43 • unnecessary_underscores
+   info • 'getToken' is deprecated and shouldn't be used. Use register() and onRegistered instead. Try replacing the use of the deprecated member with the replacement • lib/state/push.dart:127:57 • deprecated_member_use
+   info • 'onTokenRefresh' is deprecated and shouldn't be used. Use onRegistered instead. Try replacing the use of the deprecated member with the replacement • lib/state/push.dart:130:65 • deprecated_member_use
+   info • 'deleteToken' is deprecated and shouldn't be used. Use unregister() and onUnregistered instead. Try replacing the use of the deprecated member with the replacement • lib/state/push.dart:163:60 • deprecated_member_use
+
+28 issues found. (ran in 5.6s)
