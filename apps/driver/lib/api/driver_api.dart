@@ -105,6 +105,11 @@ class DriverApi extends AuthApi {
   Future<DriverTrip> start(String tripId, String pin) async =>
       DriverTrip.fromJson(_map(await client.post('/driver/trips/$tripId/start', {'pin': pin})));
 
+  /// Can this destination use in-app navigation? [check] only asks; without it an allowed start is counted
+  /// (billed per destination). False → open the Google Maps app instead.
+  Future<bool> navigation(String tripId, String destination, {bool check = false}) async =>
+      _map(await client.post('/driver/trips/$tripId/navigation', {'destination': destination, if (check) 'check': true}))['in_app'] == true;
+
   Future<DriverTrip> acceptStops(String tripId) async => DriverTrip.fromJson(_map(await client.post('/driver/trips/$tripId/stops/accept')));
 
   Future<DriverTrip> declineStops(String tripId) async => DriverTrip.fromJson(_map(await client.post('/driver/trips/$tripId/stops/decline')));

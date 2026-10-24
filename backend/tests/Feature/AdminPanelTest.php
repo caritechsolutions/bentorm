@@ -68,7 +68,7 @@ class AdminPanelTest extends TestCase
             '/admin/trips', "/admin/trips/{$trip->public_id}", '/admin/payments', '/admin/users', "/admin/users/{$admin->id}/edit",
             '/admin/service-areas', "/admin/service-areas/{$bb->id}/edit", '/admin/service-areas/create',
             '/admin/vehicle-types', '/admin/document-types', '/admin/gateways', '/admin/gateways/create', '/admin/gateways/'.\App\Models\Gateway::query()->value('id').'/edit',
-            '/admin/dispatch-settings', '/admin/dispatch-settings/create', '/admin/dispatch-settings/'.\App\Models\DispatchSetting::query()->whereNull('service_area_id')->value('id').'/edit',
+            '/admin/navigation-settings', '/admin/dispatch-settings', '/admin/dispatch-settings/create', '/admin/dispatch-settings/'.\App\Models\DispatchSetting::query()->whereNull('service_area_id')->value('id').'/edit',
         ] as $url) {
             $this->get($url)->assertOk();
         }

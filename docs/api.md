@@ -76,6 +76,7 @@ Google Places, called from the server so the key never ships for search and web 
 | POST | `/driver/vehicles/{id}/select` | | Set current vehicle (must be offline) |
 | POST | `/driver/online` · `/driver/offline` | | Requires approved profile + approved current vehicle |
 | POST | `/driver/location` | `lat, lng, heading?, speed?` | Send every 3–5 s while online. Doubles as heartbeat (90 s TTL). Returns `active_trip` for resync. |
+| POST | `/driver/trips/{id}/navigation` | `destination` (pickup\|stop\|dropoff), `check?` | In-app turn-by-turn gate (admin → Settings → In-app navigation): `{in_app, reason}`; `reason` is `off` or `monthly_limit`. Without `check` an allowed start is counted (one billed Navigation SDK destination). `in_app: false` → open the Google Maps app |
 | GET | `/driver/offers` | | Pending offers (resync after reconnect), each with `distance_m`, `eta_s` (road arrival seconds when the area ranks by arrival, else null) and `estimated_earnings` (ex VAT, after commission) |
 | GET | `/driver/trips` · `/driver/trips/active` · `/driver/trips/{id}` | | `{id}`: a trip this driver was assigned — e.g. to show that the rider cancelled |
 | POST | `/driver/trips/{id}/accept` | | 409 if taken/expired |

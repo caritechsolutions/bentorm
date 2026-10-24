@@ -5,6 +5,7 @@ import 'package:ridecoop_core/ridecoop_core.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api/models.dart';
+import '../navigation/navigation_screen.dart';
 import '../state/scope.dart';
 import '../widgets/driver_map.dart';
 
@@ -16,6 +17,10 @@ class TripScreen extends StatefulWidget {
 
   /// Tests replace this (no browser in tests).
   static Future<bool> Function(Uri url) openUrl = (url) => launchUrl(url, mode: LaunchMode.externalApplication);
+
+  /// Opens in-app navigation (tests replace this: the Navigation SDK needs a real device).
+  static Future<NavOutcome?> Function(BuildContext context, NavTarget target) openInApp = (context, target) =>
+      Navigator.of(context).push<NavOutcome>(MaterialPageRoute(builder: (_) => NavigationScreen(target: target)));
 
   @override
   State<TripScreen> createState() => _TripScreenState();
@@ -75,9 +80,24 @@ class _TripScreenState extends State<TripScreen> {
     }
   }
 
-  Future<void> _navigate(TripStop to) async {
+  /// In-app turn-by-turn when the admin has it on (and under the monthly limit); otherwise the Google Maps app.
+  Future<void> _navigate(TripStop to, String kind, String label) async {
     final url = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${to.lat},${to.lng}&travelmode=driving');
-    await TripScreen.openUrl(url);
+    final api = AppScope.of(context).api;
+    final id = _trip.id;
+    var inApp = false;
+    try {
+      inApp = await api.navigation(id, kind, check: true) && await NavigationScreen.acceptTerms() && await api.navigation(id, kind);
+    } catch (_) {
+      inApp = false; // offline, older server, terms declined: fall back to Google Maps
+    }
+    if (!mounted) return;
+    if (!inApp) {
+      await TripScreen.openUrl(url);
+      return;
+    }
+    final outcome = await TripScreen.openInApp(context, NavTarget(lat: to.lat, lng: to.lng, title: '$label: ${to.address ?? ''}'.trim(), kind: kind));
+    if (outcome == NavOutcome.useExternal) await TripScreen.openUrl(url);
   }
 
   /// Asks for the rider's PIN and starts the trip. The dialog stays open on a wrong PIN.
@@ -206,7 +226,7 @@ class _TripScreenState extends State<TripScreen> {
           _stop(Icons.trip_origin, Brand.blue, 'Pickup', t.pickup.address),
           ..._onward(t),
           const SizedBox(height: 12),
-          OutlinedButton.icon(key: const Key('navigate'), onPressed: () => _navigate(t.pickup), icon: const Icon(Icons.navigation), label: const Text('Navigate to pickup')),
+          OutlinedButton.icon(key: const Key('navigate'), onPressed: () => _navigate(t.pickup, 'pickup', 'Pickup'), icon: const Icon(Icons.navigation), label: const Text('Navigate to pickup')),
           const SizedBox(height: 8),
           FilledButton(key: const Key('arrived'), onPressed: _busy ? null : () => _act(() => AppScope.of(context).api.arrive(t.id)), child: const Text('I\'ve arrived')),
           _cancelButton(),
@@ -237,7 +257,7 @@ class _TripScreenState extends State<TripScreen> {
           if (next != null) ...[
             _stop(Icons.adjust, Colors.orange, 'Stop ${next + 1} of ${t.stops.length}', t.stops[next].address, key: const Key('next-stop')),
             const SizedBox(height: 12),
-            OutlinedButton.icon(key: const Key('navigate'), onPressed: () => _navigate(t.stops[next]), icon: const Icon(Icons.navigation), label: Text('Navigate to stop ${next + 1}')),
+            OutlinedButton.icon(key: const Key('navigate'), onPressed: () => _navigate(t.stops[next], 'stop', 'Stop ${next + 1}'), icon: const Icon(Icons.navigation), label: Text('Navigate to stop ${next + 1}')),
             const SizedBox(height: 8),
             FilledButton(
               key: const Key('reached-stop'),
@@ -254,7 +274,7 @@ class _TripScreenState extends State<TripScreen> {
             for (final s in t.stops) _stop(Icons.check_circle, const Color(0xFF1E9E5A), 'Stop done', s.address),
             _stop(Icons.place, Brand.red, 'Drop-off', t.dropoff.address),
             const SizedBox(height: 12),
-            OutlinedButton.icon(key: const Key('navigate'), onPressed: () => _navigate(t.dropoff), icon: const Icon(Icons.navigation), label: const Text('Navigate to drop-off')),
+            OutlinedButton.icon(key: const Key('navigate'), onPressed: () => _navigate(t.dropoff, 'dropoff', 'Drop-off'), icon: const Icon(Icons.navigation), label: const Text('Navigate to drop-off')),
             const SizedBox(height: 8),
             FilledButton(key: const Key('complete'), onPressed: _busy ? null : _complete, child: const Text('Complete trip')),
           ],

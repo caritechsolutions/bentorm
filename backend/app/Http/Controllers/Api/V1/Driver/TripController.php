@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\TripResource;
 use App\Models\Trip;
 use App\Services\DispatchService;
+use App\Services\NavigationPolicy;
 use App\Services\TripService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,6 +38,20 @@ class TripController extends Controller
         abort_unless($trip->driver_id === $request->user()->id, 404);
 
         return new TripResource($trip->load(['rider', 'vehicle']));
+    }
+
+    /**
+     * POST /driver/trips/{trip}/navigation {destination: pickup|stop|dropoff} — ask before starting in-app
+     * turn-by-turn (billed per destination). {in_app: true} = go ahead (counted); false = open Google Maps.
+     * With check=true it only answers (nothing counted) — the app asks first, then shows Google's terms once.
+     */
+    public function navigation(Request $request, Trip $trip, NavigationPolicy $policy): JsonResponse
+    {
+        abort_unless($trip->driver_id === $request->user()->id && $trip->isActive(), 404);
+        $data = $request->validate(['destination' => ['required', 'in:pickup,stop,dropoff'], 'check' => ['sometimes', 'boolean']]);
+        $reason = ($data['check'] ?? false) ? $policy->blockedReason() : $policy->start($request->user(), $trip, $data['destination']);
+
+        return response()->json(['in_app' => $reason === null, 'reason' => $reason]);
     }
 
     /** POST /driver/trips/{trip}/accept */

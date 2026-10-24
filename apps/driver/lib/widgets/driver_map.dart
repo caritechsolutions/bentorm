@@ -1,15 +1,20 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter/services.dart';
+import 'package:google_navigation_flutter/google_navigation_flutter.dart' as nav;
 
 import 'package:ridecoop_core/ridecoop_core.dart' show Brand;
 
 import '../api/models.dart';
 import '../config.dart';
 
-/// Full-bleed map with pickup and drop-off. [me] (the driver's position, shown by the blue dot) is used to
+/// Full-bleed map with pickup, stops and drop-off. [me] (the driver's position, shown by the blue dot) is used to
 /// frame the camera; it refits when the points change.
+///
+/// Drawn with the Navigation SDK's map view (google_navigation_flutter), not google_maps_flutter: the Navigation
+/// SDK bundles its own Maps SDK and the two can't be linked into one app.
 class DriverMap extends StatefulWidget {
   const DriverMap({
     super.key,
@@ -40,9 +45,9 @@ class DriverMap extends StatefulWidget {
 }
 
 class _DriverMapState extends State<DriverMap> {
-  GoogleMapController? _controller;
+  nav.GoogleMapViewController? _controller;
 
-  static LatLng _ll(LatLngPoint p) => LatLng(p.lat, p.lng);
+  static nav.LatLng _ll(LatLngPoint p) => nav.LatLng(latitude: p.lat, longitude: p.lng);
 
   List<LatLngPoint> get _points => [
         if (widget.pickup != null) widget.pickup!,
@@ -51,13 +56,55 @@ class _DriverMapState extends State<DriverMap> {
         if (widget.me != null) widget.me!,
       ];
 
-  String _signature(DriverMap w) =>
-      [w.pickup, w.dropoff, ...w.stops, w.me, w.center].map((p) => p is LatLngPoint ? '${p.lat},${p.lng}' : '$p').join('|');
+  String _pins(DriverMap w) =>
+      [w.pickup, w.dropoff, ...w.stops, w.route?.length].map((p) => p is LatLngPoint ? '${p.lat},${p.lng}' : '$p').join('|');
+
+  String _camera(DriverMap w) => '${_pins(w)}|${w.me?.lat},${w.me?.lng}|${w.center?.lat},${w.center?.lng}';
 
   @override
   void didUpdateWidget(DriverMap old) {
     super.didUpdateWidget(old);
-    if (_signature(old) != _signature(widget) || old.bottomPadding != widget.bottomPadding) _fit();
+    if (old.bottomPadding != widget.bottomPadding) {
+      _controller?.setPadding(EdgeInsets.only(bottom: widget.bottomPadding, top: 80)).catchError((_) {});
+    }
+    if (_pins(old) != _pins(widget)) _drawPins();
+    if (_camera(old) != _camera(widget) || old.bottomPadding != widget.bottomPadding) _fit();
+  }
+
+  Future<void> _onCreated(nav.GoogleMapViewController c) async {
+    _controller = c;
+    try {
+      await c.setMyLocationEnabled(widget.showMyLocation);
+      await c.settings.setMyLocationButtonEnabled(false);
+    } catch (_) {
+      // Location permission not granted yet; the blue dot appears once it is.
+    }
+    await _drawPins();
+    await _fit();
+  }
+
+  Future<void> _drawPins() async {
+    final c = _controller;
+    if (c == null) return;
+    try {
+      final icons = await _PinIcons.load(MediaQuery.maybeOf(context)?.devicePixelRatio ?? 2);
+      await c.clearMarkers();
+      await c.clearPolylines();
+      await c.addMarkers([
+        if (widget.pickup != null)
+          nav.MarkerOptions(position: _ll(widget.pickup!), icon: icons.pickup, anchor: const nav.MarkerAnchor(u: 0.5, v: 0.5), infoWindow: const nav.InfoWindow(title: 'Pickup')),
+        for (var i = 0; i < widget.stops.length; i++)
+          nav.MarkerOptions(position: _ll(widget.stops[i]), icon: icons.stop, anchor: const nav.MarkerAnchor(u: 0.5, v: 0.5), infoWindow: nav.InfoWindow(title: 'Stop ${i + 1}')),
+        if (widget.dropoff != null)
+          nav.MarkerOptions(position: _ll(widget.dropoff!), icon: icons.dropoff, anchor: const nav.MarkerAnchor(u: 0.5, v: 0.5), infoWindow: const nav.InfoWindow(title: 'Drop-off')),
+      ]);
+      final route = widget.route;
+      if (route != null && route.length >= 2) {
+        await c.addPolylines([nav.PolylineOptions(points: route.map(_ll).toList(), strokeColor: Brand.blue, strokeWidth: 5)]);
+      }
+    } catch (_) {
+      // The view can be torn down mid-update; the next change redraws.
+    }
   }
 
   Future<void> _fit() async {
@@ -68,14 +115,14 @@ class _DriverMapState extends State<DriverMap> {
       if (pts.length >= 2) {
         final lats = pts.map((p) => p.lat);
         final lngs = pts.map((p) => p.lng);
-        final bounds = LatLngBounds(
-          southwest: LatLng(lats.reduce(math.min), lngs.reduce(math.min)),
-          northeast: LatLng(lats.reduce(math.max), lngs.reduce(math.max)),
+        final bounds = nav.LatLngBounds(
+          southwest: nav.LatLng(latitude: lats.reduce(math.min), longitude: lngs.reduce(math.min)),
+          northeast: nav.LatLng(latitude: lats.reduce(math.max), longitude: lngs.reduce(math.max)),
         );
-        await c.animateCamera(CameraUpdate.newLatLngBounds(bounds, 70));
+        await c.animateCamera(nav.CameraUpdate.newLatLngBounds(bounds, padding: 70));
       } else {
         final p = pts.isNotEmpty ? pts.first : widget.center;
-        if (p != null) await c.animateCamera(CameraUpdate.newLatLngZoom(_ll(p), 15));
+        if (p != null) await c.animateCamera(nav.CameraUpdate.newLatLngZoom(_ll(p), 15));
       }
     } catch (_) {
       // Camera updates can fail while the map is still laying out; the next change refits.
@@ -91,51 +138,48 @@ class _DriverMapState extends State<DriverMap> {
         child: const Icon(Icons.map_outlined, size: 64, color: Colors.black26),
       );
     }
-
     final start = widget.pickup ?? widget.center ?? const LatLngPoint(AppConfig.defaultLat, AppConfig.defaultLng);
-    final markers = <Marker>{
-      if (widget.pickup != null)
-        Marker(
-          markerId: const MarkerId('pickup'),
-          position: _ll(widget.pickup!),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-          infoWindow: const InfoWindow(title: 'Pickup'),
-        ),
-      if (widget.dropoff != null)
-        Marker(
-          markerId: const MarkerId('dropoff'),
-          position: _ll(widget.dropoff!),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-          infoWindow: const InfoWindow(title: 'Drop-off'),
-        ),
-      for (var i = 0; i < widget.stops.length; i++)
-        Marker(
-          markerId: MarkerId('stop-$i'),
-          position: _ll(widget.stops[i]),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-          infoWindow: InfoWindow(title: 'Stop ${i + 1}'),
-        ),
-    };
-    final route = widget.route;
-    final polylines = <Polyline>{
-      if (route != null && route.length >= 2)
-        Polyline(polylineId: const PolylineId('route'), points: route.map(_ll).toList(), color: Brand.blue, width: 5),
-    };
-
-    return GoogleMap(
-      initialCameraPosition: CameraPosition(target: _ll(start), zoom: 14),
-      markers: markers,
-      polylines: polylines,
-      myLocationEnabled: widget.showMyLocation,
-      myLocationButtonEnabled: false,
-      zoomControlsEnabled: false,
-      mapToolbarEnabled: false,
-      compassEnabled: false,
-      padding: EdgeInsets.only(bottom: widget.bottomPadding, top: 80),
-      onMapCreated: (c) {
-        _controller = c;
-        _fit();
-      },
+    return nav.GoogleMapsMapView(
+      onViewCreated: _onCreated,
+      initialCameraPosition: nav.CameraPosition(target: _ll(start), zoom: 14),
+      initialZoomControlsEnabled: false,
+      initialMapToolbarEnabled: false,
+      initialCompassEnabled: false,
+      initialPadding: EdgeInsets.only(bottom: widget.bottomPadding, top: 80),
     );
+  }
+}
+
+/// Coloured dots for the pins (the Navigation SDK map has no tinted default markers), drawn once per screen density.
+class _PinIcons {
+  _PinIcons(this.pickup, this.stop, this.dropoff);
+  final nav.ImageDescriptor pickup;
+  final nav.ImageDescriptor stop;
+  final nav.ImageDescriptor dropoff;
+
+  static Future<_PinIcons>? _loading;
+  static double? _ratio;
+
+  static Future<_PinIcons> load(double ratio) {
+    if (_loading != null && _ratio == ratio) return _loading!;
+    _ratio = ratio;
+    return _loading = () async => _PinIcons(
+          await _dot(Brand.blue, ratio),
+          await _dot(Colors.orange, ratio),
+          await _dot(Brand.red, ratio),
+        )();
+  }
+
+  static Future<nav.ImageDescriptor> _dot(Color color, double ratio) async {
+    const logical = 22.0;
+    final px = logical * ratio;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final c = Offset(px / 2, px / 2);
+    canvas.drawCircle(c, px / 2, Paint()..color = Colors.white);
+    canvas.drawCircle(c, px / 2 - 3 * ratio, Paint()..color = color);
+    final image = await recorder.endRecording().toImage(px.ceil(), px.ceil());
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    return nav.registerBitmapImage(bitmap: bytes ?? ByteData(0), imagePixelRatio: ratio, width: logical, height: logical);
   }
 }

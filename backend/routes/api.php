@@ -41,6 +41,8 @@ Route::prefix('v1')->group(function () {
         'address_search' => \App\Services\Google\PlacesService::configured(),
         'app_scheme' => config('bentorm.app_scheme'),
         'otp_length' => 6,
+        // Driver app: show in-app turn-by-turn (each start is still checked with POST /driver/trips/{id}/navigation).
+        'navigation' => ['in_app' => app(\App\Services\NavigationPolicy::class)->blockedReason() === null],
     ]);
     Route::get('service-areas', [GeoController::class, 'serviceAreas']);
     Route::get('geo/check', [GeoController::class, 'check']);
@@ -139,6 +141,7 @@ Route::prefix('v1')->group(function () {
             Route::post('trips/{trip}/stops/{index}/reached', [DriverTripController::class, 'reachStop'])->whereNumber('index');
             Route::post('trips/{trip}/arrive', [DriverTripController::class, 'arrive']);
             Route::post('trips/{trip}/start', [DriverTripController::class, 'start']);
+            Route::post('trips/{trip}/navigation', [DriverTripController::class, 'navigation']);
             Route::post('trips/{trip}/complete', [DriverTripController::class, 'complete']);
             Route::post('trips/{trip}/cancel', [DriverTripController::class, 'cancel']);
         });
