@@ -20,6 +20,8 @@ class AutoSurgeTest extends TestCase
     public function test_busy_area_raises_fares_capped_and_falls_back(): void
     {
         Queue::fake();
+        // Midday: the seeded late-night surge would multiply on top of the automatic one.
+        $this->travelTo(now()->setTime(12, 0));
         $bb = $this->seedReference();
         $driver = $this->makeApprovedDriver($bb);
         $this->mock(DriverLocationService::class, fn (MockInterface $m) => $m->shouldReceive('allLive')->andReturn([['driver_id' => $driver->id, 'state' => 'idle', 'lat' => 13.1, 'lng' => -59.6]]));

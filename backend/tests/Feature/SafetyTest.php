@@ -152,4 +152,22 @@ class SafetyTest extends TestCase
         $this->trip->refresh();
         $this->postJson("/api/v1/trips/{$this->trip->public_id}/calls")->assertForbidden();
     }
+
+    public function test_call_diagnostics_show_what_each_phone_offered_and_turn_test_prints_a_login(): void
+    {
+        config(['bentorm.calls.turn' => ['turn:turn.ridecoop.test:3478?transport=udp'], 'bentorm.calls.turn_secret' => 'secret']);
+        $call = $this->actingAs($this->rider, 'sanctum')->postJson("/api/v1/trips/{$this->trip->public_id}/calls", ['video' => true])->assertCreated()->json();
+        $sdp = "v=0\r\na=candidate:1 1 udp 2122260223 192.168.1.20 50000 typ host\r\na=candidate:2 1 udp 1686052607 200.1.2.3 50000 typ srflx raddr 192.168.1.20 rport 50000\r\n";
+        $this->postJson("/api/v1/calls/{$call['id']}/signal", ['type' => 'offer', 'payload' => ['sdp' => $sdp, 'type' => 'offer']])->assertOk();
+        $this->postJson("/api/v1/calls/{$call['id']}/signal", ['type' => 'candidate', 'payload' => ['candidate' => 'candidate:3 1 udp 41885439 203.0.113.9 49170 typ relay raddr 200.1.2.3 rport 50000', 'sdpMid' => '0']])->assertOk();
+
+        $this->artisan('bentorm:calls')
+            ->expectsOutputToContain('caller: offer ✓ · no answer · host 1 · srflx 1 · prflx 0 · relay 1 (udp)')
+            ->expectsOutputToContain('callee: nothing kept')
+            ->assertSuccessful();
+
+        $this->artisan('bentorm:turn-test')->expectsOutputToContain('check-turn.sh')->expectsOutputToContain('turn.ridecoop.test')->assertSuccessful();
+        config(['bentorm.calls.turn' => []]);
+        $this->artisan('bentorm:turn-test')->assertFailed();
+    }
 }

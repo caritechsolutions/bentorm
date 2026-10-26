@@ -18,7 +18,8 @@
 #                               email sender for sign-in codes and receipts (stored encrypted in the gateways table)
 #   TWILIO_SID, TWILIO_TOKEN [, TWILIO_FROM | TWILIO_MESSAGING_SID]  SMS sender for sign-in codes
 #   TURN_HOST=turn.ridecoop.net  install the call relay (coturn) here for in-app calls; the name must point at this
-#                               server's public IP. Forward UDP+TCP 3478 and UDP 49160-49200 to this server.
+#                               server's public IP. Forward UDP+TCP 3478 and the relay ports (UDP 49160-49660) here.
+#                               TURN_MIN_PORT / TURN_MAX_PORT change the relay port range (about 2 ports per phone per call).
 #                               TURN_PUBLIC_IP=1.2.3.4 if the public IP can't be detected. Re-runs keep the secret.
 #   FIREBASE_CREDENTIALS=/root/firebase.json  Firebase service-account key file, for push notifications
 #                               (stored encrypted in the gateways table; delete the file afterwards)
@@ -229,12 +230,17 @@ if [[ -n "${TURN_HOST:-}" ]] || dpkg -s coturn >/dev/null 2>&1; then
   [[ -z "$TURN_SECRET" ]] && TURN_SECRET=$(rand 'A-Za-z0-9' 40)
   PUBLIC_IP="${TURN_PUBLIC_IP:-$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)}"
   PRIVATE_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+  # Relay ports: each call uses ~2 per phone. Keep the range already forwarded unless a new one is given.
+  OLD_MIN=$(grep -oP '^min-port=\K[0-9]+' /etc/turnserver.conf 2>/dev/null || true)
+  OLD_MAX=$(grep -oP '^max-port=\K[0-9]+' /etc/turnserver.conf 2>/dev/null || true)
+  TURN_MIN_PORT="${TURN_MIN_PORT:-${OLD_MIN:-49160}}"
+  TURN_MAX_PORT="${TURN_MAX_PORT:-${OLD_MAX:-49660}}"
   EXTERNAL="${PUBLIC_IP:+external-ip=$PUBLIC_IP${PRIVATE_IP:+/$PRIVATE_IP}}"
   cat > /etc/turnserver.conf <<TURN
 # Ride Coop call relay — written by scripts/install.sh. The API hands apps short-lived logins (use-auth-secret).
 listening-port=3478
-min-port=49160
-max-port=49200
+min-port=$TURN_MIN_PORT
+max-port=$TURN_MAX_PORT
 fingerprint
 use-auth-secret
 static-auth-secret=$TURN_SECRET
@@ -319,7 +325,7 @@ echo "  Google Maps : $(grep -q '^GOOGLE_MAPS_SERVER_KEY=.\+' "$ENV_FILE" && ech
 echo "  SMS         : $(php artisan tinker --execute='$g=app(App\Plugins\PluginManager::class)->gatewayFor(App\Enums\GatewayType::Sms); echo $g ? "{$g->name} ({$g->plugin})".($g->last_test_result ? " - last test {$g->last_test_result}" : "") : "none (codes only in the log)";' 2>/dev/null | tail -1)"
 echo "  Email       : $(php artisan tinker --execute='$g=app(App\Plugins\PluginManager::class)->gatewayFor(App\Enums\GatewayType::Email); echo $g ? "{$g->name} ({$g->plugin})".($g->last_test_result ? " - last test {$g->last_test_result}" : "") : "none";' 2>/dev/null | tail -1)"
 echo "  Push        : $(php artisan tinker --execute='$g=app(App\Plugins\PluginManager::class)->gatewayFor(App\Enums\GatewayType::Push); echo $g ? "{$g->name} ({$g->plugin})".($g->last_test_result ? " - last test {$g->last_test_result}" : "") : "none (apps must be open to see new rides)";' 2>/dev/null | tail -1)"
-echo "  Call relay  : $(systemctl is-active coturn 2>/dev/null | grep -qx active && echo "coturn active (turn:$(grep '^TURN_URLS=' "$ENV_FILE" | sed -E 's|^TURN_URLS=turn:([^:]+):.*|\1|'):3478) — forward UDP+TCP 3478 and UDP 49160-49200 to $IP" || echo "not installed — pass TURN_HOST=turn.yourdomain to add it (calls still work on most networks)")"
+echo "  Call relay  : $(systemctl is-active coturn 2>/dev/null | grep -qx active && echo "coturn active (turn:$(grep '^TURN_URLS=' "$ENV_FILE" | sed -E 's|^TURN_URLS=turn:([^:]+):.*|\1|'):3478) — forward UDP+TCP 3478 and UDP $(grep -oP '^min-port=\K[0-9]+' /etc/turnserver.conf)-$(grep -oP '^max-port=\K[0-9]+' /etc/turnserver.conf) to $IP" || echo "not installed — pass TURN_HOST=turn.yourdomain to add it (calls still work on most networks)")"
 echo "  Config      : $ENV_FILE"
 echo
 echo "$ADMIN_LOGIN" | sed 's/^/  /'

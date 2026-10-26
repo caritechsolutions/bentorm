@@ -12,7 +12,7 @@ What it simulates (the same calls the apps make):
 ## 1. Make test accounts (on the test server)
 
 ```bash
-cd /var/www/bentorm/backend
+cd /opt/bentorm/backend
 sudo -u www-data php artisan bentorm:loadtest-users --drivers=200 --riders=100
 # tokens are written to storage/app/loadtest-tokens.json — copy that file to the machine running k6
 ```
@@ -43,7 +43,7 @@ k6 prints a summary. It **passes** when:
 | `rider_estimate_ms` p(95) | under 1.5 s (includes the route lookup) |
 
 While it runs, watch the server: `htop` (CPU), `redis-cli info stats`, `mysqladmin processlist`, and
-`sudo tail -f /var/www/bentorm/backend/storage/logs/laravel.log`.
+`sudo tail -f /opt/bentorm/backend/storage/logs/laravel.log`.
 
 ## 4. Clean up
 

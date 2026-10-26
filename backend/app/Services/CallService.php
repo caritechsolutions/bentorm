@@ -94,10 +94,16 @@ class CallService
         abort_unless($call->isLive(), 409, 'This call has ended.');
         $to = $call->otherThan($from);
         $key = "call:{$call->id}:to:{$to}";
-        $list = Cache::get($key, []);
-        $seq = count($list) + 1;
-        $list[] = ['seq' => $seq, 'type' => $type, 'payload' => $payload];
-        Cache::put($key, array_slice($list, -200), now()->addHour());
+        // A phone sends its offer and a burst of candidates at the same moment. Without the lock, parallel requests
+        // read the same list and the last write wins — the offer or candidates vanished and the call never connected.
+        $seq = Cache::lock($key.':lock', 5)->block(5, function () use ($key, $type, $payload) {
+            $list = Cache::get($key, []);
+            $seq = ($list ? end($list)['seq'] : 0) + 1;
+            $list[] = ['seq' => $seq, 'type' => $type, 'payload' => $payload];
+            Cache::put($key, array_slice($list, -200), now()->addHour());
+
+            return $seq;
+        });
         UserSignal::send($to, 'call.signal', ['call_id' => $call->public_id, 'seq' => $seq, 'type' => $type, 'payload' => $payload]);
     }
 

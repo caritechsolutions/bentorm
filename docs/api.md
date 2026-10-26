@@ -307,5 +307,7 @@ Every feature below has an on/off switch (and numbers) in **Admin → Settings �
 | Payouts | Admin → Finance → Payouts; driver page `statement`; store portal → Statement | Ledger: + = Ride Coop owes the driver/store. Record payouts with a reference; CSV export. |
 | Automatic surge | Admin → Settings → Automatic surge | Per area, every minute: demand ÷ free drivers → multiplier (capped), applied to prices quoted for now and locked at request. |
 
+**Checking calls.** On the server: `php artisan bentorm:calls` shows the last calls and, for each phone, whether its offer/answer arrived and which connection candidates it offered (`host`, `srflx`, `relay`; no `relay` = that phone couldn't reach the call relay). Signalling is kept for an hour. `php artisan bentorm:turn-test` prints a 30-minute relay login and the command to run `scripts/check-turn.sh` on a Linux machine outside your network (DNS, UDP/TCP 3478, relay ports, relay-to-relay / hairpin NAT). Relay ports default to UDP 49160–49660 (about 2 per phone per call; `TURN_MIN_PORT` / `TURN_MAX_PORT` in the installer).
+
 **Rate limits.** Each throttled action has its own counter (for example, wrong invite codes never block SOS or a tip). All API calls also share the general limit of 120 a minute per user.
 
