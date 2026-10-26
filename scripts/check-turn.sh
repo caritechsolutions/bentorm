@@ -2,7 +2,7 @@
 # Ride Coop — check the call relay (coturn) from OUTSIDE your network.
 #
 # On the Ride Coop server, get a 30-minute login and the exact command:
-#   cd /opt/bentorm/backend && sudo php artisan bentorm:turn-test
+#   cd /opt/bentorm/backend && sudo -u www-data php artisan bentorm:turn-test
 # Then on any Linux machine outside your network (Ubuntu/Debian, as root):
 #   curl -fsSL ".../scripts/check-turn.sh?$(date +%s)" | sudo bash -s -- turn.ridecoop.net 'USER' 'PASS'
 #
