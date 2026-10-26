@@ -1,0 +1,8 @@
+{
+  "message": "Please settle BBD 5.88 owed on a previous trip first.",
+  "errors": {
+    "payment": [
+      "Please settle BBD 5.88 owed on a previous trip first."
+    ]
+  }
+}

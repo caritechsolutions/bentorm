@@ -33,6 +33,19 @@ class ViewTrip extends ViewRecord
                     Notification::make()->title('Trip cancelled')->success()->send();
                     $this->refreshFormData([]);
                 }),
+            Action::make('paidCash')->label('Mark paid in cash')->icon(Heroicon::OutlinedBanknotes)->color('success')
+                ->visible(fn (Trip $record) => $record->amount_due > 0 && $record->payment_status->value === 'pending')
+                ->modalDescription(fn (Trip $record) => 'The rider paid '.$record->currency.' '.number_format((float) $record->amount_due, 2).' in cash. They can book again straight away.')
+                ->schema([
+                    \Filament\Forms\Components\Radio::make('paid_to')->label('Who took the money?')->required()->default('office')
+                        ->options(['office' => 'Ride Coop (office)', 'driver' => 'The driver — their statement shows they hold it']),
+                    Textarea::make('note')->maxLength(255),
+                ])
+                ->action(function (Trip $record, array $data): void {
+                    app(PaymentService::class)->markPaidInCash($record, auth()->user(), $data['paid_to'], $data['note'] ?? null);
+                    Notification::make()->title('Marked as paid in cash')->success()->send();
+                    $this->refreshFormData([]);
+                }),
             Action::make('waive')->label('Waive amount owed')->icon(Heroicon::OutlinedGift)->color('warning')
                 ->visible(fn (Trip $record) => $record->amount_due > 0 && $record->payment_status->value === 'pending')
                 ->schema([Textarea::make('reason')->required()->maxLength(255)])

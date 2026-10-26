@@ -1,0 +1,15 @@
+{
+  "payment": {
+    "id": "01m5we6af7skmnjr93cys5ph0v",
+    "trip_id": "01m5we6a5c3rc6bxdyrzyv0qrh",
+    "purpose": "cancellation_fee",
+    "method": "card",
+    "amount": 5.88,
+    "currency": "BBD",
+    "status": "captured",
+    "failure_reason": null,
+    "paid_at": "2026-10-26T15:45:15+00:00",
+    "created_at": "2026-10-26T15:45:15+00:00"
+  },
+  "redirect_url": null
+}

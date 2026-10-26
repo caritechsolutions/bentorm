@@ -1,0 +1,16 @@
+{
+  "payment": {
+    "id": "01m5we6adkjfxrhqc3ha33ch22",
+    "trip_id": "01m5we6a5c3rc6bxdyrzyv0qrh",
+    "purpose": "cancellation_fee",
+    "method": "card",
+    "amount": 5.88,
+    "currency": "BBD",
+    "status": "pending",
+    "redirect_url": "http://127.0.0.1:8099/api/v1/payments/test/01m5we6adkjfxrhqc3ha33ch22?expires=1793031315&signature=6183f43133ad3b10a45b0e67a140c7d4667d29ea646838d1d48951f4262e2cb2",
+    "failure_reason": null,
+    "paid_at": null,
+    "created_at": "2026-10-26T15:45:15+00:00"
+  },
+  "redirect_url": "http://127.0.0.1:8099/api/v1/payments/test/01m5we6adkjfxrhqc3ha33ch22?expires=1793031315&signature=6183f43133ad3b10a45b0e67a140c7d4667d29ea646838d1d48951f4262e2cb2"
+}

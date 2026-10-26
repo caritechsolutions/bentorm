@@ -1,0 +1,72 @@
+[
+  {
+    "id": "01m5we6a5c3rc6bxdyrzyv0qrh",
+    "status": "cancelled",
+    "vehicle_type": "standard",
+    "service_area_id": 1,
+    "pickup": {
+      "lat": 13.0969,
+      "lng": -59.6145,
+      "address": "Broad Street, Bridgetown",
+      "zone_id": null
+    },
+    "dropoff": {
+      "lat": 13.0745,
+      "lng": -59.588,
+      "address": "Rockley, Christ Church",
+      "zone_id": null
+    },
+    "stops": [],
+    "stop_change": null,
+    "pin_verified": false,
+    "estimate": {
+      "distance_m": null,
+      "duration_s": null,
+      "fare": 22.0
+    },
+    "actual": {
+      "distance_m": null,
+      "duration_s": null,
+      "wait_s": null,
+      "fare": null,
+      "subtotal": null,
+      "tax": null
+    },
+    "tip": 0.0,
+    "discount": 0.0,
+    "credit": 0.0,
+    "payable": null,
+    "promo_code": null,
+    "use_credit": false,
+    "can_chat": false,
+    "can_call": false,
+    "unread_messages": 0,
+    "can_tip": false,
+    "currency": "BBD",
+    "fare_breakdown": null,
+    "surge_multiplier": 1.0,
+    "payment_method": "cash",
+    "payment_status": "pending",
+    "amount_due": 5.88,
+    "passengers": 1,
+    "luggage": 0,
+    "required_features": [],
+    "hold_amount": null,
+    "payment_action": null,
+    "rider_note": null,
+    "cancelled_by": "rider",
+    "cancellation_reason": null,
+    "cancellation_fee": 5.88,
+    "scheduled_at": null,
+    "timestamps": {
+      "requested_at": "2026-10-26T15:15:15+00:00",
+      "accepted_at": null,
+      "arrived_at": null,
+      "started_at": null,
+      "completed_at": null,
+      "cancelled_at": "2026-10-26T15:20:15+00:00"
+    },
+    "kind": "ride",
+    "delivery": null
+  }
+]

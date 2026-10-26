@@ -327,6 +327,35 @@ class PaymentService
         return $trip;
     }
 
+    /**
+     * The rider paid what they owed in cash — at the office, or to the driver. Recorded as a cash payment; when the
+     * driver took it, their statement shows they hold the money (the cancellation share stays theirs).
+     */
+    public function markPaidInCash(Trip $trip, User $admin, string $paidTo, ?string $note = null): Trip
+    {
+        if ($trip->payment_status !== PaymentStatus::Pending || $trip->amount_due <= 0) {
+            throw ValidationException::withMessages(['trip' => ['Nothing is owed on this trip.']]);
+        }
+        $amount = round((float) $trip->amount_due, 2);
+        DB::transaction(function () use ($trip, $admin, $paidTo, $note, $amount) {
+            Payment::query()->create([
+                'trip_id' => $trip->id, 'user_id' => $trip->rider_id, 'purpose' => $trip->status === TripStatus::Cancelled ? 'cancellation_fee' : 'trip_fare',
+                'method' => PayMethod::Cash->value, 'amount' => $amount, 'captured_amount' => $amount, 'currency' => $trip->currency, 'status' => 'captured',
+            ]);
+            if ($paidTo === 'driver' && $trip->driver_id) {
+                \App\Models\LedgerEntry::query()->create(['payee_type' => 'driver', 'payee_id' => $trip->driver_id, 'kind' => 'cash_collected',
+                    'amount' => -$amount, 'currency' => $trip->currency ?: 'BBD', 'trip_id' => $trip->id,
+                    'description' => sprintf('Cash %.2f you collected from %s for a %s', $amount, $trip->rider?->firstName() ?? 'the rider',
+                        $trip->status === TripStatus::Cancelled ? 'cancelled ride' : 'ride')]);
+            }
+            $trip->forceFill(['payment_status' => PaymentStatus::Paid, 'amount_due' => 0])->save();
+            Log::info('Amount owed paid in cash', ['trip' => $trip->public_id, 'admin' => $admin->id, 'paid_to' => $paidTo, 'note' => $note]);
+        });
+        event(new TripUpdated($trip));
+
+        return $trip;
+    }
+
     public function refund(Payment $payment, ?float $amount = null): Payment
     {
         $captured = (float) ($payment->captured_amount ?? $payment->amount);

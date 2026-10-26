@@ -13,6 +13,7 @@ import 'history_screen.dart';
 import 'places_screen.dart';
 import 'rewards_screens.dart';
 import 'search_screen.dart';
+import 'shop/checkout_screen.dart';
 import 'shop/order_screen.dart';
 import 'shop/orders_screen.dart';
 import 'shop/shop_screen.dart';
@@ -27,7 +28,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   LatLngPoint? _me;
   Place? _pickup;
   Place? _dropoff;
@@ -50,6 +51,96 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _promo; // checked code, sent with the estimate and the request
   bool _useCredit = false;
   double _creditBalance = 0;
+  List<Trip> _owed = const []; // e.g. a cancellation fee on a cash ride: blocks new bookings until paid
+  bool _paying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Back from the bank's card page: see whether it's paid.
+    if (state == AppLifecycleState.resumed && _owed.isNotEmpty) _loadOwed();
+  }
+
+  Future<void> _loadOwed() async {
+    try {
+      final owed = await AppScope.of(context).api.outstanding();
+      if (mounted) setState(() => _owed = owed);
+    } on ApiException {
+      // Not essential: booking still says what's owed.
+    }
+  }
+
+  /// Pay what's owed: a saved card at once, or the card page (any card).
+  Future<void> _payOwed(Trip t) async {
+    final api = AppScope.of(context).api;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text('Pay ${money(t.amountDue, t.currency)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(_owedReason(t), style: const TextStyle(color: Colors.black54)),
+          ),
+          for (final c in _cards)
+            ListTile(
+              key: Key('pay-owed-card-${c.id}'),
+              leading: const Icon(Icons.credit_card),
+              title: Text(c.label),
+              onTap: () => Navigator.pop(ctx, c.id),
+            ),
+          ListTile(
+            key: const Key('pay-owed-page'),
+            leading: const Icon(Icons.lock_outline),
+            title: Text(_cards.isEmpty ? 'Pay by card' : 'Pay with another card'),
+            subtitle: const Text('Opens the secure card page'),
+            onTap: () => Navigator.pop(ctx, '_page'),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: Text('Paid in cash already? Contact Ride Coop support and we\'ll clear it.', style: TextStyle(color: Colors.black54, fontSize: 13)),
+          ),
+        ]),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    setState(() => _paying = true);
+    try {
+      final url = await api.payOutstanding(t.id, cardId: choice == '_page' ? null : choice);
+      if (url != null) {
+        await CheckoutScreen.openUrl(Uri.parse(url));
+      } else if (mounted) {
+        _snack('Paid — thank you. You can book again.');
+      }
+      await _loadOwed();
+    } on ApiException catch (e) {
+      if (mounted) _snack(e.status == 402 ? 'The card was declined. Try another card.' : e.message);
+    } finally {
+      if (mounted) setState(() => _paying = false);
+    }
+  }
+
+  String _owedReason(Trip t) {
+    final d = t.requestedAt;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final when = d == null ? '' : ' on ${d.day} ${months[d.month - 1]}';
+    return t.status == 'cancelled' ? 'Cancellation fee for the ride you cancelled$when, after a driver was on the way.' : 'Unpaid fare for your ride$when.';
+  }
 
   @override
   void didChangeDependencies() {
@@ -75,6 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadOrders();
     _loadPlaces();
     _loadCredit();
+    _loadOwed();
     final me = await scope.location.current();
     if (!mounted) return;
     final point = me ?? const LatLngPoint(AppConfig.defaultLat, AppConfig.defaultLng);
@@ -241,7 +333,8 @@ class _HomeScreenState extends State<HomeScreen> {
       await _openTrip(trip);
     } on ApiException catch (e) {
       if (!mounted) return;
-      _snack(e.status == 402 ? e.message : (e.field('scheduled_at') ?? e.field('promo_code') ?? e.field('vehicle_type') ?? e.field('passengers') ?? e.field('luggage') ?? e.field('pickup') ?? e.field('dropoff') ?? e.message));
+      if (e.field('payment') != null) _loadOwed();
+      _snack(e.status == 402 ? e.message : (e.field('payment') ?? e.field('scheduled_at') ?? e.field('promo_code') ?? e.field('vehicle_type') ?? e.field('passengers') ?? e.field('luggage') ?? e.field('pickup') ?? e.field('dropoff') ?? e.message));
     } finally {
       if (mounted) setState(() => _requesting = false);
     }
@@ -262,6 +355,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     _loadCards();
     _loadCredit();
+    _loadOwed();
   }
 
   /// Now or a time later (within the window the admin set).
@@ -472,6 +566,33 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(width: 8),
             _ModeChip(key: const Key('mode-shop'), icon: Icons.shopping_bag_outlined, label: 'Shop', selected: false, onTap: _openShop),
           ]),
+          for (final t in _owed)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Container(
+                key: const Key('owed-banner'),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: Brand.red.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12), border: Border.all(color: Brand.red)),
+                child: Row(children: [
+                  const Icon(Icons.receipt_long, color: Brand.red),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('You owe ${money(t.amountDue, t.currency)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(_owedReason(t), style: const TextStyle(color: Colors.black54, fontSize: 13)),
+                      const Text('Pay it to book your next ride.', style: TextStyle(color: Colors.black54, fontSize: 13)),
+                    ]),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    key: const Key('pay-owed'),
+                    style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+                    onPressed: _paying ? null : () => _payOwed(t),
+                    child: const Text('Pay now'),
+                  ),
+                ]),
+              ),
+            ),
           for (final o in _orders)
             Padding(
               padding: const EdgeInsets.only(top: 10),

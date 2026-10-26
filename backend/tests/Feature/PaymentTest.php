@@ -250,4 +250,24 @@ class PaymentTest extends TestCase
             ->assertOk()->assertJsonPath('payment_status', 'waived');
         $this->actingAs($this->rider)->getJson('/api/v1/me/outstanding')->assertJsonCount(0);
     }
+
+    public function test_admin_marks_a_cash_cancellation_fee_paid_to_the_driver(): void
+    {
+        $driver = $this->makeApprovedDriver();
+        $trip = $this->owedTrip();
+        $trip->forceFill(['status' => 'cancelled', 'driver_id' => $driver->id, 'final_fare' => null, 'cancellation_fee' => 5.88, 'amount_due' => 5.88,
+            'driver_earnings' => 4.5, 'cancelled_at' => now()])->save();
+        $this->actingAs($this->makeUser('admin'), 'web');
+        \Livewire\Livewire::test(\App\Filament\Resources\Trips\Pages\ViewTrip::class, ['record' => $trip->public_id])
+            ->assertActionVisible('paidCash')
+            ->callAction('paidCash', ['paid_to' => 'driver', 'note' => 'Paid driver at the next pickup'])->assertHasNoActionErrors();
+
+        $trip->refresh();
+        $this->assertSame(['paid', 0.0], [$trip->payment_status->value, $trip->amount_due]);
+        $this->assertDatabaseHas('payments', ['trip_id' => $trip->id, 'method' => 'cash', 'status' => 'captured', 'amount' => 5.88, 'purpose' => 'cancellation_fee']);
+        // The driver holds the 5.88 they collected.
+        $this->assertDatabaseHas('ledger_entries', ['payee_type' => 'driver', 'payee_id' => $driver->id, 'kind' => 'cash_collected', 'amount' => -5.88]);
+        $this->actingAs($this->rider)->getJson('/api/v1/me/outstanding')->assertJsonCount(0);
+        $this->actingAs($this->rider)->postJson('/api/v1/trips', $this->tripPayload(self::BRIDGETOWN, self::OISTINS))->assertCreated();
+    }
 }
