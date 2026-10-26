@@ -129,7 +129,7 @@ Route::post('calls/{call}/{action}', function (\Illuminate\Http\Request $request
     return $calls->toApi($call, $u);
 })->whereIn('action', ['accept', 'decline', 'end', 'phone'])->middleware('throttle:30,1,post-calls-call-action');
 Route::post('calls/{call}/signal', function (\Illuminate\Http\Request $request, \App\Models\Call $call, \App\Services\CallService $calls) {
-    $d = $request->validate(['type' => ['required', 'in:offer,answer,candidate'], 'payload' => ['required', 'array']]);
+    $d = $request->validate(['type' => ['required', 'in:offer,answer,candidate,state'], 'payload' => ['required', 'array']]);
     $calls->signal($call, $request->user(), $d['type'], $d['payload']);
 
     return ['ok' => true];

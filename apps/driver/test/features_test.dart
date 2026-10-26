@@ -140,8 +140,9 @@ void main() {
     await settle(tester, 6);
     expect(server.calls('POST /calls/$cid/accept'), hasLength(1));
     expect(media.calls, ['start video=true', 'offer v=0']);
-    final answer = jsonDecode(server.calls('POST /calls/$cid/signal').first.body) as Map;
-    expect(answer['type'], 'answer');
+    final sent = server.calls('POST /calls/$cid/signal').map((r) => jsonDecode(r.body) as Map).toList();
+    expect(sent.where((m) => m['type'] == 'answer'), hasLength(1), reason: 'the offer is answered once');
+    expect(sent.map((m) => m['payload']['state']).whereType<String>(), containsAll(['media_ok', 'connected']));
     expect(find.byKey(const Key('call-flip')), findsOneWidget, reason: 'camera on');
 
     await tapKey(tester, 'call-end');

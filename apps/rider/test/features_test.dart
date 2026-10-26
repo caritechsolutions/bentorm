@@ -194,7 +194,9 @@ void main() {
     expect(find.byKey(const Key('call-name')), findsOneWidget);
     expect(find.text('Ringing…'), findsOneWidget);
     expect(media.calls.first, 'start video=true');
-    expect(server.calls('POST /calls/$cid/signal').first.body, contains('"type":"offer"'));
+    final sent = server.calls('POST /calls/$cid/signal').map((r) => r.body).toList();
+    expect(sent.where((b) => b.contains('"type":"offer"')), hasLength(1));
+    expect(sent.first, contains('"state":"media_ok"'), reason: 'the phone tells the server its microphone started');
 
     answered = true;
     await settle(tester, 6);

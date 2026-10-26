@@ -273,6 +273,7 @@ class _CallScreenState extends State<CallScreen> {
     _speaker = widget.call.video;
     _media.onCandidate = (c) => _api.signal(_call.id, 'candidate', c).catchError((Object _) {});
     _media.onState = (s) {
+      _report(s);
       if (!mounted) return;
       setState(() {
         if (s == 'connected') {
@@ -305,13 +306,27 @@ class _CallScreenState extends State<CallScreen> {
     super.dispose();
   }
 
+  /// Tells the server how this phone is doing (shown by `artisan bentorm:calls`). Best effort.
+  void _report(String state, [String? detail]) {
+    _api.signal(_call.id, 'state', {'state': state, if (detail != null) 'detail': detail.length > 300 ? detail.substring(0, 300) : detail}).catchError((Object _) {});
+  }
+
   Future<void> _startMedia({required bool asCaller}) async {
     try {
       await _media.start(iceServers: _call.iceServers, video: _camera);
       _started = true;
-      if (asCaller) await _api.signal(_call.id, 'offer', await _media.createOffer());
+      _report('media_ok', _camera ? 'video' : 'audio');
     } catch (e) {
+      _report('media_error', '$e');
       if (mounted) setState(() => _note = 'Allow the microphone${_camera ? ' and camera' : ''} for Ride Coop to talk in the app.');
+      return;
+    }
+    if (asCaller) {
+      try {
+        await _api.signal(_call.id, 'offer', await _media.createOffer());
+      } catch (e) {
+        _report('error', 'offer: $e');
+      }
     }
   }
 
@@ -322,17 +337,22 @@ class _CallScreenState extends State<CallScreen> {
     try {
       final r = await _api.signals(_call.id, _after);
       for (final s in r.signals) {
-        _after = (s['seq'] as num).toInt();
-        if (!_started) continue; // incoming, not accepted yet: the offer is read again after accepting
+        // Not accepted yet (or the camera/mic isn't ready): leave the offer unread; it's read once we're started.
+        if (!_started) break;
         final payload = Map<String, dynamic>.from(s['payload'] as Map);
-        switch (s['type']) {
-          case 'offer':
-            await _api.signal(_call.id, 'answer', await _media.answerOffer(payload));
-          case 'answer':
-            await _media.acceptAnswer(payload);
-          case 'candidate':
-            await _media.addCandidate(payload);
+        try {
+          switch (s['type']) {
+            case 'offer':
+              await _api.signal(_call.id, 'answer', await _media.answerOffer(payload));
+            case 'answer':
+              await _media.acceptAnswer(payload);
+            case 'candidate':
+              await _media.addCandidate(payload);
+          }
+        } catch (e) {
+          _report('error', '${s['type']}: $e');
         }
+        _after = (s['seq'] as num).toInt();
       }
       if (r.status != _call.status) {
         _call = await _api.get(_call.id);
@@ -359,8 +379,7 @@ class _CallScreenState extends State<CallScreen> {
     try {
       _call = await _api.act(_call.id, 'accept');
       await _startMedia(asCaller: false);
-      _after = 0; // read the offer (and early candidates) again now that we're ready
-      await _tick();
+      await _tick(); // the offer and early candidates were left unread until now
     } on ApiException catch (e) {
       _finish(e.message);
     }

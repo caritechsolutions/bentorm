@@ -161,8 +161,11 @@ class SafetyTest extends TestCase
         $this->postJson("/api/v1/calls/{$call['id']}/signal", ['type' => 'offer', 'payload' => ['sdp' => $sdp, 'type' => 'offer']])->assertOk();
         $this->postJson("/api/v1/calls/{$call['id']}/signal", ['type' => 'candidate', 'payload' => ['candidate' => 'candidate:3 1 udp 41885439 203.0.113.9 49170 typ relay raddr 200.1.2.3 rport 50000', 'sdpMid' => '0']])->assertOk();
 
+        $this->postJson("/api/v1/calls/{$call['id']}/signal", ['type' => 'state', 'payload' => ['state' => 'media_ok', 'detail' => 'video']])->assertOk();
         $this->artisan('bentorm:calls')
+            ->expectsOutputToContain('not answered')
             ->expectsOutputToContain('caller: offer ✓ · no answer · host 1 · srflx 1 · prflx 0 · relay 1 (udp)')
+            ->expectsOutputToContain('phone said: media_ok (video)')
             ->expectsOutputToContain('callee: nothing kept')
             ->assertSuccessful();
 

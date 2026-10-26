@@ -30,6 +30,8 @@ class CallDiagnostics extends Command
             $this->line('');
             $this->line(sprintf('<info>Call %s</info>  %s  %s  %s  status=%s via=%s', $c->public_id, $c->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i:s'),
                 $c->video ? 'video' : 'audio', ($c->caller?->firstName() ?? '?').' → '.($c->callee?->firstName() ?? '?'), $c->status, $c->via ?? 'app'));
+            $this->line('  '.($c->answered_at ? 'answered after '.$c->created_at->diffInSeconds($c->answered_at).' s' : 'not answered')
+                .($c->ended_at ? ', ended after '.$c->created_at->diffInSeconds($c->ended_at).' s' : ''));
             foreach ([[$c->caller_id, $c->callee_id, 'caller'], [$c->callee_id, $c->caller_id, 'callee']] as [$from, $to, $who]) {
                 $msgs = Cache::get("call:{$c->id}:to:{$to}");
                 if ($msgs === null) {
@@ -37,7 +39,11 @@ class CallDiagnostics extends Command
 
                     continue;
                 }
-                $this->line("  {$who}: ".$this->summary($msgs));
+                [$summary, $states] = $this->summary($msgs);
+                $this->line("  {$who}: {$summary}");
+                if ($states) {
+                    $this->line('      phone said: '.implode(' → ', $states));
+                }
             }
         }
         $this->line('');
@@ -46,14 +52,23 @@ class CallDiagnostics extends Command
         return self::SUCCESS;
     }
 
-    /** @param array<int, array{type: string, payload: array}> $msgs */
-    public function summary(array $msgs): string
+    /**
+     * @param  array<int, array{type: string, payload: array}>  $msgs
+     * @return array{0: string, 1: string[]} the summary line and what the phone reported (media_ok, connected, errors…)
+     */
+    public function summary(array $msgs): array
     {
         $types = ['offer' => 0, 'answer' => 0];
         $cands = ['host' => 0, 'srflx' => 0, 'prflx' => 0, 'relay' => 0];
         $relayProto = [];
+        $states = [];
         foreach ($msgs as $m) {
             $lines = [];
+            if ($m['type'] === 'state') {
+                $states[] = ($m['payload']['state'] ?? '?').(isset($m['payload']['detail']) ? ' ('.$m['payload']['detail'].')' : '');
+
+                continue;
+            }
             if (in_array($m['type'], ['offer', 'answer'], true)) {
                 $types[$m['type']]++;
                 preg_match_all('/a=(candidate:[^\r\n]+)/', (string) ($m['payload']['sdp'] ?? ''), $mm);
@@ -78,6 +93,6 @@ class CallDiagnostics extends Command
             $out[] = "{$k} {$v}".($k === 'relay' && $relayProto ? ' ('.implode('/', array_keys($relayProto)).')' : '');
         }
 
-        return implode(' · ', $out);
+        return [implode(' · ', $out), $states];
     }
 }
