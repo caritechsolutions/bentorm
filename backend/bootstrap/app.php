@@ -26,6 +26,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // API has no login page: unauthenticated requests get 401 JSON, never a redirect.
         $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*', 'broadcasting/*') ? null : ($request->is('app/*') ? '/app/signed-out' : '/'));
         $middleware->api(append: [PreserveZeroFraction::class]);
+        // WebRTC call setup (SDP) must keep its trailing CRLF: trimmed, the other phone can't read it
+        // ("SessionDescription is NULL") and the call never connects.
+        $middleware->trimStrings(except: ['payload.*']);
         $middleware->alias([
             'role' => EnsureRole::class,
             'last-seen' => TouchLastSeen::class,

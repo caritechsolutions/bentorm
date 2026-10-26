@@ -173,4 +173,14 @@ class SafetyTest extends TestCase
         config(['bentorm.calls.turn' => []]);
         $this->artisan('bentorm:turn-test')->assertFailed();
     }
+
+    public function test_call_setup_reaches_the_other_phone_byte_for_byte(): void
+    {
+        // Real SDP ends with CRLF; trimming it made Android reject the offer ("SessionDescription is NULL").
+        $sdp = "v=0\r\no=- 1 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=group:BUNDLE 0\r\n";
+        $call = $this->actingAs($this->rider, 'sanctum')->postJson("/api/v1/trips/{$this->trip->public_id}/calls", ['video' => false])->assertCreated()->json();
+        $this->postJson("/api/v1/calls/{$call['id']}/signal", ['type' => 'offer', 'payload' => ['sdp' => $sdp, 'type' => 'offer']])->assertOk();
+        $got = $this->actingAs($this->driver, 'sanctum')->getJson("/api/v1/calls/{$call['id']}/signals")->json('signals.0.payload.sdp');
+        $this->assertSame($sdp, $got);
+    }
 }
