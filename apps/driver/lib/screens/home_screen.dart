@@ -92,10 +92,37 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const Spacer(),
-                  _StatusChip(online: e.online),
+                  _StatusChip(online: e.online, problem: e.connectionProblem),
                 ]),
               ),
             ),
+            if (e.connectionProblem)
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 64, 12, 0),
+                  child: Material(
+                    key: const Key('connection-banner'),
+                    color: Brand.red,
+                    borderRadius: BorderRadius.circular(12),
+                    elevation: 4,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(children: [
+                        const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            e.pingProblem == 'location'
+                                ? 'Not receiving rides — your location is off or unavailable. Turn on location for Ride Coop Driver.'
+                                : 'Not receiving rides — no connection to Ride Coop. Reconnecting…',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  ),
+                ),
+              ),
             Align(
               alignment: Alignment.bottomCenter,
               child: ConstrainedBox(
@@ -221,18 +248,22 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.online});
+  const _StatusChip({required this.online, this.problem = false});
   final bool online;
+
+  /// Online, but the server isn't hearing from this phone.
+  final bool problem;
 
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: online ? const Color(0xFF1E9E5A) : Colors.white,
+          color: problem ? Brand.red : (online ? const Color(0xFF1E9E5A) : Colors.white),
           borderRadius: BorderRadius.circular(20),
           boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
         ),
-        child: Text(online ? 'ONLINE' : 'OFFLINE', style: TextStyle(fontWeight: FontWeight.bold, color: online ? Colors.white : Brand.charcoal)),
+        child: Text(problem ? 'RECONNECTING' : (online ? 'ONLINE' : 'OFFLINE'),
+            key: const Key('status-chip'), style: TextStyle(fontWeight: FontWeight.bold, color: online ? Colors.white : Brand.charcoal)),
       );
 }
 

@@ -1,10 +1,10 @@
 {
-  "id": "01m5q4pa7kh30s6jxr9c9bb1wv",
+  "id": "01m5z33b874eee9bncmq68j59r",
   "status": "accepted",
   "vehicle_type": "standard",
   "service_area_id": 1,
   "rider": {
-    "id": 26,
+    "id": 272,
     "name": "Rita Rider",
     "role": "rider",
     "avatar_url": null
@@ -117,8 +117,8 @@
   "cancellation_fee": 0.0,
   "scheduled_at": null,
   "timestamps": {
-    "requested_at": "2026-10-24T14:23:01+00:00",
-    "accepted_at": "2026-10-24T14:23:02+00:00",
+    "requested_at": "2026-10-27T16:29:07+00:00",
+    "accepted_at": "2026-10-27T16:29:07+00:00",
     "arrived_at": null,
     "started_at": null,
     "completed_at": null,

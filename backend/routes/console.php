@@ -19,3 +19,5 @@ Schedule::call(fn () => app(App\Services\CallService::class)->expireRinging())->
 Schedule::call(fn () => App\Models\TripMessage::query()->where('created_at', '<', now()->subDays(30))->delete())->daily()->name('chat:prune');
 // Automatic surge: requests vs free drivers per area (App features → Automatic surge).
 Schedule::call(fn () => app(App\Services\AutoSurgeService::class)->compute())->everyMinute()->name('surge:auto')->withoutOverlapping();
+// Drivers marked online whose phone went quiet for 10 minutes are set offline (and told by push).
+Schedule::call(fn () => app(App\Services\TripService::class)->expireSilentDrivers())->everyMinute()->name('drivers:expire-silent')->withoutOverlapping();

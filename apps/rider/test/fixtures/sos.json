@@ -1,5 +1,5 @@
 {
-  "alert_id": 2,
+  "alert_id": 4,
   "message": "Ride Coop has been alerted and can see where you are. If you are in danger, call the police now.",
   "emergency_numbers": [
     {
@@ -15,5 +15,5 @@
       "number": "311"
     }
   ],
-  "share_url": "http://127.0.0.1:8099/t/A5UCtCI28QdVXXXDCvBbMmKaAvWWErhE"
+  "share_url": "http://127.0.0.1:8099/t/s53ldFWp5C2nh3ga6FJskrbqRX3z1zvg"
 }

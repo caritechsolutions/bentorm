@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:ridecoop_core/ridecoop_core.dart' show AppPages, CallScreen, ChatScreen, RealtimeEvent, Safety;
+import 'package:ridecoop_core/ridecoop_core.dart' show AppPages, CallScreen, ChatScreen, RealtimeClient, RealtimeEvent, Safety;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api/api_client.dart';
@@ -34,6 +34,9 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
   String? _stopNotice; // the driver's answer to a stop change, until the rider closes it
   double? _tipChoice;
   StreamSubscription<RealtimeEvent>? _live;
+  RealtimeClient? _realtime;
+  TripRoute? _route;
+  String get _channel => 'private-trip.${_trip.id}';
 
   @override
   void initState() {
@@ -42,13 +45,19 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
     _rated = widget.initial.rated;
     _timer = Timer.periodic(widget.pollEvery, (_) => _refresh());
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Live updates: refresh at once when the server says something changed; the poll slows to a safety net.
+      // Live updates: the driver's position arrives on the trip's own channel every few seconds; trip changes and
+      // messages on the rider's channel refresh at once. The poll stays at its normal pace as a safety net.
       final rt = AppScope.of(context).realtime;
-      if (rt?.connected == true && _timer != null && _timer!.isActive) {
-        _timer!.cancel();
-        _timer = Timer.periodic(widget.pollEvery * 3, (_) => _refresh());
-      }
+      _realtime = rt;
+      rt?.join(_channel);
       _live = rt?.events.listen((e) {
+        if (e.name == 'driver.location' && e.channel == _channel) {
+          final lat = (e.data['lat'] as num?)?.toDouble(), lng = (e.data['lng'] as num?)?.toDouble();
+          if (lat != null && lng != null && mounted && _trip.hasDriver) {
+            setState(() => _driver = DriverPosition(lat, lng, (e.data['heading'] as num?)?.toDouble()));
+          }
+          return;
+        }
         if (e.data['trip_id']?.toString() == _trip.id || e.name.startsWith('trip.') || e.name == 'chat.message') _refresh();
       });
       _refresh();
@@ -61,6 +70,7 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _live?.cancel();
+    _realtime?.leave(_channel);
     _comment.dispose();
     super.dispose();
   }
@@ -78,7 +88,8 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
       final before = _trip.stopChange?.status;
       setState(() {
         _trip = snap.trip!;
-        _driver = snap.driverPosition;
+        _driver = snap.driverPosition ?? (_trip.hasDriver && _trip.isActive ? _driver : null);
+        _route = snap.route;
       });
       final after = _trip.stopChange?.status;
       if (before == 'pending' && after != null && after != 'pending' && mounted) {
@@ -88,7 +99,10 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
                 ? 'Your driver couldn\'t change the stops. The ride continues as before.'
                 : null);
       }
-      if (!_trip.isActive && _trip.status != 'scheduled') _timer?.cancel();
+      if (!_trip.isActive && _trip.status != 'scheduled') {
+        _timer?.cancel();
+        _realtime?.leave(_channel);
+      }
     } on ApiException {
       // Keep showing the last known state; the next tick retries.
     }
@@ -179,6 +193,12 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
                 dropoff: LatLngPoint(t.dropoff.lat, t.dropoff.lng),
                 stops: [for (final s in t.remainingStops) s.point],
                 driver: driverPt,
+                driverHeading: t.hasDriver ? _driver?.heading : null,
+                driverVehicleType: t.vehicleType,
+                route: _routeLine(t, driverPt),
+                splitRouteAtDriver: t.status == 'in_progress',
+                pickupLabel: _pickupLabel(t),
+                dropoffLabel: _dropoffLabel(t),
                 bottomPadding: 320,
                 showMyLocation: t.isActive,
               ),
@@ -205,6 +225,45 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+
+  /// The line on the map: the driver's way to you while they're coming, then the ride. Straight when no road route.
+  List<LatLngPoint>? _routeLine(Trip t, LatLngPoint? car) {
+    final r = _route;
+    if (!t.isActive) return null;
+    if (r?.polyline != null && r!.polyline!.length >= 2) return r.polyline;
+    if (car != null && (t.status == 'accepted' || t.status == 'arrived')) return [car, LatLngPoint(t.pickup.lat, t.pickup.lng)];
+    return null;
+  }
+
+  static String _mins(int seconds) => seconds < 90 ? '1 min' : '${(seconds / 60).round()} min';
+
+  String _pickupLabel(Trip t) {
+    final r = _route;
+    if (t.status == 'arrived') return 'Driver here';
+    if (t.status == 'accepted' && r != null && r.phase == 'to_pickup') return 'Pickup · ${_mins(r.durationS)}';
+    return 'Pickup';
+  }
+
+  String _dropoffLabel(Trip t) {
+    final r = _route;
+    if (t.status != 'in_progress' || r == null || r.phase != 'ride' || r.durationS <= 0) return 'Drop-off';
+    // Time left ≈ the share of the route still ahead of the car.
+    final line = r.polyline, car = _driver;
+    var left = r.durationS.toDouble();
+    if (line != null && line.length > 1 && car != null) {
+      var best = 0;
+      var bestD = double.infinity;
+      for (var i = 0; i < line.length; i++) {
+        final d = (line[i].lat - car.lat) * (line[i].lat - car.lat) + (line[i].lng - car.lng) * (line[i].lng - car.lng);
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+        }
+      }
+      left = r.durationS * (1 - best / (line.length - 1));
+    }
+    return 'Drop-off · ${_mins(left.round())}';
   }
 
   List<Widget> _panel(Trip t) {

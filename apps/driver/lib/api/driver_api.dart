@@ -88,15 +88,19 @@ class DriverApi extends AuthApi {
     await client.post('/driver/offline');
   }
 
-  /// Location ping (also the presence heartbeat). Returns the active trip, if any, for resync.
-  Future<DriverTrip?> ping(double lat, double lng, {double? heading, double? speed}) async {
+  /// Location ping (also the presence heartbeat). Returns the active trip, if any, for resync, and whether the
+  /// server has this driver online (null from older servers).
+  Future<({DriverTrip? trip, bool? online})> ping(double lat, double lng, {double? heading, double? speed}) async {
     final r = _map(await client.post('/driver/location', {
       'lat': lat,
       'lng': lng,
       if (heading != null && heading >= 0) 'heading': heading,
       if (speed != null && speed >= 0) 'speed': speed,
     }));
-    return r['active_trip'] is Map<String, dynamic> ? DriverTrip.fromJson(r['active_trip']) : null;
+    return (
+      trip: r['active_trip'] is Map<String, dynamic> ? DriverTrip.fromJson(r['active_trip']) : null,
+      online: r['online'] is bool ? r['online'] as bool : null,
+    );
   }
 
   Future<List<Offer>> offers() async =>

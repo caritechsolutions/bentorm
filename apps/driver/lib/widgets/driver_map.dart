@@ -1,11 +1,10 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:google_navigation_flutter/google_navigation_flutter.dart' as nav;
 
-import 'package:ridecoop_core/ridecoop_core.dart' show Brand;
+import 'package:ridecoop_core/ridecoop_core.dart' show Brand, MapIcon, MapIcons;
 
 import '../api/models.dart';
 import '../config.dart';
@@ -92,11 +91,11 @@ class _DriverMapState extends State<DriverMap> {
       await c.clearPolylines();
       await c.addMarkers([
         if (widget.pickup != null)
-          nav.MarkerOptions(position: _ll(widget.pickup!), icon: icons.pickup, anchor: const nav.MarkerAnchor(u: 0.5, v: 0.5), infoWindow: const nav.InfoWindow(title: 'Pickup')),
+          nav.MarkerOptions(position: _ll(widget.pickup!), icon: icons.pickup, anchor: nav.MarkerAnchor(u: 0.5, v: icons.pickupAnchor), infoWindow: const nav.InfoWindow(title: 'Pickup')),
         for (var i = 0; i < widget.stops.length; i++)
           nav.MarkerOptions(position: _ll(widget.stops[i]), icon: icons.stop, anchor: const nav.MarkerAnchor(u: 0.5, v: 0.5), infoWindow: nav.InfoWindow(title: 'Stop ${i + 1}')),
         if (widget.dropoff != null)
-          nav.MarkerOptions(position: _ll(widget.dropoff!), icon: icons.dropoff, anchor: const nav.MarkerAnchor(u: 0.5, v: 0.5), infoWindow: const nav.InfoWindow(title: 'Drop-off')),
+          nav.MarkerOptions(position: _ll(widget.dropoff!), icon: icons.dropoff, anchor: nav.MarkerAnchor(u: 0.5, v: icons.dropoffAnchor), infoWindow: const nav.InfoWindow(title: 'Drop-off')),
       ]);
       final route = widget.route;
       if (route != null && route.length >= 2) {
@@ -151,11 +150,15 @@ class _DriverMapState extends State<DriverMap> {
 }
 
 /// Coloured dots for the pins (the Navigation SDK map has no tinted default markers), drawn once per screen density.
+/// Pickup / drop-off pins with a label and stop dots (shared drawing in ridecoop_core), registered with the
+/// Navigation SDK once per pixel ratio.
 class _PinIcons {
-  _PinIcons(this.pickup, this.stop, this.dropoff);
+  _PinIcons(this.pickup, this.stop, this.dropoff, this.pickupAnchor, this.dropoffAnchor);
   final nav.ImageDescriptor pickup;
   final nav.ImageDescriptor stop;
   final nav.ImageDescriptor dropoff;
+  final double pickupAnchor;
+  final double dropoffAnchor;
 
   static Future<_PinIcons>? _loading;
   static double? _ratio;
@@ -166,19 +169,13 @@ class _PinIcons {
     return _loading = _build(ratio);
   }
 
-  static Future<_PinIcons> _build(double ratio) async =>
-      _PinIcons(await _dot(Brand.blue, ratio), await _dot(Colors.orange, ratio), await _dot(Brand.red, ratio));
-
-  static Future<nav.ImageDescriptor> _dot(Color color, double ratio) async {
-    const logical = 22.0;
-    final px = logical * ratio;
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    final c = Offset(px / 2, px / 2);
-    canvas.drawCircle(c, px / 2, Paint()..color = Colors.white);
-    canvas.drawCircle(c, px / 2 - 3 * ratio, Paint()..color = color);
-    final image = await recorder.endRecording().toImage(px.ceil(), px.ceil());
-    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-    return nav.registerBitmapImage(bitmap: bytes ?? ByteData(0), imagePixelRatio: ratio, width: logical, height: logical);
+  static Future<_PinIcons> _build(double ratio) async {
+    final p = await MapIcons.labelPin('Pickup', Brand.blue, ratio);
+    final d = await MapIcons.labelPin('Drop-off', Brand.red, ratio);
+    final s = await MapIcons.dot(Colors.orange, ratio, size: 22);
+    return _PinIcons(await _register(p, ratio), await _register(s, ratio), await _register(d, ratio), p.anchorY, d.anchorY);
   }
+
+  static Future<nav.ImageDescriptor> _register(MapIcon icon, double ratio) =>
+      nav.registerBitmapImage(bitmap: ByteData.sublistView(icon.png), imagePixelRatio: ratio, width: icon.width, height: icon.height);
 }

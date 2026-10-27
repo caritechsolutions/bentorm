@@ -1,19 +1,19 @@
 {
   "trip": {
-    "id": "01m5q4pa7kh30s6jxr9c9bb1wv",
+    "id": "01m5z33b874eee9bncmq68j59r",
     "status": "accepted",
     "vehicle_type": "standard",
     "service_area_id": 1,
     "rider": {
-      "id": 26,
+      "id": 272,
       "name": "Rita Rider",
-      "phone": "+12465581710",
-      "email": "feat12465581710@example.com",
+      "phone": "+12465583281",
+      "email": "feat12465583281@example.com",
       "role": "rider",
       "country_code": null,
       "avatar_url": null,
       "is_active": true,
-      "created_at": "2026-10-24T14:23:00+00:00"
+      "created_at": "2026-10-27T16:29:06+00:00"
     },
     "driver": {
       "id": 3,
@@ -27,7 +27,7 @@
         "accepts_deliveries": false,
         "rating_avg": 5.0,
         "rating_count": 13,
-        "completed_trips": 24,
+        "completed_trips": 26,
         "current_vehicle_id": 3,
         "approved_at": "2026-10-24T02:47:04+00:00"
       }
@@ -62,7 +62,7 @@
     },
     "stops": [],
     "stop_change": null,
-    "pin": "0776",
+    "pin": "5492",
     "pin_verified": false,
     "estimate": {
       "distance_m": 4940,
@@ -138,8 +138,8 @@
     "cancellation_fee": 0.0,
     "scheduled_at": null,
     "timestamps": {
-      "requested_at": "2026-10-24T14:23:01+00:00",
-      "accepted_at": "2026-10-24T14:23:02+00:00",
+      "requested_at": "2026-10-27T16:29:07+00:00",
+      "accepted_at": "2026-10-27T16:29:07+00:00",
       "arrived_at": null,
       "started_at": null,
       "completed_at": null,
@@ -150,12 +150,18 @@
     "delivery": null
   },
   "driver_position": {
-    "lat": 13.0975,
-    "lng": -59.615,
-    "heading": 90.0,
+    "lat": 13.099,
+    "lng": -59.612,
+    "heading": 200.0,
     "speed": null,
     "state": "busy",
     "vehicle_type": "standard",
-    "updated_at": 1792851779
+    "updated_at": 1793118547
+  },
+  "route": {
+    "phase": "to_pickup",
+    "polyline": null,
+    "distance_m": 465,
+    "duration_s": 56
   }
 }

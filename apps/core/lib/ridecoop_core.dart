@@ -9,6 +9,7 @@ export 'src/calls.dart';
 export 'src/chat.dart';
 export 'src/incoming_calls.dart';
 export 'src/live.dart';
+export 'src/map_icons.dart';
 export 'src/phone_login_screen.dart';
 export 'src/realtime.dart';
 export 'src/remote_config.dart';

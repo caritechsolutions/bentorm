@@ -1,6 +1,6 @@
 [
   {
-    "id": 3,
+    "id": 7,
     "kind": "home",
     "label": "Home",
     "address": "Rockley, Christ Church",
@@ -9,7 +9,7 @@
     "place_id": null
   },
   {
-    "id": 4,
+    "id": 8,
     "kind": "other",
     "label": "Gym",
     "address": "Warrens, St Michael",

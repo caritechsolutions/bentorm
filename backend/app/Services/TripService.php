@@ -13,6 +13,7 @@ use App\Models\Rating;
 use App\Models\Trip;
 use App\Models\TripLocation;
 use App\Models\User;
+use App\Models\Vehicle;
 use App\Plugins\PluginManager;
 use App\Support\Geo;
 use Illuminate\Support\Facades\DB;
@@ -630,20 +631,58 @@ class TripService
         return $t;
     }
 
-    /** Driver position ping — updates presence and, if on a trip, records and broadcasts it. */
+    /**
+     * Driver position ping — updates presence and, if on a trip, records and broadcasts it.
+     * Every ping re-states the driver's full presence (vehicle type, idle/busy) from the database, so a gap in
+     * pings (no signal, phone asleep) can never leave an online driver invisible to dispatch.
+     */
     public function driverPing(User $driver, float $lat, float $lng, ?float $heading, ?float $speed): ?Trip
     {
-        $this->locations->update($driver, $lat, $lng, $heading, $speed);
-
         $trip = $driver->activeTrip();
+        $profile = $driver->driverProfile;
+        if (! $trip && ! $profile?->is_online) {
+            return null; // offline and not on a job: not dispatchable (the reply tells the app)
+        }
+        $type = $profile?->current_vehicle_id ? Vehicle::query()->whereKey($profile->current_vehicle_id)->value('vehicle_type') : null;
+        $this->locations->update($driver, $lat, $lng, $heading, $speed, $type, $trip ? 'busy' : 'idle');
+
         if ($trip && in_array($trip->status, [TripStatus::Accepted, TripStatus::Arrived, TripStatus::InProgress], true)) {
             if ($trip->status === TripStatus::InProgress) {
                 $this->recordLocation($trip, $lat, $lng, $heading, $speed);
             }
-            event(new DriverLocationUpdated($trip->public_id, $driver->id, $lat, $lng, $heading, $speed));
+            try {
+                event(new DriverLocationUpdated($trip->public_id, $driver->id, $lat, $lng, $heading, $speed));
+            } catch (\Throwable $e) {
+                report($e); // live updates down: the rider's app polls the position instead
+            }
         }
 
         return $trip;
+    }
+
+    /**
+     * Drivers still marked online whose app has gone quiet for $minutes (phone off, app closed): set them offline
+     * so the admin panel and the app tell the truth. The app signs back on by itself if it's still running.
+     */
+    public function expireSilentDrivers(int $minutes = 10): int
+    {
+        $n = 0;
+        $cutoff = now()->subMinutes($minutes)->timestamp;
+        \App\Models\DriverProfile::query()->where('is_online', true)->with('user')->each(function ($p) use (&$n, $cutoff) {
+            if (! $p->user || $this->locations->isOnline($p->user_id) || $p->user->activeTrip()) {
+                return;
+            }
+            $seen = $this->locations->lastSeen($p->user_id);
+            if ($seen !== null && $seen > $cutoff) {
+                return;
+            }
+            $p->forceFill(['is_online' => false])->save();
+            $this->locations->goOffline($p->user);
+            app(PushService::class)->notify($p->user_id, new \App\Support\PushMessage('You\'re offline', 'We lost contact with your phone, so you were set offline. Open Ride Coop Driver to go online again.', ['type' => 'offline']));
+            $n++;
+        });
+
+        return $n;
     }
 
     public function goOnline(User $driver): void

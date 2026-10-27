@@ -26,6 +26,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  # Tests fake the live-updates socket.
+  web_socket_channel: ^3.0.1
 
 flutter:
   uses-material-design: true

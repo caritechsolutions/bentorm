@@ -31,6 +31,14 @@ class DriverEngine extends ChangeNotifier {
   Timer? _offerTimer;
   bool _disposed = false;
 
+  /// Pings in a row that didn't reach the server (no signal, no location). From 3 (~12 s) the app warns the driver.
+  int failedPings = 0;
+  bool get connectionProblem => online && failedPings >= 3;
+
+  /// Why the last pings failed: 'location' or 'network'.
+  String? pingProblem;
+  bool _rejoining = false;
+
   /// Loads the profile, resumes an active trip and an online session after a restart.
   Future<void> load() async {
     await refreshStatus();
@@ -154,6 +162,8 @@ class DriverEngine extends ChangeNotifier {
     status = null;
     online = false;
     toggling = false;
+    failedPings = 0;
+    pingProblem = null;
     blockers = const [];
     offers = const [];
     activeTrip = null;
@@ -179,15 +189,44 @@ class DriverEngine extends ChangeNotifier {
 
   Future<void> _ping() async {
     final fix = await location.current();
-    if (fix == null) return;
+    if (fix == null) {
+      failedPings++;
+      pingProblem = 'location';
+      _notify();
+      return;
+    }
     position = LatLngPoint(fix.lat, fix.lng);
     try {
-      final serverTrip = await api.ping(fix.lat, fix.lng, heading: fix.heading, speed: fix.speed);
-      if (serverTrip != null && activeTrip == null) activeTrip = serverTrip; // resync
+      final r = await api.ping(fix.lat, fix.lng, heading: fix.heading, speed: fix.speed);
+      failedPings = 0;
+      pingProblem = null;
+      if (r.trip != null && activeTrip == null) activeTrip = r.trip; // resync
+      // The server set us offline (the phone was silent for a while) but the driver still wants rides: sign back on.
+      if (r.online == false && online && activeTrip == null) await _rejoin();
     } on ApiException {
-      // Next tick retries.
+      failedPings++;
+      pingProblem = 'network';
     }
     _notify();
+  }
+
+  Future<void> _rejoin() async {
+    if (_rejoining) return;
+    _rejoining = true;
+    try {
+      await api.goOnline();
+      message = 'Connection restored — you\'re online again.';
+    } on ApiException catch (e) {
+      // Can't go online any more (documents expired, account changed): show the truth.
+      online = false;
+      offers = const [];
+      final issues = e.body['issues'];
+      blockers = issues is List ? issues.map((i) => '$i').toList() : const [];
+      message = e.message;
+      if (activeTrip == null) _stopTimers();
+    } finally {
+      _rejoining = false;
+    }
   }
 
   /// A push arrived (or was tapped): don't wait for the next tick.

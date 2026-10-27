@@ -173,4 +173,36 @@ void main() {
     expect(find.textContaining('BBD ${(tipped['tip'] as num).toStringAsFixed(2)} tip from Rita'), findsOneWidget);
     await unmount(tester, app2);
   });
+
+  testWidgets('pings failing shows "not receiving rides"; when the server lost the driver the app signs back on', (tester) async {
+    var reply = fixture('location_online') as Map<String, dynamic>;
+    var failing = false;
+    final server = driverServer()
+      ..on('POST /driver/online', fixture('online'))
+      ..handle('POST /driver/location', (_) => failing ? Reply(500, {'message': 'Server Error'}) : reply);
+    final app = await pumpDriverApp(tester, server);
+    await tapKey(tester, 'go-online');
+    expect(find.text('ONLINE'), findsOneWidget);
+    expect(find.byKey(const Key('connection-banner')), findsNothing);
+
+    // No connection for ~12 s: the driver is told they're not receiving rides.
+    failing = true;
+    await tester.pump(const Duration(seconds: 13));
+    await settle(tester);
+    expect(find.byKey(const Key('connection-banner')), findsOneWidget);
+    expect(find.text('RECONNECTING'), findsOneWidget);
+    expect(find.textContaining('no connection to Ride Coop'), findsOneWidget);
+
+    // Back, but the server had set the driver offline: the app goes online again by itself.
+    failing = false;
+    reply = {...reply, 'online': false, 'active_trip': null};
+    final onlineCalls = server.calls('POST /driver/online').length;
+    await tester.pump(const Duration(seconds: 5));
+    await settle(tester);
+    expect(server.calls('POST /driver/online').length, onlineCalls + 1);
+    expect(find.byKey(const Key('connection-banner')), findsNothing);
+    expect(find.text('ONLINE'), findsOneWidget);
+    expect(find.text('Connection restored — you\'re online again.'), findsOneWidget);
+    await unmount(tester, app);
+  });
 }

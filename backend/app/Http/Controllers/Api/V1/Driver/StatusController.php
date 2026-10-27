@@ -44,6 +44,8 @@ class StatusController extends Controller
 
         return response()->json([
             'ok' => true,
+            // false = the server has this driver offline (e.g. no pings for a long while): the app signs back on.
+            'online' => (bool) $request->user()->driverProfile?->fresh()?->is_online,
             'active_trip' => $trip ? (new TripResource($trip->load(['rider', 'vehicle'])))->resolve($request) : null,
         ]);
     }

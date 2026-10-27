@@ -1,0 +1,10 @@
+{
+  "cars": [
+    {
+      "lat": 13.098,
+      "lng": -59.615,
+      "heading": 90,
+      "vehicle_type": "standard"
+    }
+  ]
+}

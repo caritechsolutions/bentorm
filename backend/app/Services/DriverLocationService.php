@@ -16,9 +16,21 @@ class DriverLocationService
 {
     private const GEO_KEY = 'drivers:geo';
 
-    public function update(User $driver, float $lat, float $lng, ?float $heading = null, ?float $speed = null, ?string $vehicleType = null): void
+    /**
+     * A position ping. With $state, presence is re-stated in full: vehicle type, idle/busy (keeping the time the
+     * driver became idle, for "longest waiting" dispatch) — the ping alone puts a dropped driver back.
+     */
+    public function update(User $driver, float $lat, float $lng, ?float $heading = null, ?float $speed = null, ?string $vehicleType = null, ?string $state = null): void
     {
         $id = (string) $driver->id;
+        if ($state !== null) {
+            $now = array_values((array) Redis::hmget("driver:{$id}", ['state', 'idle_since']));
+            if (($now[0] ?? null) !== $state) {
+                $this->setState($driver, $state);
+            } elseif ($state === 'idle' && ! is_numeric($now[1] ?? null)) {
+                Redis::hset("driver:{$id}", 'idle_since', now()->timestamp);
+            }
+        }
         $hash = [
             'lat' => $lat,
             'lng' => $lng,
@@ -106,8 +118,8 @@ class DriverLocationService
                 continue;
             }
             if (! $this->isOnline($id)) {
-                // Stale entry — clean it up.
-                $this->goOfflineById($id);
+                // No ping for a while: off the map, but keep the record — the next ping puts them straight back.
+                Redis::zrem(self::GEO_KEY, (string) $id);
                 continue;
             }
             $h = array_values((array) Redis::hmget("driver:{$id}", ['state', 'vehicle_type', 'lat', 'lng', 'idle_since']));
@@ -148,10 +160,40 @@ class DriverLocationService
         return $out;
     }
 
-    private function goOfflineById(int $id): void
+    /** Unix time of the driver's last ping, or null if none is known. */
+    public function lastSeen(int $id): ?int
     {
-        Redis::zrem(self::GEO_KEY, (string) $id);
-        Redis::del("driver:{$id}");
+        $t = Redis::hget("driver:{$id}", 'updated_at');
+
+        return is_numeric($t) ? (int) $t : null;
+    }
+
+    /**
+     * Free cars near a point, for the rider's map before booking. Rough positions only (about 100 m), no ids.
+     *
+     * @return array<int, array{lat: float, lng: float, heading: ?float, vehicle_type: ?string}>
+     */
+    public function carsNear(float $lat, float $lng, int $radiusM = 4000, int $limit = 15): array
+    {
+        $raw = Redis::command('georadius', [self::GEO_KEY, $lng, $lat, $radiusM, 'm', ['ASC', 'COUNT' => $limit * 3]]);
+        $out = [];
+        foreach ($raw ?: [] as $member) {
+            $id = (int) (is_array($member) ? $member[0] : $member);
+            if (! $this->isOnline($id)) {
+                continue;
+            }
+            $h = array_values((array) Redis::hmget("driver:{$id}", ['state', 'vehicle_type', 'lat', 'lng', 'heading']));
+            if (($h[0] ?: 'idle') !== 'idle' || ! is_numeric($h[2] ?? null) || ! is_numeric($h[3] ?? null)) {
+                continue;
+            }
+            $out[] = ['lat' => round((float) $h[2], 3), 'lng' => round((float) $h[3], 3),
+                'heading' => is_numeric($h[4] ?? null) ? ((int) round((float) $h[4] / 15) * 15) % 360 : null, 'vehicle_type' => $h[1] ?: null];
+            if (count($out) >= $limit) {
+                break;
+            }
+        }
+
+        return $out;
     }
 
     private function heartbeatTtl(): int

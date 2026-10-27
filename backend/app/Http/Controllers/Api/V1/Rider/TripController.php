@@ -37,7 +37,8 @@ class TripController extends Controller
 
         return response()->json([
             'trip' => (new TripResource($trip))->resolve($request),
-            'driver_position' => $trip->driver_id ? $locations->position($trip->driver_id) : null,
+            'driver_position' => $pos = ($trip->driver_id ? $locations->position($trip->driver_id) : null),
+            'route' => app(\App\Services\TripRouteService::class)->forTrip($trip, $pos),
         ]);
     }
 
@@ -96,7 +97,8 @@ class TripController extends Controller
 
         return response()->json([
             'trip' => (new TripResource($trip))->resolve($request),
-            'driver_position' => $trip->isActive() && $trip->driver_id ? $locations->position($trip->driver_id) : null,
+            'driver_position' => $pos = ($trip->isActive() && $trip->driver_id ? $locations->position($trip->driver_id) : null),
+            'route' => $trip->isActive() ? app(\App\Services\TripRouteService::class)->forTrip($trip, $pos) : null,
         ]);
     }
 

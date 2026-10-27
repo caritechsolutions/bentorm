@@ -99,6 +99,32 @@ class DriverLocationRedisTest extends TestCase
         Redis::connection()->del('driver:9:hb'); // simulate the TTL lapsing
 
         $this->assertSame([], $this->loc->nearbyIdle(13.1, -59.6, 8000, 'standard'));
-        $this->assertNull($this->loc->position($d), 'stale entry cleaned up');
+        $this->assertFalse((bool) Redis::connection()->zscore('drivers:geo', '9'), 'off the map');
+        $this->assertNotNull($this->loc->position($d), 'record kept (vehicle type, state)');
+
+        // The next ping (as TripService sends it: type + state) puts the driver straight back.
+        $this->loc->update($d, 13.1, -59.6, null, null, 'standard', 'idle');
+        $this->assertSame([9], array_column($this->loc->nearbyIdle(13.1, -59.6, 8000, 'standard'), 'driver_id'));
+    }
+
+    public function test_a_ping_restores_a_driver_whose_record_was_lost(): void
+    {
+        $d = $this->driver(11);
+        $this->loc->update($d, 13.1, -59.6, 45.0, null, 'premium', 'idle'); // nothing in Redis before, e.g. after a flush
+        $this->assertSame([11], array_column($this->loc->nearbyIdle(13.1, -59.6, 8000, 'premium'), 'driver_id'));
+        $this->assertNotNull(Redis::connection()->hget('driver:11', 'idle_since'));
+        // Busy on a job, then free again.
+        $this->loc->update($d, 13.1, -59.6, null, null, 'premium', 'busy');
+        $this->assertSame([], $this->loc->nearbyIdle(13.1, -59.6, 8000, 'premium'));
+        $this->loc->update($d, 13.1, -59.6, null, null, 'premium', 'idle');
+        $this->assertCount(1, $this->loc->nearbyIdle(13.1, -59.6, 8000, 'premium'));
+    }
+
+    public function test_cars_near_are_rough_and_anonymous(): void
+    {
+        $this->loc->update($this->driver(21), 13.09812, -59.61437, 93.0, null, 'standard', 'idle');
+        $this->loc->update($this->driver(22), 13.1010, -59.6100, 10.0, null, 'xl', 'busy');
+        $cars = $this->loc->carsNear(13.0969, -59.6145);
+        $this->assertSame([['lat' => 13.098, 'lng' => -59.614, 'heading' => 90, 'vehicle_type' => 'standard']], $cars, 'busy car hidden, ~100 m precision, no id');
     }
 }

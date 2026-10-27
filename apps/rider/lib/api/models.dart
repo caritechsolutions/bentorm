@@ -370,15 +370,38 @@ class DriverPosition {
   factory DriverPosition.fromJson(Map<String, dynamic> j) => DriverPosition(_d(j['lat']), _d(j['lng']), _dn(j['heading']));
 }
 
+/// The road line to draw: the driver's way to the pickup ("to_pickup") or the ride itself ("ride").
+class TripRoute {
+  TripRoute({required this.phase, this.polyline, required this.distanceM, required this.durationS});
+  final String phase;
+
+  /// Null when the server has no road route (then draw a straight line).
+  final List<LatLngPoint>? polyline;
+  final int distanceM;
+  final int durationS;
+
+  static TripRoute? fromJson(dynamic v) {
+    if (v is! Map<String, dynamic>) return null;
+    return TripRoute(
+      phase: _s(v['phase']) ?? 'ride',
+      polyline: v['polyline'] is List ? _l(v['polyline']).whereType<List>().map((p) => LatLngPoint(_d(p[0]), _d(p[1]))).toList() : null,
+      distanceM: _in(v['distance_m']) ?? 0,
+      durationS: _in(v['duration_s']) ?? 0,
+    );
+  }
+}
+
 /// GET /trips/active and GET /trips/{id}.
 class TripSnapshot {
-  TripSnapshot(this.trip, this.driverPosition);
+  TripSnapshot(this.trip, this.driverPosition, [this.route]);
   final Trip? trip;
   final DriverPosition? driverPosition;
+  final TripRoute? route;
 
   factory TripSnapshot.fromJson(Map<String, dynamic> j) => TripSnapshot(
         j['trip'] is Map<String, dynamic> ? Trip.fromJson(j['trip']) : null,
         j['driver_position'] is Map<String, dynamic> ? DriverPosition.fromJson(j['driver_position']) : null,
+        TripRoute.fromJson(j['route']),
       );
 }
 
@@ -516,3 +539,20 @@ class ReferralInfo {
         referredBy: _s(j['referred_by']),
       );
 }
+
+/// A free car shown around the rider before booking (rough position, no driver details).
+class NearbyCar {
+  const NearbyCar(this.lat, this.lng, this.heading, this.vehicleType);
+  final double lat;
+  final double lng;
+  final double? heading;
+  final String? vehicleType;
+
+  factory NearbyCar.fromJson(Map<String, dynamic> j) => NearbyCar(
+        _d(j['lat']),
+        _d(j['lng']),
+        _dn(j['heading']),
+        _s(j['vehicle_type']),
+      );
+}
+

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:ridecoop_core/ridecoop_core.dart' show AppPages;
 
@@ -53,17 +55,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   double _creditBalance = 0;
   List<Trip> _owed = const []; // e.g. a cancellation fee on a cash ride: blocks new bookings until paid
   bool _paying = false;
+  List<NearbyCar> _cars = const [];
+  Timer? _carsTimer;
+  bool _away = false; // a trip or another screen is open: no need to fetch cars
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Free cars around the pickup, refreshed every 15 s while this screen is showing.
+    _carsTimer = Timer.periodic(const Duration(seconds: 15), (_) => _loadCars());
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _carsTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadCars() async {
+    final at = _pickup ?? (_me == null ? null : Place(name: '', lat: _me!.lat, lng: _me!.lng));
+    if (_away || at == null || !mounted) return;
+    final cars = await AppScope.of(context).api.nearbyCars(at.lat, at.lng, vehicleType: _dropoff != null ? _selected : null);
+    if (mounted) setState(() => _cars = cars);
   }
 
   @override
@@ -175,6 +190,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final here = await scope.api.reverse(point.lat, point.lng);
       if (!mounted || _pickup != null) return;
       setState(() => _pickup = here ?? Place(name: me != null ? 'Current location' : 'Bridgetown', lat: point.lat, lng: point.lng));
+      _loadCars();
     }
   }
 
@@ -341,8 +357,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _openTrip(Trip trip) async {
+    _away = true;
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => TripScreen(initial: trip)));
+    _away = false;
     if (!mounted) return;
+    _loadCars();
     // Back from the trip: start fresh from where the rider is.
     setState(() {
       _dropoff = null;
@@ -517,6 +536,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               dropoff: dropPt,
               stops: [for (final s in _stops) LatLngPoint(s.lat, s.lng)],
               route: _estimate?.route?.polyline,
+              cars: _cars,
               center: _me,
               bottomPadding: _dropoff == null ? 220 : 420,
             ),

@@ -34,6 +34,16 @@ class RiderApi extends AuthApi {
   Future<Place> place(String placeId, {String? session}) async =>
       Place.fromJson(await client.get('/places/${Uri.encodeComponent(placeId)}', query: {if (session != null) 'session': session}) as Map<String, dynamic>);
 
+  /// Free cars near a point (rough positions), for the map before booking. Empty when unavailable.
+  Future<List<NearbyCar>> nearbyCars(double lat, double lng, {String? vehicleType}) async {
+    try {
+      final r = await client.get('/drivers/nearby', query: {'lat': '$lat', 'lng': '$lng', if (vehicleType != null) 'vehicle_type': vehicleType});
+      return [for (final c in ((r as Map)['cars'] as List? ?? const [])) NearbyCar.fromJson(Map<String, dynamic>.from(c as Map))];
+    } on ApiException {
+      return const [];
+    }
+  }
+
   /// Named places within ~250 m of a point, nearest first. Empty when search is unavailable.
   Future<List<Place>> nearbyPlaces(double lat, double lng) async {
     try {
