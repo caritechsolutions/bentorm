@@ -178,7 +178,11 @@ void main() {
     var reply = fixture('location_online') as Map<String, dynamic>;
     var failing = false;
     final server = driverServer()
-      ..on('POST /driver/online', fixture('online'))
+      // Like the server: once online again, pings say so.
+      ..handle('POST /driver/online', (_) {
+        reply = {...reply, 'online': true};
+        return fixture('online');
+      })
       ..handle('POST /driver/location', (_) => failing ? Reply(500, {'message': 'Server Error'}) : reply);
     final app = await pumpDriverApp(tester, server);
     await tapKey(tester, 'go-online');
