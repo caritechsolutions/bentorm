@@ -33,7 +33,8 @@ class LedgerService
         if ($t->status === TripStatus::Completed && $t->isDelivery()) {
             $this->once($type, $id, 'delivery', (float) $t->driver_earnings, $cur, "Delivery {$when} (order {$t->order?->number()}){$by}", trip: $t);
             if ($t->tip_amount > 0 && ! $t->tipped_at) {
-                $this->once($type, $id, 'tip', (float) $t->tip_amount, $cur, "Tip at checkout (order {$t->order?->number()}){$by}", trip: $t);
+                [$tt, $ti] = $this->tipPayee($t);
+                $this->once($tt, $ti, 'tip', (float) $t->tip_amount, $cur, "Tip at checkout (order {$t->order?->number()})".($tt === 'fleet' ? $by : ''), trip: $t);
             }
         } elseif ($t->status === TripStatus::Completed && $t->payment_method === PaymentMethod::Cash) {
             // The driver kept the cash; promo/credit the rider didn't pay is Ride Coop's to cover.
@@ -54,7 +55,7 @@ class LedgerService
     public function bookTip(Trip $t, float $amount): void
     {
         if ($t->driver_id && $amount > 0) {
-            [$type, $id] = $this->payee($t);
+            [$type, $id] = $this->tipPayee($t);
             LedgerEntry::query()->create(['payee_type' => $type, 'payee_id' => $id, 'kind' => 'tip', 'amount' => round($amount, 2),
                 'currency' => $t->currency ?: 'BBD', 'trip_id' => $t->id, 'description' => 'Tip from '.($t->rider?->firstName() ?? 'a rider').($type === 'fleet' ? $this->drivenBy($t) : '')]);
         }
@@ -64,6 +65,12 @@ class LedgerService
     public function payee(Trip $t): array
     {
         return $t->fleet_id ? ['fleet', (int) $t->fleet_id] : ['driver', (int) $t->driver_id];
+    }
+
+    /** Tips go to the driver, unless the fleet whose car it was keeps tips (admin setting per fleet). @return array{0: string, 1: int} */
+    public function tipPayee(Trip $t): array
+    {
+        return $t->fleet_id && $t->fleet && ! $t->fleet->tips_to_driver ? ['fleet', (int) $t->fleet_id] : ['driver', (int) $t->driver_id];
     }
 
     private function drivenBy(Trip $t): string

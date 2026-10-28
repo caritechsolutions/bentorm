@@ -3,7 +3,8 @@
     <x-filament::section>
         <div style="font-size:14px;opacity:.7">{{ $b >= 0 ? 'Ride Coop owes you' : 'You owe Ride Coop' }}</div>
         <div style="font-size:32px;font-weight:700">BBD {{ number_format(abs($b), 2) }}</div>
-        <div style="font-size:14px;opacity:.7">What your cars earned (card trips, fees, tips) less Ride Coop's commission on cash trips, less payouts.
+        <div style="font-size:14px;opacity:.7">What your cars earned (card trips, fees{{ $fleet->tips_to_driver ? '' : ', tips' }}) less Ride Coop's commission on cash trips, less payouts.
+            {{ $fleet->tips_to_driver ? 'Riders\' tips go to your drivers.' : 'Riders\' tips are paid to you.' }}
             {{ $fleet->bank_account_number ? 'Paid to '.$fleet->bank_name.' ••••'.substr(preg_replace('/\D/', '', $fleet->bank_account_number), -4).'.' : 'Add your bank account in Fleet settings → Payouts.' }}</div>
     </x-filament::section>
 

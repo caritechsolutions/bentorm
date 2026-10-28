@@ -238,6 +238,9 @@ class FleetPortalTest extends TestCase
         Livewire::test(\App\Filament\Resources\Fleets\RelationManagers\CarsRelationManager::class, ['ownerRecord' => $fleet, 'pageClass' => ViewFleet::class])
             ->assertCanSeeTableRecords([$car]);
         Livewire::test(ViewFleet::class, ['record' => $fleet->id])->callAction('approve')->assertHasNoActionErrors();
+        Livewire::test(\App\Filament\Resources\Fleets\Pages\EditFleet::class, ['record' => $fleet->id])
+            ->assertFormSet(['tips_to_driver' => true])->fillForm(['tips_to_driver' => false])->call('save')->assertHasNoFormErrors();
+        $this->assertFalse($fleet->fresh()->tips_to_driver);
         $this->assertTrue($fleet->fresh()->isApproved());
 
         // The driver's own car is moved into the fleet; they keep driving it as a fleet driver, online throughout.

@@ -160,6 +160,29 @@ class FleetTest extends TestCase
         $this->getJson("/api/v1/driver/trips/{$card->public_id}")->assertJsonPath('earnings_paid_to', 'Island Taxis');
     }
 
+    public function test_tips_go_to_the_driver_unless_the_fleet_keeps_them(): void
+    {
+        $mark = $this->joinedDriver('Mark');
+        $this->actingAs($mark, 'sanctum')->postJson("/api/v1/driver/vehicles/{$this->car->id}/select")->assertOk();
+        $mark = $mark->fresh();
+        $this->assertTrue($this->fleet->fresh()->tips_to_driver, 'default: the driver gets the tips');
+
+        $card = app(TripService::class)->complete($this->ride($mark, 'card'), $mark);
+        $this->actingAs($card->rider, 'sanctum')->postJson("/api/v1/trips/{$card->public_id}/tip", ['amount' => 5])->assertOk();
+        $this->assertSame(5.0, LedgerEntry::balance('driver', $mark->id), 'tip to Mark');
+        $this->assertEqualsWithDelta($card->driver_earnings, LedgerEntry::balance('fleet', $this->fleet->id), 0.001, 'fare to the fleet');
+        $e = $this->actingAs($mark, 'sanctum')->getJson('/api/v1/driver/earnings')->assertOk();
+        $e->assertJsonPath('periods.today.tips', 5.0)->assertJsonPath('periods.today.earnings', 5.0)
+            ->assertJsonPath('fleets.0.periods.today.earnings', (float) $card->driver_earnings);
+
+        // Admin switches this fleet to keep tips: the next tip goes to the fleet.
+        $this->fleet->forceFill(['tips_to_driver' => false])->save();
+        $card2 = app(TripService::class)->complete($this->ride($mark, 'card'), $mark);
+        $this->actingAs($card2->rider, 'sanctum')->postJson("/api/v1/trips/{$card2->public_id}/tip", ['amount' => 3])->assertOk();
+        $this->assertSame(5.0, LedgerEntry::balance('driver', $mark->id));
+        $this->assertEqualsWithDelta($card->driver_earnings + $card2->driver_earnings + 3, LedgerEntry::balance('fleet', $this->fleet->id), 0.001);
+    }
+
     public function test_taking_the_car_away_mid_trip_lets_the_trip_finish_then_sets_the_driver_offline(): void
     {
         $mark = $this->joinedDriver('Mark');

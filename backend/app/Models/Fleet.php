@@ -15,14 +15,15 @@ use Illuminate\Support\Str;
  */
 class Fleet extends Model
 {
-    protected $fillable = ['name', 'slug', 'service_area_id', 'phone', 'email', 'bank_name', 'bank_account_name', 'bank_account_number', 'bank_branch'];
+    protected $fillable = ['name', 'slug', 'service_area_id', 'phone', 'email', 'bank_name', 'bank_account_name', 'bank_account_number', 'bank_branch', 'tips_to_driver'];
 
-    protected $attributes = ['status' => 'pending'];
+    protected $attributes = ['status' => 'pending', 'tips_to_driver' => true];
 
     protected function casts(): array
     {
         return [
             'status' => FleetStatus::class,
+            'tips_to_driver' => 'boolean',
             'approved_at' => 'datetime',
             'bank_account_number' => 'encrypted',
         ];

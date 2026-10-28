@@ -35,13 +35,19 @@ class EarningsController extends Controller
                 'tips' => round((float) (clone $q)->sum('tip_amount'), 2),
                 'cash_collected' => round((float) (clone $q)->where('payment_method', 'cash')->where('status', TripStatus::Completed->value)->sum('final_fare'), 2),
             ];
-            foreach ((clone $all)->whereNotNull('fleet_id')->with('fleet:id,name')->get() as $t) {
+            foreach ((clone $all)->whereNotNull('fleet_id')->with('fleet:id,name,tips_to_driver')->get() as $t) {
+                // Tips in a fleet car are the driver's unless that fleet keeps tips (admin setting).
+                $tipToDriver = (bool) ($t->fleet?->tips_to_driver ?? true);
+                if ($tipToDriver && $t->tip_amount > 0) {
+                    $out[$name]['earnings'] = round($out[$name]['earnings'] + (float) $t->tip_amount, 2);
+                    $out[$name]['tips'] = round($out[$name]['tips'] + (float) $t->tip_amount, 2);
+                }
                 $f = &$fleets[$t->fleet_id];
                 $f ??= ['fleet' => $t->fleet?->name ?? 'Fleet', 'periods' => []];
                 $p = &$f['periods'][$name];
                 $p ??= ['trips' => 0, 'earnings' => 0.0, 'cash_collected' => 0.0];
                 $p['trips'] += $t->status === TripStatus::Completed ? 1 : 0;
-                $p['earnings'] = round($p['earnings'] + (float) $t->driver_earnings + (float) $t->tip_amount, 2);
+                $p['earnings'] = round($p['earnings'] + (float) $t->driver_earnings + ($tipToDriver ? 0 : (float) $t->tip_amount), 2);
                 if ($t->status === TripStatus::Completed && $t->payment_method?->value === 'cash') {
                     $p['cash_collected'] = round($p['cash_collected'] + (float) $t->final_fare, 2);
                 }

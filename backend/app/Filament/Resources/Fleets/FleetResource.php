@@ -63,6 +63,11 @@ class FleetResource extends Resource
                 TextInput::make('phone')->tel()->maxLength(32),
                 TextInput::make('email')->email()->maxLength(255),
             ]),
+            Section::make('Money')->schema([
+                \Filament\Forms\Components\Toggle::make('tips_to_driver')->label('Tips go to the driver')
+                    ->helperText('On: riders\' tips on trips in this fleet\'s cars are paid to the driver. Off: the fleet keeps them. Applies to tips from now on.')
+                    ->default(true),
+            ]),
             Section::make('Payouts')->columns(2)->schema([
                 TextInput::make('bank_name')->maxLength(80),
                 TextInput::make('bank_branch')->maxLength(80),
@@ -86,6 +91,7 @@ class FleetResource extends Resource
                 TextEntry::make('bank')->label('Bank')->state(fn (Fleet $record) => $record->bank_account_number ? "{$record->bank_name} · {$record->bank_account_name} · {$record->bank_account_number}" : 'Not given'),
                 TextEntry::make('balance')->label('Ride Coop owes them')->state(fn (Fleet $record) => number_format(LedgerEntry::balance('fleet', $record->id), 2))
                     ->url(fn () => \App\Filament\Pages\Payouts::getUrl(['tab' => 'fleet'])),
+                TextEntry::make('tips_to_driver')->label('Tips')->formatStateUsing(fn ($state) => $state ? 'Go to the driver' : 'Kept by the fleet'),
                 TextEntry::make('cash')->label('Cash held by drivers')->state(fn (Fleet $record) => number_format(array_sum($record->cashHeld()), 2)),
                 TextEntry::make('today')->label('Today')->state(fn (Fleet $record) => ($t = app(FleetService::class)->today($record))['trips'].' trips · '.number_format($t['earnings'], 2)),
             ]),
