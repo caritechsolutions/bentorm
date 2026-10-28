@@ -1,0 +1,6 @@
+Analyzing core...                                               
+
+warning • Dead code. Try removing the code, or fixing the code before it so that it can be reached • lib/src/map_icons.dart:174:86 • dead_code
+warning • The left operand can't be null, so the right operand is never executed. Try removing the operator and the right operand • lib/src/map_icons.dart:174:89 • dead_null_aware_expression
+
+2 issues found. (ran in 7.1s)
