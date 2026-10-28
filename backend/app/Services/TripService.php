@@ -643,7 +643,12 @@ class TripService
         if (! $trip && ! $profile?->is_online) {
             return null; // offline and not on a job: not dispatchable (the reply tells the app)
         }
-        $type = $profile?->current_vehicle_id ? Vehicle::query()->whereKey($profile->current_vehicle_id)->value('vehicle_type') : null;
+        $car = $profile?->current_vehicle_id ? Vehicle::query()->whereKey($profile->current_vehicle_id)->first(['id', 'vehicle_type', 'fleet_id']) : null;
+        // A fleet car taken away: once any trip is over, the driver is set offline (with the reason) instead.
+        if ($car?->fleet_id && ! $trip && app(FleetService::class)->enforce($driver)) {
+            return null;
+        }
+        $type = $car?->vehicle_type;
         $this->locations->update($driver, $lat, $lng, $heading, $speed, $type, $trip ? 'busy' : 'idle');
 
         if ($trip && in_array($trip->status, [TripStatus::Accepted, TripStatus::Arrived, TripStatus::InProgress], true)) {
@@ -692,9 +697,14 @@ class TripService
             abort(response()->json(['message' => 'You cannot go online yet.', 'issues' => $issues], 403));
         }
 
-        $profile = $driver->driverProfile;
-        $profile->forceFill(['is_online' => true])->save();
-        $this->locations->goOnline($driver, $profile->currentVehicle->vehicle_type);
+        DB::transaction(function () use ($driver) {
+            $profile = $driver->driverProfile;
+            // One driver per fleet car: checked again under a lock so two drivers can't take it at the same moment.
+            $vehicle = Vehicle::query()->whereKey($profile->current_vehicle_id)->lockForUpdate()->firstOrFail();
+            app(FleetService::class)->assertFree($vehicle, $driver);
+            $profile->forceFill(['is_online' => true, 'offline_reason' => null])->save();
+            $this->locations->goOnline($driver, $vehicle->vehicle_type);
+        });
     }
 
     public function goOffline(User $driver): void

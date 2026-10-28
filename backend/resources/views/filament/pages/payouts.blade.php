@@ -1,7 +1,7 @@
 <x-filament-panels::page>
     @php $rows = $this->rows(); $cell = 'padding:10px 12px;border-bottom:1px solid rgba(127,127,127,.18);text-align:left;vertical-align:top'; @endphp
     <div style="display:flex;gap:8px">
-        @foreach (['driver' => 'Drivers', 'store' => 'Stores'] as $key => $label)
+        @foreach (['driver' => 'Drivers', 'fleet' => 'Fleets', 'store' => 'Stores'] as $key => $label)
             <x-filament::button wire:click="$set('tab', '{{ $key }}')" :color="$tab === $key ? 'primary' : 'gray'" size="sm">{{ $label }}</x-filament::button>
         @endforeach
     </div>

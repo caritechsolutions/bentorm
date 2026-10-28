@@ -1,0 +1,24 @@
+{
+  "profile": {
+    "status": "approved",
+    "status_note": null,
+    "service_area_id": 1,
+    "is_online": false,
+    "offline_reason": "Island Taxis removed you from their fleet.",
+    "accepts_deliveries": false,
+    "rating_avg": 5.0,
+    "rating_count": 13,
+    "completed_trips": 27,
+    "licence_number": "L1",
+    "licence_expiry": "2030-01-01",
+    "psv_permit_number": null,
+    "current_vehicle_id": null,
+    "current_vehicle": null,
+    "approved_at": "2026-10-24T02:47:04+00:00"
+  },
+  "can_go_online": false,
+  "issues": [
+    "Add and select a vehicle."
+  ],
+  "fleet_invites": []
+}

@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 class Vehicle extends Model
 {
     protected $fillable = [
-        'driver_id', 'make', 'model', 'year', 'colour', 'plate', 'seats', 'luggage_capacity', 'features', 'vehicle_type', 'status', 'status_note', 'approved_at',
+        'driver_id', 'fleet_id', 'make', 'model', 'year', 'colour', 'plate', 'seats', 'luggage_capacity', 'features', 'vehicle_type', 'status', 'status_note', 'approved_at',
     ];
 
     protected function casts(): array
@@ -28,6 +28,25 @@ class Vehicle extends Model
     public function driver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'driver_id');
+    }
+
+    public function fleet(): BelongsTo
+    {
+        return $this->belongsTo(Fleet::class);
+    }
+
+    public function isFleetCar(): bool
+    {
+        return $this->fleet_id !== null;
+    }
+
+    /** The driver who has this car selected and is online in it (fleet cars: one at a time), other than $except. */
+    public function inUseBy(?int $except = null): ?User
+    {
+        $profile = DriverProfile::query()->where('current_vehicle_id', $this->id)->where('is_online', true)
+            ->when($except, fn ($q) => $q->where('user_id', '!=', $except))->with('user')->first();
+
+        return $profile?->user;
     }
 
     public function documents(): MorphMany

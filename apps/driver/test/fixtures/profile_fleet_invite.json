@@ -1,0 +1,65 @@
+{
+  "profile": {
+    "status": "approved",
+    "status_note": null,
+    "service_area_id": 1,
+    "is_online": false,
+    "offline_reason": null,
+    "accepts_deliveries": false,
+    "rating_avg": 5.0,
+    "rating_count": 13,
+    "completed_trips": 27,
+    "licence_number": "L1",
+    "licence_expiry": "2030-01-01",
+    "psv_permit_number": null,
+    "current_vehicle_id": 3,
+    "current_vehicle": {
+      "id": 3,
+      "driver_id": 3,
+      "make": "Toyota",
+      "model": "Corolla",
+      "year": null,
+      "colour": null,
+      "plate": "ZR101",
+      "seats": 4,
+      "luggage_capacity": 2,
+      "features": [
+        "child_seat"
+      ],
+      "vehicle_type": "standard",
+      "status": "approved",
+      "status_note": null,
+      "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/45"
+    },
+    "approved_at": "2026-10-24T02:47:04+00:00"
+  },
+  "can_go_online": true,
+  "issues": [],
+  "fleet_invites": [
+    {
+      "id": 7,
+      "fleet": {
+        "id": 4,
+        "name": "Island Taxis",
+        "phone": "+12464281234"
+      },
+      "vehicles": [
+        {
+          "id": 155,
+          "plate": "FL1",
+          "make": "Toyota",
+          "model": "Axio",
+          "colour": "White"
+        },
+        {
+          "id": 156,
+          "plate": "FL2",
+          "make": "Nissan",
+          "model": "Note",
+          "colour": "Silver"
+        }
+      ],
+      "invited_at": "2026-10-28T02:09:29+00:00"
+    }
+  ]
+}

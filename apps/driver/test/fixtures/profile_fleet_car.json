@@ -1,0 +1,42 @@
+{
+  "profile": {
+    "status": "approved",
+    "status_note": null,
+    "service_area_id": 1,
+    "is_online": false,
+    "offline_reason": null,
+    "accepts_deliveries": false,
+    "rating_avg": 5.0,
+    "rating_count": 13,
+    "completed_trips": 27,
+    "licence_number": "L1",
+    "licence_expiry": "2030-01-01",
+    "psv_permit_number": null,
+    "current_vehicle_id": 155,
+    "current_vehicle": {
+      "id": 155,
+      "driver_id": null,
+      "make": "Toyota",
+      "model": "Axio",
+      "year": 2021,
+      "colour": "White",
+      "plate": "FL1",
+      "seats": 4,
+      "luggage_capacity": 2,
+      "features": [],
+      "vehicle_type": "standard",
+      "status": "approved",
+      "status_note": null,
+      "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/1179",
+      "fleet": {
+        "id": 4,
+        "name": "Island Taxis"
+      },
+      "in_use_by": null
+    },
+    "approved_at": "2026-10-24T02:47:04+00:00"
+  },
+  "can_go_online": true,
+  "issues": [],
+  "fleet_invites": []
+}

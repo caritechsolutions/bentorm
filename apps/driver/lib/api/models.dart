@@ -53,6 +53,9 @@ class Vehicle {
     required this.vehicleType,
     required this.status,
     this.statusNote,
+    this.fleetId,
+    this.fleetName,
+    this.inUseBy,
   });
 
   final int id;
@@ -68,6 +71,14 @@ class Vehicle {
   final String status; // pending | approved | rejected | suspended
   final String? statusNote;
 
+  /// A fleet's car the driver has been given (null = the driver's own car). Its documents are the fleet's.
+  final int? fleetId;
+  final String? fleetName;
+
+  /// First name of another driver online in this fleet car right now (one driver per car).
+  final String? inUseBy;
+  bool get isFleetCar => fleetId != null;
+
   factory Vehicle.fromJson(Map<String, dynamic> j) => Vehicle(
         id: _in(j['id']) ?? 0,
         make: _s(j['make']) ?? '',
@@ -81,6 +92,9 @@ class Vehicle {
         vehicleType: _s(j['vehicle_type']) ?? 'standard',
         status: _s(j['status']) ?? 'pending',
         statusNote: _s(j['status_note']),
+        fleetId: _in(_m(j['fleet'])['id']),
+        fleetName: _s(_m(j['fleet'])['name']),
+        inUseBy: _s(j['in_use_by']),
       );
 
   String get title => [if (year != null) '$year', make, model].join(' ');
@@ -100,7 +114,11 @@ class DriverProfile {
     this.psvPermit,
     this.currentVehicle,
     this.acceptsDeliveries = false,
+    this.offlineReason,
   });
+
+  /// Why the server set the driver offline (e.g. a fleet took its car back). Shown instead of signing back on.
+  final String? offlineReason;
 
   final String status; // pending | approved | suspended | rejected
   /// Shop deliveries on/off (any approved vehicle can deliver).
@@ -129,18 +147,47 @@ class DriverProfile {
         psvPermit: _s(j['psv_permit_number']),
         currentVehicle: j['current_vehicle'] is Map<String, dynamic> ? Vehicle.fromJson(j['current_vehicle']) : null,
         acceptsDeliveries: j['accepts_deliveries'] == true,
+        offlineReason: _s(j['offline_reason']),
       );
 }
 
 /// GET /driver/profile: the profile plus whether they can go online, and why not.
 class DriverStatus {
-  DriverStatus(this.profile, this.canGoOnline, this.issues);
+  DriverStatus(this.profile, this.canGoOnline, this.issues, {this.invites = const []});
   final DriverProfile profile;
   final bool canGoOnline;
   final List<String> issues;
 
-  factory DriverStatus.fromJson(Map<String, dynamic> j) =>
-      DriverStatus(DriverProfile.fromJson(_m(j['profile'])), j['can_go_online'] == true, _l(j['issues']).map((e) => '$e').toList());
+  /// Fleets that invited this driver to drive their cars.
+  final List<FleetInvite> invites;
+
+  factory DriverStatus.fromJson(Map<String, dynamic> j) => DriverStatus(
+        DriverProfile.fromJson(_m(j['profile'])),
+        j['can_go_online'] == true,
+        _l(j['issues']).map((e) => '$e').toList(),
+        invites: _l(j['fleet_invites']).map((e) => FleetInvite.fromJson(_m(e))).toList(),
+      );
+}
+
+/// A taxi owner's invitation to drive their cars.
+class FleetInvite {
+  FleetInvite({required this.id, required this.fleetName, this.fleetPhone, this.cars = const []});
+  final int id;
+  final String fleetName;
+  final String? fleetPhone;
+
+  /// "PLATE · Make Model" of the cars offered.
+  final List<String> cars;
+
+  factory FleetInvite.fromJson(Map<String, dynamic> j) => FleetInvite(
+        id: _in(j['id']) ?? 0,
+        fleetName: _s(_m(j['fleet'])['name']) ?? 'A fleet',
+        fleetPhone: _s(_m(j['fleet'])['phone']),
+        cars: _l(j['vehicles']).map((e) {
+          final v = _m(e);
+          return [_s(v['plate']), [_s(v['make']), _s(v['model'])].whereType<String>().join(' ')].whereType<String>().where((x) => x.isNotEmpty).join(' · ');
+        }).toList(),
+      );
 }
 
 /// One row of a document checklist.
@@ -314,7 +361,11 @@ class DriverTrip {
     this.canChat = false,
     this.canCall = false,
     this.unreadMessages = 0,
+    this.earningsPaidTo,
   });
+
+  /// Set when the trip was in a fleet's car: its earnings are paid to that fleet.
+  final String? earningsPaidTo;
 
   /// What the rider pays after promo / ride credit (Ride Coop covers the difference; you earn on the full fare).
   final double? payable;
@@ -390,6 +441,7 @@ class DriverTrip {
       canChat: j['can_chat'] == true,
       canCall: j['can_call'] == true,
       unreadMessages: _in(j['unread_messages']) ?? 0,
+      earningsPaidTo: _s(j['earnings_paid_to']),
     );
   }
 
@@ -442,13 +494,29 @@ class EarningsPeriod {
 }
 
 class Earnings {
-  Earnings(this.currency, this.today, this.week, this.month);
+  Earnings(this.currency, this.today, this.week, this.month, {this.fleets = const []});
   final String currency;
   final EarningsPeriod today;
   final EarningsPeriod week;
   final EarningsPeriod month;
+
+  /// Trips in fleet cars: earned for (and paid to) each fleet.
+  final List<FleetEarnings> fleets;
   factory Earnings.fromJson(Map<String, dynamic> j) {
     final p = _m(j['periods']);
-    return Earnings(_s(j['currency']) ?? '', EarningsPeriod.fromJson(_m(p['today'])), EarningsPeriod.fromJson(_m(p['week'])), EarningsPeriod.fromJson(_m(p['month'])));
+    return Earnings(_s(j['currency']) ?? '', EarningsPeriod.fromJson(_m(p['today'])), EarningsPeriod.fromJson(_m(p['week'])), EarningsPeriod.fromJson(_m(p['month'])),
+        fleets: _l(j['fleets']).map((e) => FleetEarnings.fromJson(_m(e))).toList());
+  }
+}
+
+class FleetEarnings {
+  FleetEarnings(this.fleet, this.today, this.week, this.month);
+  final String fleet;
+  final EarningsPeriod today;
+  final EarningsPeriod week;
+  final EarningsPeriod month;
+  factory FleetEarnings.fromJson(Map<String, dynamic> j) {
+    final p = _m(j['periods']);
+    return FleetEarnings(_s(j['fleet']) ?? 'Fleet', EarningsPeriod.fromJson(_m(p['today'])), EarningsPeriod.fromJson(_m(p['week'])), EarningsPeriod.fromJson(_m(p['month'])));
   }
 }

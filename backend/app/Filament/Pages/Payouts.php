@@ -19,7 +19,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use UnitEnum;
 
 /**
- * Who Ride Coop owes (card rides, deliveries, tips, store orders) and who owes Ride Coop (commission on cash rides).
+ * Who Ride Coop owes (card rides, deliveries, tips, fleets, store orders) and who owes Ride Coop (commission on cash rides).
  * Pay by bank transfer as usual, then record it here; the driver/store sees it on their statement.
  */
 class Payouts extends Page
@@ -38,6 +38,7 @@ class Payouts extends Page
 
     protected string $view = 'filament.pages.payouts';
 
+    #[\Livewire\Attributes\Url]
     public string $tab = 'driver';
 
     /** @return array<int, array<string, mixed>> */
@@ -51,9 +52,14 @@ class Payouts extends Page
         return $rows;
     }
 
-    /** Name, phone and bank details for a driver (user id) or store. */
+    /** Name, phone and bank details for a driver (user id), fleet or store. */
     private function payee(string $type, int $id): array
     {
+        if ($type === 'fleet') {
+            $f = \App\Models\Fleet::query()->find($id);
+
+            return ['name' => $f?->name ?? 'Fleet #'.$id, 'phone' => $f?->phone, 'bank' => $f?->bank_account_number ? "{$f->bank_name} · {$f->bank_account_name} · {$f->bank_account_number}" : null];
+        }
         if ($type === 'store') {
             $s = Store::query()->find($id);
 

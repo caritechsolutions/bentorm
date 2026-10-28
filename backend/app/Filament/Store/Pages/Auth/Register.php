@@ -21,7 +21,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * Store owner sign-up. Step 1: name, phone, email, password → a code goes to the phone (SMS) and email.
  * Step 2: the code proves the phone; then the account is created — or, if this phone already rides with
- * Ride Coop, that account is used (same person, one login). Next stop: "Register your store".
+ * Ride Coop, that account is used (same person, one login). Next stop: "Register your store" (or fleet: the fleet
+ * portal uses this page too).
  */
 class Register extends BaseRegister
 {
@@ -30,7 +31,7 @@ class Register extends BaseRegister
     public function form(Schema $schema): Schema
     {
         return $schema->components([
-            Text::make('Create a login for your store. We\'ll text a code to your phone to confirm it\'s you.')->color('gray'),
+            Text::make('Create a login for your '.self::what().'. We\'ll text a code to your phone to confirm it\'s you.')->color('gray'),
             $this->getNameFormComponent()->label('Your name')->disabled(fn () => $this->codeSent),
             TextInput::make('phone')->label('Mobile number')->tel()->required()->placeholder('1 246 …')->disabled(fn () => $this->codeSent),
             TextInput::make('email')->label('Email')->email()->required()->maxLength(255)->disabled(fn () => $this->codeSent),
@@ -96,12 +97,18 @@ class Register extends BaseRegister
         return app(RegistrationResponse::class);
     }
 
+    /** Shared by the store portal and the fleet portal. */
+    private static function what(): string
+    {
+        return Filament::getCurrentPanel()?->getId() === 'fleet' ? 'fleet' : 'store';
+    }
+
     /** The email can't belong to someone else; an admin's phone can't be taken over from here. */
     private function checkConflicts(string $phone, string $email): void
     {
         $existing = User::query()->where('phone', $phone)->first();
         if ($existing?->isAdmin()) {
-            throw ValidationException::withMessages(['data.phone' => 'This number belongs to an admin account. Use a different number for your store.']);
+            throw ValidationException::withMessages(['data.phone' => 'This number belongs to an admin account. Use a different number for your '.self::what().'.']);
         }
         $emailOwner = User::query()->where('email', mb_strtolower(trim($email)))->first();
         if ($emailOwner && $emailOwner->id !== $existing?->id) {

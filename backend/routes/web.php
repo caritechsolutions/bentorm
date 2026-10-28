@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Storage;
 Route::get('/', fn () => match (request()->getHost()) {
     config('bentorm.admin_host') => redirect('/admin'),
     config('bentorm.store_host') => redirect('/store'),
+    config('bentorm.fleet_host') => redirect('/fleet'),
     config('bentorm.support_host') => redirect('/app/help'),
     default => response()->json(['service' => 'bentorm-api', 'health' => '/api/v1/health']),
 });
@@ -59,6 +60,13 @@ Route::middleware(['web', 'auth'])->get('/store-alerts/{store:slug}', function (
 
     return response()->json(['placed' => $store->orders()->where('status', 'placed')->orderBy('id')->pluck('public_id')]);
 })->name('store.order-alerts');
+
+// Fleet portal live map: the fleet's cars, who's driving and where (members only).
+Route::middleware(['web', 'auth'])->get('/fleet-live/{fleet:slug}', function (App\Models\Fleet $fleet) {
+    abort_unless(auth()->user()?->canAccessTenant($fleet), 403);
+
+    return response()->json(['cars' => app(App\Services\FleetService::class)->live($fleet), 'today' => app(App\Services\FleetService::class)->today($fleet)]);
+})->name('fleet.live');
 
 // Live map data for the admin panel (session auth).
 Route::middleware(['web', 'auth'])->get('/admin-live.json', function (App\Services\DriverLocationService $locations) {

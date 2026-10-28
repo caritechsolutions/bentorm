@@ -6,6 +6,7 @@ import '../state/scope.dart';
 import 'documents_screen.dart';
 import 'profile_form.dart';
 import 'vehicle_form.dart';
+import 'vehicles_screen.dart';
 
 /// Onboarding hub: what's still needed, driver details, vehicle, documents.
 class AccountScreen extends StatefulWidget {
@@ -33,7 +34,8 @@ class _AccountScreenState extends State<AccountScreen> {
       final status = await api.status();
       final docs = await api.documents();
       final vehicle = status.profile.currentVehicle;
-      final vDocs = vehicle == null ? null : await api.documents(vehicleId: vehicle.id);
+      // A fleet car's documents are the fleet's to keep up to date.
+      final vDocs = vehicle == null || vehicle.isFleetCar ? null : await api.documents(vehicleId: vehicle.id);
       if (!mounted) return;
       setState(() {
         _status = status;
@@ -75,12 +77,15 @@ class _AccountScreenState extends State<AccountScreen> {
             _section(
               key: const Key('step-vehicle'),
               number: 2,
-              title: 'Your vehicle',
+              title: 'My vehicles',
               done: s.profile.currentVehicle != null,
               subtitle: s.profile.currentVehicle == null
-                  ? 'Make, model, plate, seats and luggage'
-                  : '${s.profile.currentVehicle!.title} · ${s.profile.currentVehicle!.plate} · ${_vehicleStatus(s.profile.currentVehicle!.status)}',
-              onTap: () => _push(VehicleForm(vehicle: s.profile.currentVehicle, serviceAreaId: s.profile.serviceAreaId)),
+                  ? 'Add your car, or drive a fleet\'s car you were invited to'
+                  : 'Driving ${s.profile.currentVehicle!.plate} · ${s.profile.currentVehicle!.title}'
+                      '${s.profile.currentVehicle!.isFleetCar ? ' · ${s.profile.currentVehicle!.fleetName}' : ''} · ${_vehicleStatus(s.profile.currentVehicle!.status)}',
+              onTap: () => _push(s.profile.currentVehicle == null && s.invites.isEmpty
+                  ? VehicleForm(serviceAreaId: s.profile.serviceAreaId)
+                  : VehiclesScreen(serviceAreaId: s.profile.serviceAreaId)),
             ),
             _section(
               key: const Key('step-documents'),
@@ -94,9 +99,13 @@ class _AccountScreenState extends State<AccountScreen> {
               key: const Key('step-vehicle-documents'),
               number: 4,
               title: 'Vehicle documents & photos',
-              done: _vehicleDocs != null && !_vehicleDocs!.any((d) => d.needsAction),
-              subtitle: s.profile.currentVehicle == null ? 'Add your vehicle first' : _docSummary(_vehicleDocs),
-              onTap: s.profile.currentVehicle == null ? null : () => _push(DocumentsScreen(vehicle: s.profile.currentVehicle)),
+              done: s.profile.currentVehicle?.isFleetCar == true || (_vehicleDocs != null && !_vehicleDocs!.any((d) => d.needsAction)),
+              subtitle: s.profile.currentVehicle == null
+                  ? 'Add your vehicle first'
+                  : s.profile.currentVehicle!.isFleetCar
+                      ? 'Looked after by ${s.profile.currentVehicle!.fleetName ?? 'the fleet'}'
+                      : _docSummary(_vehicleDocs),
+              onTap: s.profile.currentVehicle == null || s.profile.currentVehicle!.isFleetCar ? null : () => _push(DocumentsScreen(vehicle: s.profile.currentVehicle)),
             ),
           ],
         ])),

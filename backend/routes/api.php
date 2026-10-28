@@ -142,6 +142,8 @@ Route::prefix('v1')->group(function () {
             Route::post('vehicles', [DriverProfileController::class, 'storeVehicle']);
             Route::patch('vehicles/{vehicle}', [DriverProfileController::class, 'updateVehicle']);
             Route::post('vehicles/{vehicle}/select', [DriverProfileController::class, 'selectVehicle']);
+            Route::get('fleet-invites', [DriverProfileController::class, 'fleetInvites']);
+            Route::post('fleet-invites/{invite}/{answer}', [DriverProfileController::class, 'respondToInvite'])->whereIn('answer', ['accept', 'decline']);
             Route::get('vehicles/{vehicle}/documents', [DriverDocumentController::class, 'vehicleIndex']);
             Route::post('vehicles/{vehicle}/documents', [DriverDocumentController::class, 'vehicleStore']);
 

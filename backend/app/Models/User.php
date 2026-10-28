@@ -44,13 +44,13 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     }
 
     /**
-     * Admin panel: active admins only. Store portal: any active account (one with no store yet is taken
-     * to "Register your store"); each store's data is only reachable by its own members (HasTenants).
+     * Admin panel: active admins only. Store and fleet portals: any active account (one with no store / fleet yet is
+     * taken to register one); each store's or fleet's data is only reachable by its own members (HasTenants).
      */
     public function canAccessPanel(Panel $panel): bool
     {
         return match ($panel->getId()) {
-            'store' => (bool) $this->is_active,
+            'store', 'fleet' => (bool) $this->is_active,
             default => $this->isAdmin() && $this->is_active,
         };
     }
@@ -61,19 +61,34 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         return $this->belongsToMany(Store::class, 'store_users')->withPivot('role')->withTimestamps();
     }
 
+    /** Fleets this person owns or manages. */
+    public function fleets(): BelongsToMany
+    {
+        return $this->belongsToMany(Fleet::class, 'fleet_users')->withPivot('role')->withTimestamps();
+    }
+
     public function getTenants(Panel $panel): Collection
     {
-        return $this->stores()->orderBy('name')->get();
+        return $panel->getId() === 'fleet' ? $this->fleets()->orderBy('name')->get() : $this->stores()->orderBy('name')->get();
     }
 
     public function canAccessTenant(Model $tenant): bool
     {
-        return $tenant instanceof Store && $this->stores()->whereKey($tenant->getKey())->exists();
+        return match (true) {
+            $tenant instanceof Store => $this->stores()->whereKey($tenant->getKey())->exists(),
+            $tenant instanceof Fleet => $this->fleets()->whereKey($tenant->getKey())->exists(),
+            default => false,
+        };
     }
 
     public function isStoreOwner(Store $store): bool
     {
         return $this->stores()->whereKey($store->getKey())->wherePivot('role', 'owner')->exists();
+    }
+
+    public function isFleetOwner(Fleet $fleet): bool
+    {
+        return $this->fleets()->whereKey($fleet->getKey())->wherePivot('role', 'owner')->exists();
     }
 
     public function firstName(): string

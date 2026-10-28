@@ -111,7 +111,7 @@ class DocumentResource extends Resource
 
         return match (true) {
             $owner instanceof DriverProfile => ($owner->user?->name ?? 'Driver').' · '.($owner->user?->phone ?? ''),
-            $owner instanceof Vehicle => "{$owner->plate} · {$owner->make} {$owner->model} (".($owner->driver?->name ?? '?').')',
+            $owner instanceof Vehicle => "{$owner->plate} · {$owner->make} {$owner->model} (".($owner->driver?->name ?? ($owner->fleet ? 'fleet: '.$owner->fleet->name : '?')).')',
             $owner instanceof \App\Models\Store => 'Store · '.$owner->name,
             default => '—',
         };

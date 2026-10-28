@@ -28,7 +28,9 @@ class ComplianceService
     public function checklist(Model $owner): array
     {
         $appliesTo = $owner instanceof Vehicle ? 'vehicle' : ($owner instanceof Store ? 'store' : 'driver');
-        $areaId = $owner instanceof Vehicle ? $owner->driver?->driverProfile?->service_area_id : $owner->service_area_id;
+        $areaId = $owner instanceof Vehicle
+            ? ($owner->fleet_id ? $owner->fleet?->service_area_id : $owner->driver?->driverProfile?->service_area_id)
+            : $owner->service_area_id;
 
         $types = DocumentType::query()->applicable($appliesTo, $areaId)
             // Store documents can be for one shop category only (e.g. a food-handling permit for restaurants).
@@ -112,7 +114,12 @@ class ComplianceService
         $vehicle = $profile->currentVehicle;
         if (! $vehicle) {
             $issues[] = 'Add and select a vehicle.';
+        } elseif ($vehicle->isFleetCar() && ! app(FleetService::class)->canUse($driver, $vehicle)) {
+            $issues[] = "You no longer have access to {$vehicle->plate}".($vehicle->fleet ? " from {$vehicle->fleet->name}" : '').'. Choose another car.';
         } else {
+            if ($vehicle->isFleetCar() && ($other = $vehicle->inUseBy($driver->id))) {
+                $issues[] = "{$vehicle->plate} is in use by {$other->firstName()}.";
+            }
             if (! $vehicle->isApproved()) {
                 $issues[] = "Vehicle {$vehicle->plate} is awaiting approval.";
             }

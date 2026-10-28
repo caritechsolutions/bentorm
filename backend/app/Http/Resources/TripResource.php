@@ -50,6 +50,8 @@ class TripResource extends Resource
                 'tax' => $this->tax_amount,
             ],
             'driver_earnings' => $this->when($isDriverOrAdmin, $this->driver_earnings),
+            // A trip in a fleet's car: its earnings are paid to the fleet.
+            'earnings_paid_to' => $this->when($isDriverOrAdmin && $this->fleet_id, fn () => $this->fleet?->name),
             'tip' => (float) $this->tip_amount,
             // Promo discount and ride credit (paid by Ride Coop): the rider pays `payable`; cash drivers collect it.
             'discount' => (float) $this->discount_amount,

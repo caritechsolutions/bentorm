@@ -75,7 +75,9 @@ class VehicleResource extends Resource
                 TextEntry::make('seats')->label('Passenger seats'),
                 TextEntry::make('luggage_capacity')->label('Luggage (bags)'),
                 TextEntry::make('features')->badge()->formatStateUsing(fn ($state) => Ui::features()[$state] ?? $state)->placeholder('None'),
-                TextEntry::make('driver.name')->label('Driver')
+                TextEntry::make('fleet.name')->label('Fleet')->placeholder('— (the driver\'s own car)')
+                    ->url(fn (Vehicle $record) => $record->fleet ? \App\Filament\Resources\Fleets\FleetResource::getUrl('view', ['record' => $record->fleet]) : null),
+                TextEntry::make('driver.name')->label('Owner (driver)')->placeholder('—')
                     ->url(fn (Vehicle $record) => $record->driver?->driverProfile ? \App\Filament\Resources\Drivers\DriverResource::getUrl('view', ['record' => $record->driver->driverProfile]) : null),
                 TextEntry::make('status')->badge()->color(fn ($state) => Ui::color($state))->formatStateUsing(fn ($state) => Ui::label($state)),
                 TextEntry::make('status_note')->label('Note')->placeholder('—'),
@@ -89,7 +91,7 @@ class VehicleResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->with('driver'))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['driver', 'fleet']))
             ->defaultSort('id', 'desc')
             ->columns([
                 TextColumn::make('plate')->searchable()->weight('bold'),
@@ -97,7 +99,8 @@ class VehicleResource extends Resource
                 TextColumn::make('vehicle_type')->label('Type')->badge()->color('gray'),
                 TextColumn::make('seats')->label('Capacity')->formatStateUsing(fn ($s, Vehicle $record) => "{$record->seats} pax · {$record->luggage_capacity} bags"),
                 TextColumn::make('features')->badge()->formatStateUsing(fn ($state) => Ui::features()[$state] ?? $state)->placeholder('—'),
-                TextColumn::make('driver.name')->label('Driver')->searchable(),
+                TextColumn::make('driver.name')->label('Driver')->searchable()->placeholder('—')
+                    ->description(fn (Vehicle $r) => $r->fleet ? 'Fleet: '.$r->fleet->name : null),
                 TextColumn::make('status')->badge()->color(fn ($state) => Ui::color($state))->formatStateUsing(fn ($state) => Ui::label($state)),
                 TextColumn::make('created_at')->label('Added')->since()->sortable(),
             ])
@@ -106,6 +109,23 @@ class VehicleResource extends Resource
                 SelectFilter::make('vehicle_type')->label('Type')->options(fn () => VehicleType::query()->pluck('name', 'key')),
             ])
             ->recordActions([ViewAction::make()]);
+    }
+
+    /** A driver's own car → a fleet (e.g. the taxi owner registered it under a driver before signing up). */
+    public static function moveToFleetAction(): \Filament\Actions\Action
+    {
+        return \Filament\Actions\Action::make('moveToFleet')->label('Move to a fleet')->icon(Heroicon::OutlinedArrowRightCircle)->color('gray')
+            ->visible(fn (Vehicle $record) => ! $record->fleet_id)
+            ->schema([
+                Select::make('fleet_id')->label('Fleet')->required()->searchable()
+                    ->options(fn () => \App\Models\Fleet::query()->orderBy('name')->pluck('name', 'id')),
+                \Filament\Forms\Components\Toggle::make('keep_driver')->label('The driver keeps driving it (as one of the fleet\'s drivers)')->default(true),
+            ])
+            ->modalDescription('The car and its documents become the fleet\'s. Its earnings go to the fleet from now on.')
+            ->action(function (Vehicle $record, array $data): void {
+                app(\App\Services\FleetService::class)->moveIntoFleet($record, \App\Models\Fleet::query()->findOrFail($data['fleet_id']), (bool) ($data['keep_driver'] ?? false));
+                \Filament\Notifications\Notification::make()->title("{$record->plate} moved")->success()->send();
+            });
     }
 
     public static function getRelations(): array

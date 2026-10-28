@@ -15,7 +15,7 @@ class Trip extends Model
     use HasUlids;
 
     protected $fillable = [
-        'rider_id', 'order_id', 'driver_id', 'vehicle_id', 'service_area_id', 'pickup_zone_id', 'dropoff_zone_id', 'vehicle_type', 'status',
+        'rider_id', 'order_id', 'driver_id', 'vehicle_id', 'fleet_id', 'service_area_id', 'pickup_zone_id', 'dropoff_zone_id', 'vehicle_type', 'status',
         'pickup_lat', 'pickup_lng', 'pickup_address', 'dropoff_lat', 'dropoff_lng', 'dropoff_address', 'stops', 'stop_change',
         'pin', 'pin_attempts', 'pin_failed_at', 'pin_verified_at',
         'estimated_distance_m', 'estimated_duration_s', 'estimated_fare',
@@ -95,6 +95,12 @@ class Trip extends Model
     public function vehicle(): BelongsTo
     {
         return $this->belongsTo(Vehicle::class);
+    }
+
+    /** The fleet this trip earned for (the car was a fleet car when the driver accepted). */
+    public function fleet(): BelongsTo
+    {
+        return $this->belongsTo(Fleet::class);
     }
 
     public function serviceArea(): BelongsTo

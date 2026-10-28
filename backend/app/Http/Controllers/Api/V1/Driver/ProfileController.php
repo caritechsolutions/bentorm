@@ -8,7 +8,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\DriverProfileResource;
 use App\Http\Resources\VehicleResource;
 use App\Models\Vehicle;
+use App\Models\FleetDriver;
 use App\Services\ComplianceService;
+use App\Services\FleetService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -16,7 +18,7 @@ use Illuminate\Validation\Rule;
 
 class ProfileController extends Controller
 {
-    public function __construct(private readonly ComplianceService $compliance) {}
+    public function __construct(private readonly ComplianceService $compliance, private readonly FleetService $fleets) {}
 
     /** GET /driver/profile — profile plus what's blocking going online. */
     public function show(Request $request): JsonResponse
@@ -27,7 +29,32 @@ class ProfileController extends Controller
             'profile' => (new DriverProfileResource($profile->load('currentVehicle')))->resolve($request),
             'can_go_online' => ($issues = $this->compliance->canGoOnline($request->user()->fresh())) === [],
             'issues' => $issues,
+            'fleet_invites' => $this->fleets->invitesFor($request->user())->map(fn (FleetDriver $i) => $this->invite($i))->values(),
         ]);
+    }
+
+    /** GET /driver/fleet-invites — fleets that invited this driver (by account or phone). */
+    public function fleetInvites(Request $request): JsonResponse
+    {
+        return response()->json(['invites' => $this->fleets->invitesFor($request->user())->map(fn (FleetDriver $i) => $this->invite($i))->values()]);
+    }
+
+    /** POST /driver/fleet-invites/{invite}/accept | decline */
+    public function respondToInvite(Request $request, FleetDriver $invite, string $answer): JsonResponse
+    {
+        $this->fleets->respond($invite, $request->user(), $answer === 'accept');
+
+        return response()->json(['ok' => true, 'status' => $invite->status]);
+    }
+
+    private function invite(FleetDriver $i): array
+    {
+        return [
+            'id' => $i->id,
+            'fleet' => ['id' => $i->fleet->id, 'name' => $i->fleet->name, 'phone' => $i->fleet->phone],
+            'vehicles' => $i->vehicles->map(fn ($v) => ['id' => $v->id, 'plate' => $v->plate, 'make' => $v->make, 'model' => $v->model, 'colour' => $v->colour])->values(),
+            'invited_at' => $i->updated_at?->toIso8601String(),
+        ];
     }
 
     /** PATCH /driver/profile */
@@ -58,7 +85,8 @@ class ProfileController extends Controller
     /** GET /driver/vehicles */
     public function vehicles(Request $request): AnonymousResourceCollection
     {
-        return VehicleResource::collection($request->user()->vehicles()->latest('id')->get());
+        // Their own cars, then fleet cars they've been given (marked with the fleet and who's driving it now).
+        return VehicleResource::collection($this->fleets->vehiclesFor($request->user()));
     }
 
     /** POST /driver/vehicles */
@@ -119,12 +147,13 @@ class ProfileController extends Controller
     /** POST /driver/vehicles/{vehicle}/select — set as current vehicle. */
     public function selectVehicle(Request $request, Vehicle $vehicle): DriverProfileResource
     {
-        abort_unless($vehicle->driver_id === $request->user()->id, 403, 'Not your vehicle.');
+        abort_unless($this->fleets->canUse($request->user(), $vehicle), 403, 'Not your vehicle.');
         $profile = $request->user()->driverProfile()->firstOrCreate([]);
         if ($profile->is_online) {
             abort(409, 'Go offline before switching vehicles.');
         }
-        $profile->update(['current_vehicle_id' => $vehicle->id]);
+        $this->fleets->assertFree($vehicle, $request->user());
+        $profile->update(['current_vehicle_id' => $vehicle->id, 'offline_reason' => null]);
 
         return new DriverProfileResource($profile->fresh()->load('currentVehicle'));
     }

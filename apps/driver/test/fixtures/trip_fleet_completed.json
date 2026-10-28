@@ -1,0 +1,99 @@
+{
+  "id": "01m604a2jaarr2njhhcdvffejp",
+  "status": "completed",
+  "vehicle_type": "standard",
+  "service_area_id": 1,
+  "rider": {
+    "id": 2,
+    "name": "Smoke Rider",
+    "role": "rider",
+    "avatar_url": null
+  },
+  "vehicle": {
+    "id": 155,
+    "driver_id": null,
+    "make": "Toyota",
+    "model": "Axio",
+    "year": 2021,
+    "colour": "White",
+    "plate": "FL1",
+    "seats": 4,
+    "luggage_capacity": 2,
+    "features": [],
+    "vehicle_type": "standard",
+    "status": "approved",
+    "status_note": null,
+    "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/1179",
+    "fleet": {
+      "id": 4,
+      "name": "Island Taxis"
+    },
+    "in_use_by": null
+  },
+  "pickup": {
+    "lat": 13.0969,
+    "lng": -59.6145,
+    "address": "Broad Street, Bridgetown",
+    "zone_id": null
+  },
+  "dropoff": {
+    "lat": 13.0745,
+    "lng": -59.588,
+    "address": "Rockley, Christ Church",
+    "zone_id": null
+  },
+  "stops": [],
+  "stop_change": null,
+  "pin_verified": false,
+  "estimate": {
+    "distance_m": null,
+    "duration_s": null,
+    "fare": 22.0
+  },
+  "actual": {
+    "distance_m": null,
+    "duration_s": null,
+    "wait_s": null,
+    "fare": 22.0,
+    "subtotal": null,
+    "tax": null
+  },
+  "driver_earnings": 17.6,
+  "earnings_paid_to": "Island Taxis",
+  "tip": 0.0,
+  "discount": 0.0,
+  "credit": 0.0,
+  "payable": 22.0,
+  "promo_code": null,
+  "use_credit": false,
+  "can_chat": false,
+  "can_call": false,
+  "unread_messages": 0,
+  "can_tip": false,
+  "currency": "BBD",
+  "fare_breakdown": null,
+  "surge_multiplier": 1.0,
+  "payment_method": "cash",
+  "payment_status": "paid",
+  "amount_due": 0.0,
+  "passengers": 1,
+  "luggage": 0,
+  "required_features": [],
+  "hold_amount": null,
+  "payment_action": null,
+  "rider_note": null,
+  "cancelled_by": null,
+  "cancellation_reason": null,
+  "cancellation_fee": 0.0,
+  "scheduled_at": null,
+  "timestamps": {
+    "requested_at": "2026-10-28T01:39:30+00:00",
+    "accepted_at": "2026-10-28T01:40:30+00:00",
+    "arrived_at": null,
+    "started_at": "2026-10-28T01:49:30+00:00",
+    "completed_at": "2026-10-28T02:04:30+00:00",
+    "cancelled_at": null
+  },
+  "kind": "ride",
+  "delivery": null
+}

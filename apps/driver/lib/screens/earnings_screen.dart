@@ -49,6 +49,21 @@ class _EarningsScreenState extends State<EarningsScreen> {
                 ]),
               ),
             ),
+          for (final f in e.fleets)
+            Card(
+              key: Key('fleet-earnings-${f.fleet}'),
+              color: const Color(0xFFF2F6FA),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Earnings paid to ${f.fleet}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  for (final (label, p) in [('Today', f.today), ('This week', f.week), ('This month', f.month)])
+                    Text('$label: ${money(p.earnings, e.currency)} · ${p.trips} ${p.trips == 1 ? 'trip' : 'trips'}'
+                        '${p.cash > 0 ? ' · cash collected ${money(p.cash, e.currency)} (hand to ${f.fleet})' : ''}'),
+                ]),
+              ),
+            ),
           const SizedBox(height: 8),
           const Text('Earnings are your share after the Ride Coop fee, before tax. Cash you collected is already in your pocket.',
               style: TextStyle(color: Colors.black54, fontSize: 13)),

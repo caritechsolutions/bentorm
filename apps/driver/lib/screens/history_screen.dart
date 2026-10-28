@@ -71,7 +71,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
               final cur = t.currency.isEmpty ? null : t.currency;
               return ListTile(
                 title: Text(t.dropoff.address ?? 'Trip', maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text('${_date(t.requestedAt)} · ${t.riderName ?? ''} · ${t.status == 'completed' ? (t.isCash ? 'cash' : 'card') : t.status}'),
+                subtitle: Text('${_date(t.requestedAt)} · ${t.riderName ?? ''} · ${t.status == 'completed' ? (t.isCash ? 'cash' : 'card') : t.status}'
+                    '${t.earningsPaidTo != null ? ' · paid to ${t.earningsPaidTo}' : ''}'),
                 trailing: Text(t.earnings != null ? money(t.earnings, cur) : '', style: const TextStyle(fontWeight: FontWeight.bold)),
               );
             },

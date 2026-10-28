@@ -13,6 +13,6 @@ class ViewVehicle extends ViewRecord
 
     protected function getHeaderActions(): array
     {
-        return [...ApprovalActions::forVehicle(), EditAction::make()->color('gray')];
+        return [...ApprovalActions::forVehicle(), VehicleResource::moveToFleetAction(), EditAction::make()->color('gray')];
     }
 }

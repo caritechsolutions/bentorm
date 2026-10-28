@@ -45,6 +45,10 @@ class AppServiceProvider extends ServiceProvider
             // Driver payouts ledger: book finished rides, deliveries and cancellation fees.
             if ($t->wasChanged('status') && in_array($t->status, [\App\Enums\TripStatus::Completed, \App\Enums\TripStatus::Cancelled], true)) {
                 app(\App\Services\LedgerService::class)->bookTrip($t);
+                // A fleet car taken away during the trip: offline now that it's over.
+                if ($t->fleet_id && $t->driver) {
+                    app(\App\Services\FleetService::class)->enforce($t->driver);
+                }
             }
         });
         // Orders: release the code / return credit when one doesn't go ahead; mark used and reward invites on delivery.

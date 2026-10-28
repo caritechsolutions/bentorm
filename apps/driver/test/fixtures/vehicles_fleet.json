@@ -1,0 +1,80 @@
+[
+  {
+    "id": 3,
+    "driver_id": 3,
+    "make": "Toyota",
+    "model": "Corolla",
+    "year": null,
+    "colour": null,
+    "plate": "ZR101",
+    "seats": 4,
+    "luggage_capacity": 2,
+    "features": [
+      "child_seat"
+    ],
+    "vehicle_type": "standard",
+    "status": "approved",
+    "status_note": null,
+    "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/45"
+  },
+  {
+    "id": 1,
+    "driver_id": 3,
+    "make": "Toyota",
+    "model": "Corolla",
+    "year": null,
+    "colour": null,
+    "plate": "SMOKE1",
+    "seats": 4,
+    "luggage_capacity": 2,
+    "features": [
+      "child_seat"
+    ],
+    "vehicle_type": "standard",
+    "status": "approved",
+    "status_note": null,
+    "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/7"
+  },
+  {
+    "id": 156,
+    "driver_id": null,
+    "make": "Nissan",
+    "model": "Note",
+    "year": 2020,
+    "colour": "Silver",
+    "plate": "FL2",
+    "seats": 4,
+    "luggage_capacity": 2,
+    "features": [],
+    "vehicle_type": "standard",
+    "status": "approved",
+    "status_note": null,
+    "photo_url": null,
+    "fleet": {
+      "id": 4,
+      "name": "Island Taxis"
+    },
+    "in_use_by": "Mark"
+  },
+  {
+    "id": 155,
+    "driver_id": null,
+    "make": "Toyota",
+    "model": "Axio",
+    "year": 2021,
+    "colour": "White",
+    "plate": "FL1",
+    "seats": 4,
+    "luggage_capacity": 2,
+    "features": [],
+    "vehicle_type": "standard",
+    "status": "approved",
+    "status_note": null,
+    "photo_url": "http://127.0.0.1:8099/api/v1/files/documents/1179",
+    "fleet": {
+      "id": 4,
+      "name": "Island Taxis"
+    },
+    "in_use_by": null
+  }
+]

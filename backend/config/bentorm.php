@@ -32,6 +32,8 @@ return [
     'admin_host' => env('ADMIN_HOST'),
     // Optional friendly hostname for the store portal (/store); NPM points it at the same :8082 as the admin panel.
     'store_host' => env('STORE_HOST'),
+    // Optional hostname for the fleet portal (/fleet), e.g. fleet.ridecoop.net → the same :8082.
+    'fleet_host' => env('FLEET_HOST'),
     // Help, support and statement pages opened from the apps (e.g. support.ridecoop.net, proxied to the API port).
     // Unset: the API's own address is used.
     'support_host' => env('SUPPORT_HOST'),

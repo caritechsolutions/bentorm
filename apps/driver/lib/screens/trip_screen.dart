@@ -368,7 +368,9 @@ class _TripScreenState extends State<TripScreen> {
           else
             Text('${money(t.finalFare, cur)} paid by card', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-          if (t.earnings != null) Text('You earned ${money(t.earnings, cur)}', key: const Key('earned'), style: const TextStyle(fontSize: 18, color: Color(0xFF1E9E5A), fontWeight: FontWeight.w600)),
+          if (t.earnings != null)
+            Text(t.earningsPaidTo != null ? 'Earned ${money(t.earnings, cur)} · paid to ${t.earningsPaidTo}' : 'You earned ${money(t.earnings, cur)}',
+                key: const Key('earned'), style: const TextStyle(fontSize: 18, color: Color(0xFF1E9E5A), fontWeight: FontWeight.w600)),
           if (t.tip > 0)
             Padding(
               padding: const EdgeInsets.only(top: 4),
@@ -454,7 +456,9 @@ class _TripScreenState extends State<TripScreen> {
         return [
           const Text('Order delivered', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-          if (t.earnings != null) Text('You earned ${money(t.earnings, cur)}', key: const Key('earned'), style: const TextStyle(fontSize: 18, color: Color(0xFF1E9E5A), fontWeight: FontWeight.w600)),
+          if (t.earnings != null)
+            Text(t.earningsPaidTo != null ? 'Earned ${money(t.earnings, cur)} · paid to ${t.earningsPaidTo}' : 'You earned ${money(t.earnings, cur)}',
+                key: const Key('earned'), style: const TextStyle(fontSize: 18, color: Color(0xFF1E9E5A), fontWeight: FontWeight.w600)),
           const SizedBox(height: 16),
           FilledButton(key: const Key('done'), onPressed: () => Navigator.of(context).pop(), child: const Text('Done')),
         ];

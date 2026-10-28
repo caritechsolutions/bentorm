@@ -51,6 +51,14 @@ class DriverApi extends AuthApi {
     await client.post('/driver/vehicles/$id/select');
   }
 
+  // ---------------------------------------------------------------- fleets
+  Future<List<FleetInvite>> fleetInvites() async =>
+      (_map(await client.get('/driver/fleet-invites'))['invites'] as List).map((e) => FleetInvite.fromJson(_map(e))).toList();
+
+  Future<void> respondToInvite(int id, {required bool accept}) async {
+    await client.post('/driver/fleet-invites/$id/${accept ? 'accept' : 'decline'}');
+  }
+
   // ---------------------------------------------------------------- documents
   Future<List<DocItem>> documents({int? vehicleId}) async {
     final r = _map(await client.get(vehicleId == null ? '/driver/documents' : '/driver/vehicles/$vehicleId/documents'));
@@ -89,8 +97,8 @@ class DriverApi extends AuthApi {
   }
 
   /// Location ping (also the presence heartbeat). Returns the active trip, if any, for resync, and whether the
-  /// server has this driver online (null from older servers).
-  Future<({DriverTrip? trip, bool? online})> ping(double lat, double lng, {double? heading, double? speed}) async {
+  /// server has this driver online (null from older servers) and, if the server took them offline on purpose, why.
+  Future<({DriverTrip? trip, bool? online, String? offlineReason})> ping(double lat, double lng, {double? heading, double? speed}) async {
     final r = _map(await client.post('/driver/location', {
       'lat': lat,
       'lng': lng,
@@ -100,6 +108,7 @@ class DriverApi extends AuthApi {
     return (
       trip: r['active_trip'] is Map<String, dynamic> ? DriverTrip.fromJson(r['active_trip']) : null,
       online: r['online'] is bool ? r['online'] as bool : null,
+      offlineReason: r['offline_reason'] is String ? r['offline_reason'] as String : null,
     );
   }
 

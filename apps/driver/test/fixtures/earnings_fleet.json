@@ -1,0 +1,45 @@
+{
+  "currency": "BBD",
+  "periods": {
+    "today": {
+      "trips": 4,
+      "earnings": 72.78,
+      "tips": 5.0,
+      "cash_collected": 88.0
+    },
+    "week": {
+      "trips": 4,
+      "earnings": 72.78,
+      "tips": 5.0,
+      "cash_collected": 88.0
+    },
+    "month": {
+      "trips": 29,
+      "earnings": 692.71,
+      "tips": 5.0,
+      "cash_collected": 537.0
+    }
+  },
+  "fleets": [
+    {
+      "fleet": "Island Taxis",
+      "periods": {
+        "today": {
+          "trips": 1,
+          "earnings": 17.6,
+          "cash_collected": 22.0
+        },
+        "week": {
+          "trips": 1,
+          "earnings": 17.6,
+          "cash_collected": 22.0
+        },
+        "month": {
+          "trips": 1,
+          "earnings": 17.6,
+          "cash_collected": 22.0
+        }
+      }
+    }
+  ]
+}

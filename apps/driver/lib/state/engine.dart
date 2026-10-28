@@ -64,6 +64,18 @@ class DriverEngine extends ChangeNotifier {
     _notify();
   }
 
+  /// Accept or decline a fleet's invitation to drive its cars.
+  Future<void> answerInvite(FleetInvite invite, {required bool accept}) async {
+    try {
+      await api.respondToInvite(invite.id, accept: accept);
+      message = accept ? 'You can now drive ${invite.fleetName}\'s cars. Choose one under My vehicles.' : 'Invitation declined.';
+      await refreshStatus();
+    } on ApiException catch (e) {
+      message = e.message;
+    }
+    _notify();
+  }
+
   /// Shop deliveries on/off. Takes effect for the next job offered.
   Future<void> setDeliveries(bool on) async {
     try {
@@ -201,8 +213,19 @@ class DriverEngine extends ChangeNotifier {
       failedPings = 0;
       pingProblem = null;
       if (r.trip != null && activeTrip == null) activeTrip = r.trip; // resync
-      // The server set us offline (the phone was silent for a while) but the driver still wants rides: sign back on.
-      if (r.online == false && online && activeTrip == null) await _rejoin();
+      if (r.online == false && online && activeTrip == null) {
+        if (r.offlineReason != null) {
+          // Set offline on purpose (a fleet took its car back): say why, and don't sign back on.
+          online = false;
+          offers = const [];
+          message = r.offlineReason;
+          _stopTimers();
+          await refreshStatus();
+        } else {
+          // The server set us offline (the phone was silent for a while) but the driver still wants rides: sign back on.
+          await _rejoin();
+        }
+      }
     } on ApiException {
       failedPings++;
       pingProblem = 'network';

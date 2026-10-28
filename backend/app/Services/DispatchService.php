@@ -202,6 +202,7 @@ class DispatchService
             $locked->forceFill([
                 'driver_id' => $driver->id,
                 'vehicle_id' => $profile?->current_vehicle_id,
+                'fleet_id' => $profile?->current_vehicle_id ? Vehicle::query()->whereKey($profile->current_vehicle_id)->value('fleet_id') : null,
                 'status' => TripStatus::Accepted,
                 'accepted_at' => now(),
             ])->save();

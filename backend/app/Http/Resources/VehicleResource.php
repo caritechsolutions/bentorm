@@ -11,6 +11,11 @@ class VehicleResource extends Resource
     public function toArray(Request $request): array
     {
         $private = $request->user()?->isAdmin() || $request->user()?->id === $this->driver_id;
+        // Fleet cars, to the drivers given them: which fleet, and whether someone else is driving it now.
+        $fleetView = $this->fleet_id && $request->user() && ($request->user()->isAdmin() || $request->user()->isDriver());
+        if ($fleetView) {
+            $private = true;
+        }
 
         return [
             'id' => $this->id,
@@ -27,6 +32,8 @@ class VehicleResource extends Resource
             'status' => $this->when($private, $this->status),
             'status_note' => $this->when($private, $this->status_note),
             'photo_url' => $this->photoUrl(),
+            'fleet' => $this->when($fleetView, fn () => ['id' => $this->fleet_id, 'name' => $this->fleet?->name]),
+            'in_use_by' => $this->when($fleetView, fn () => $this->inUseBy($request->user()->id)?->firstName()),
         ];
     }
 

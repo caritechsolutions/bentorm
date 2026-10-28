@@ -12,6 +12,7 @@ import 'account_screen.dart';
 import 'earnings_screen.dart';
 import 'history_screen.dart';
 import 'trip_screen.dart';
+import 'vehicles_screen.dart';
 
 /// Online / offline, ride offers, and the way into the active trip.
 class HomeScreen extends StatefulWidget {
@@ -61,6 +62,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) _engine.refreshStatus();
   }
 
+  Future<void> _openVehicles() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => VehiclesScreen(serviceAreaId: _engine.status?.profile.serviceAreaId)));
+    if (mounted) _engine.refreshStatus();
+  }
+
   Future<void> _openAccount() async {
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AccountScreen()));
     if (mounted) _engine.refreshStatus();
@@ -73,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, _) {
         final e = _engine;
         return Scaffold(
-          drawer: _Menu(onAccount: _openAccount),
+          drawer: _Menu(onAccount: _openAccount, onVehicles: _openVehicles),
           body: Stack(children: [
             Positioned.fill(
               child: DriverMap(me: e.position, center: e.position ?? const LatLngPoint(AppConfig.defaultLat, AppConfig.defaultLng), bottomPadding: 260),
@@ -192,10 +198,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final p = e.status!.profile;
     final blockers = e.blockers;
+    final car = p.currentVehicle;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      for (final i in e.status!.invites) _InviteCard(invite: i, onAnswer: (accept) => e.answerInvite(i, accept: accept)),
       Text('Hi ${AppScope.of(context).session.user?.firstName ?? 'there'}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
       const SizedBox(height: 4),
       Text(p.status == 'approved' ? 'You\'re offline.' : _statusLine(p.status), style: const TextStyle(color: Colors.black54)),
+      if (p.offlineReason != null)
+        Container(
+          key: const Key('offline-reason'),
+          margin: const EdgeInsets.only(top: 10),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: Brand.yellow.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(10)),
+          child: Row(children: [
+            const Icon(Icons.info_outline),
+            const SizedBox(width: 10),
+            Expanded(child: Text(p.offlineReason!)),
+          ]),
+        ),
+      if (car != null && p.status == 'approved')
+        ListTile(
+          key: const Key('current-car-line'),
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(car.isFleetCar ? Icons.local_taxi : Icons.directions_car),
+          title: Text('${car.plate} · ${car.title}'),
+          subtitle: car.isFleetCar ? Text('${car.fleetName}\'s car · earnings paid to ${car.fleetName}') : null,
+          trailing: TextButton(key: const Key('change-car'), onPressed: _openVehicles, child: const Text('Change')),
+        ),
       if (blockers.isNotEmpty) ...[
         const SizedBox(height: 12),
         const Text('Before you can drive:', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -380,9 +409,60 @@ class _OfferCardState extends State<OfferCard> {
       );
 }
 
+/// A fleet's invitation to drive its cars.
+class _InviteCard extends StatefulWidget {
+  const _InviteCard({required this.invite, required this.onAnswer});
+  final FleetInvite invite;
+  final Future<void> Function(bool accept) onAnswer;
+
+  @override
+  State<_InviteCard> createState() => _InviteCardState();
+}
+
+class _InviteCardState extends State<_InviteCard> {
+  bool _busy = false;
+
+  Future<void> _answer(bool accept) async {
+    setState(() => _busy = true);
+    await widget.onAnswer(accept);
+    if (mounted) setState(() => _busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final i = widget.invite;
+    return Container(
+      key: Key('fleet-invite-${i.id}'),
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: Brand.blue.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: Brand.blue)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          const Icon(Icons.local_taxi, color: Brand.blue),
+          const SizedBox(width: 8),
+          Expanded(child: Text('${i.fleetName} invited you to drive their cars', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+        ]),
+        if (i.cars.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(i.cars.join('\n'))),
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text('Earnings in their cars are paid to ${i.fleetName}. Your own car and documents stay yours.',
+              style: const TextStyle(color: Colors.black54, fontSize: 13)),
+        ),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: OutlinedButton(key: const Key('invite-decline'), onPressed: _busy ? null : () => _answer(false), child: const Text('Decline'))),
+          const SizedBox(width: 10),
+          Expanded(child: FilledButton(key: const Key('invite-accept'), onPressed: _busy ? null : () => _answer(true), child: const Text('Accept'))),
+        ]),
+      ]),
+    );
+  }
+}
+
 class _Menu extends StatelessWidget {
-  const _Menu({required this.onAccount});
+  const _Menu({required this.onAccount, required this.onVehicles});
   final VoidCallback onAccount;
+  final VoidCallback onVehicles;
 
   @override
   Widget build(BuildContext context) {
@@ -420,6 +500,15 @@ class _Menu extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               onAccount();
+            },
+          ),
+          ListTile(
+            key: const Key('drawer-vehicles'),
+            leading: const Icon(Icons.directions_car_outlined),
+            title: const Text('My vehicles'),
+            onTap: () {
+              Navigator.pop(context);
+              onVehicles();
             },
           ),
           ListTile(

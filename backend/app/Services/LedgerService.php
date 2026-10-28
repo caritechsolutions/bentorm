@@ -12,33 +12,41 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Books what Ride Coop owes drivers and stores. + = owed to them, − = they owe (cash rides: the driver kept the
+ * Books what Ride Coop owes drivers, fleets and stores. + = owed to them, − = they owe (cash rides: the driver kept the
  * fare, so Ride Coop's share is owed back). Every event is booked once, so calling these again is safe.
  */
 class LedgerService
 {
-    /** A finished ride or delivery (and its cancellation fee / checkout tip). */
+    /**
+     * A finished ride or delivery (and its cancellation fee / checkout tip). Trips in a fleet car earn for the fleet;
+     * cash the fleet's driver collected is noted as held for the owner (FleetService::bookCash).
+     */
     public function bookTrip(Trip $t): void
     {
         if (! $t->driver_id) {
             return;
         }
+        [$type, $id] = $this->payee($t);
+        $by = $type === 'fleet' ? $this->drivenBy($t) : '';
         $cur = $t->currency ?: 'BBD';
         $when = $t->requested_at?->format('j M') ?? '';
         if ($t->status === TripStatus::Completed && $t->isDelivery()) {
-            $this->once('driver', $t->driver_id, 'delivery', (float) $t->driver_earnings, $cur, "Delivery {$when} (order {$t->order?->number()})", trip: $t);
+            $this->once($type, $id, 'delivery', (float) $t->driver_earnings, $cur, "Delivery {$when} (order {$t->order?->number()}){$by}", trip: $t);
             if ($t->tip_amount > 0 && ! $t->tipped_at) {
-                $this->once('driver', $t->driver_id, 'tip', (float) $t->tip_amount, $cur, "Tip at checkout (order {$t->order?->number()})", trip: $t);
+                $this->once($type, $id, 'tip', (float) $t->tip_amount, $cur, "Tip at checkout (order {$t->order?->number()}){$by}", trip: $t);
             }
         } elseif ($t->status === TripStatus::Completed && $t->payment_method === PaymentMethod::Cash) {
             // The driver kept the cash; promo/credit the rider didn't pay is Ride Coop's to cover.
             $kept = $t->payable();
-            $this->once('driver', $t->driver_id, 'ride_cash', round((float) $t->driver_earnings - $kept, 2), $cur,
-                sprintf('Cash ride %s: you collected %.2f, your share %.2f', $when, $kept, (float) $t->driver_earnings), trip: $t);
+            $this->once($type, $id, 'ride_cash', round((float) $t->driver_earnings - $kept, 2), $cur,
+                sprintf('Cash ride %s: %s collected %.2f, your share %.2f%s', $when, $type === 'fleet' ? 'driver' : 'you', $kept, (float) $t->driver_earnings, $by), trip: $t);
+            if ($type === 'fleet') {
+                app(FleetService::class)->bookCash($t, $kept);
+            }
         } elseif ($t->status === TripStatus::Completed) {
-            $this->once('driver', $t->driver_id, 'ride_card', (float) $t->driver_earnings, $cur, "Card ride {$when}", trip: $t);
+            $this->once($type, $id, 'ride_card', (float) $t->driver_earnings, $cur, "Card ride {$when}{$by}", trip: $t);
         } elseif ($t->status === TripStatus::Cancelled && $t->cancellation_fee > 0 && $t->driver_earnings > 0) {
-            $this->once('driver', $t->driver_id, 'cancellation', (float) $t->driver_earnings, $cur, "Cancellation fee {$when}", trip: $t);
+            $this->once($type, $id, 'cancellation', (float) $t->driver_earnings, $cur, "Cancellation fee {$when}{$by}", trip: $t);
         }
     }
 
@@ -46,9 +54,21 @@ class LedgerService
     public function bookTip(Trip $t, float $amount): void
     {
         if ($t->driver_id && $amount > 0) {
-            LedgerEntry::query()->create(['payee_type' => 'driver', 'payee_id' => $t->driver_id, 'kind' => 'tip', 'amount' => round($amount, 2),
-                'currency' => $t->currency ?: 'BBD', 'trip_id' => $t->id, 'description' => 'Tip from '.($t->rider?->firstName() ?? 'a rider')]);
+            [$type, $id] = $this->payee($t);
+            LedgerEntry::query()->create(['payee_type' => $type, 'payee_id' => $id, 'kind' => 'tip', 'amount' => round($amount, 2),
+                'currency' => $t->currency ?: 'BBD', 'trip_id' => $t->id, 'description' => 'Tip from '.($t->rider?->firstName() ?? 'a rider').($type === 'fleet' ? $this->drivenBy($t) : '')]);
         }
+    }
+
+    /** Who a trip's money goes to: the fleet whose car it was, or the driver. @return array{0: string, 1: int} */
+    public function payee(Trip $t): array
+    {
+        return $t->fleet_id ? ['fleet', (int) $t->fleet_id] : ['driver', (int) $t->driver_id];
+    }
+
+    private function drivenBy(Trip $t): string
+    {
+        return ' · '.($t->vehicle?->plate ? $t->vehicle->plate.', ' : '').($t->driver?->name ?? 'driver');
     }
 
     /** A delivered order: the store's share (items + VAT − commission). */
