@@ -23,6 +23,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Behind Nginx Proxy Manager: trust X-Forwarded-* so URLs and client IPs are correct.
         $middleware->trustProxies(at: '*');
+        // Each hostname opens only its own portal (newadmin → /admin, fleet → /fleet, store → /store).
+        $middleware->append(\App\Http\Middleware\PortalHosts::class);
         // API has no login page: unauthenticated requests get 401 JSON, never a redirect.
         $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*', 'broadcasting/*') ? null : ($request->is('app/*') ? '/app/signed-out' : '/'));
         $middleware->api(append: [PreserveZeroFraction::class]);

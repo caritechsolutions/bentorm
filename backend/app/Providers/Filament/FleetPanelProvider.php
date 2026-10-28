@@ -42,6 +42,8 @@ class FleetPanelProvider extends PanelProvider
             ->registration(Register::class)
             ->passwordReset(ResetPassword::class)
             ->brandName('Ride Coop Fleets')
+            ->profile(\App\Filament\Pages\Auth\EditProfile::class) // My profile: name, email, password (simple page: it sits outside any store/fleet)
+            ->tenantMenu(fn (): bool => \Filament\Facades\Filament::getTenant() !== null) // My profile sits outside any store/fleet
             ->favicon(fn (): string => asset('favicon.ico')) // at request time, so it's https behind NPM
             ->colors(['primary' => Color::Sky])
             ->defaultAvatarProvider(\App\Filament\Support\InitialsAvatarProvider::class)

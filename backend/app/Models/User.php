@@ -50,7 +50,8 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     public function canAccessPanel(Panel $panel): bool
     {
         return match ($panel->getId()) {
-            'store', 'fleet' => (bool) $this->is_active,
+            // Admin accounts use the admin panel only (they can't own or work at a store or fleet).
+            'store', 'fleet' => (bool) $this->is_active && ! $this->isAdmin(),
             default => $this->isAdmin() && $this->is_active,
         };
     }
