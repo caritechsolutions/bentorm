@@ -81,9 +81,9 @@ void main() {
   test('a gliding car moves smoothly to each new position and turns the short way', () {
     final g = GlidingPoint(over: const Duration(seconds: 4));
     final t0 = DateTime(2026, 10, 27, 12);
-    g.moveTo(13.10, -59.60, 350, now: t0);
+    g.moveTo(13.10, -59.60, 350, speed: 12, now: t0);
     expect(g.at(t0)!.lat, 13.10);
-    g.moveTo(13.11, -59.60, 10, now: t0);
+    g.moveTo(13.11, -59.60, 10, speed: 12, now: t0); // at speed the phone's heading is used
     final half = g.at(t0.add(const Duration(seconds: 2)))!;
     expect(half.lat, closeTo(13.105, 0.0001), reason: 'half way after half the time');
     expect(half.heading < 5 || half.heading > 355, isTrue, reason: '350° → 10° turns through north, not round the back');
