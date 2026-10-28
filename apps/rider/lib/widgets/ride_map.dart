@@ -20,6 +20,9 @@ class RideMap extends StatefulWidget {
     this.driver,
     this.driverHeading,
     this.driverVehicleType,
+    this.driverSpeed,
+    this.followDriver = false,
+    this.followWith,
     this.route,
     this.splitRouteAtDriver = false,
     this.pickupLabel = 'Pickup',
@@ -39,6 +42,14 @@ class RideMap extends StatefulWidget {
   final LatLngPoint? driver;
   final double? driverHeading;
   final String? driverVehicleType;
+
+  /// m/s: the car only turns when it's really moving (GPS heading is noise when parked).
+  final double? driverSpeed;
+
+  /// Keep the camera on the driver (and [followWith], e.g. the pickup) as they move, until the rider moves the map;
+  /// the recenter button turns it back on.
+  final bool followDriver;
+  final LatLngPoint? followWith;
   final List<LatLngPoint>? route;
 
   /// During the ride: the part of [route] already driven is drawn grey.
@@ -72,6 +83,9 @@ class _RideMapState extends State<RideMap> with SingleTickerProviderStateMixin {
     }
   });
   final Map<String, BitmapDescriptor> _icons = {};
+  bool _following = true;
+  bool _cameraByUs = false; // a camera move we started (not the rider's finger)
+  DateTime _lastFollow = DateTime.fromMillisecondsSinceEpoch(0);
   double _ratio = 2;
 
   static LatLng _ll(LatLngPoint p) => LatLng(p.lat, p.lng);
@@ -101,7 +115,7 @@ class _RideMapState extends State<RideMap> with SingleTickerProviderStateMixin {
   void _feedDriver() {
     final d = widget.driver;
     if (d == null) return;
-    _car.moveTo(d.lat, d.lng, widget.driverHeading);
+    _car.moveTo(d.lat, d.lng, widget.driverHeading, speed: widget.driverSpeed);
     if (RideMap.enabled && !_ticker.isActive) _ticker.start();
   }
 
@@ -147,13 +161,49 @@ class _RideMapState extends State<RideMap> with SingleTickerProviderStateMixin {
         widget.cars.any((c) => !_icons.containsKey('car:${c.vehicleType ?? 'standard'}'))) {
       _loadIcons();
     }
-    if (_signature(old) != _signature(widget) || old.bottomPadding != widget.bottomPadding) _fit();
+    if (_signature(old) != _signature(widget) || old.bottomPadding != widget.bottomPadding) {
+      _following && widget.followDriver && widget.driver != null ? _follow(force: true) : _fit();
+    } else if (widget.followDriver && _following && widget.driver != null && widget.driver != old.driver) {
+      _follow();
+    }
+  }
+
+  /// Keep the car (and the point it's heading for) in view. At most every 3 s so the map doesn't keep jumping.
+  Future<void> _follow({bool force = false}) async {
+    final c = _controller, d = widget.driver;
+    if (c == null || d == null) return;
+    final now = DateTime.now();
+    if (!force && now.difference(_lastFollow) < const Duration(seconds: 3)) return;
+    _lastFollow = now;
+    final w = widget.followWith;
+    _cameraByUs = true;
+    try {
+      if (w == null || (w.lat - d.lat).abs() + (w.lng - d.lng).abs() < 0.003) {
+        await c.animateCamera(CameraUpdate.newLatLngZoom(_ll(d), 16));
+      } else {
+        await c.animateCamera(CameraUpdate.newLatLngBounds(
+          LatLngBounds(
+            southwest: LatLng(math.min(d.lat, w.lat), math.min(d.lng, w.lng)),
+            northeast: LatLng(math.max(d.lat, w.lat), math.max(d.lng, w.lng)),
+          ),
+          80,
+        ));
+      }
+    } catch (_) {
+      // The map may still be laying out; the next position tries again.
+    }
+  }
+
+  void _recenter() {
+    setState(() => _following = true);
+    widget.driver != null && widget.followDriver ? _follow(force: true) : _fit();
   }
 
   Future<void> _fit() async {
     final c = _controller;
     if (c == null) return;
     final pts = _points;
+    _cameraByUs = true;
     try {
       if (pts.length >= 2) {
         final lats = pts.map((p) => p.lat);
@@ -195,11 +245,16 @@ class _RideMapState extends State<RideMap> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     if (!RideMap.enabled) {
-      return Container(
-        color: const Color(0xFFE8EEF2),
-        alignment: Alignment.center,
-        child: const Icon(Icons.map_outlined, size: 64, color: Colors.black26),
-      );
+      return Stack(children: [
+        Positioned.fill(
+          child: Container(
+            color: const Color(0xFFE8EEF2),
+            alignment: Alignment.center,
+            child: const Icon(Icons.map_outlined, size: 64, color: Colors.black26),
+          ),
+        ),
+        _recenterButton(),
+      ]);
     }
 
     final start = widget.pickup ?? widget.center ?? const LatLngPoint(AppConfig.defaultLat, AppConfig.defaultLng);
@@ -260,8 +315,38 @@ class _RideMapState extends State<RideMap> with SingleTickerProviderStateMixin {
       polylines.add(Polyline(polylineId: const PolylineId('route'), points: ahead, color: Brand.blue, width: 5));
     }
 
+    return Stack(children: [
+      Positioned.fill(child: _map(start, markers, polylines)),
+      _recenterButton(),
+    ]);
+  }
+
+  /// Back to the car (and the pickup / drop-off), following again.
+  Widget _recenterButton() {
+    if (!widget.followDriver || widget.driver == null) return const SizedBox.shrink();
+    return Positioned(
+      right: 12,
+      bottom: widget.bottomPadding + 12,
+      child: FloatingActionButton.small(
+        key: const Key('recenter'),
+        heroTag: 'recenter',
+        backgroundColor: Colors.white,
+        foregroundColor: _following ? Brand.blue : Brand.charcoal,
+        tooltip: 'Show my driver',
+        onPressed: _recenter,
+        child: Icon(_following ? Icons.navigation : Icons.my_location),
+      ),
+    );
+  }
+
+  Widget _map(LatLngPoint start, Set<Marker> markers, Set<Polyline> polylines) {
     return GoogleMap(
       initialCameraPosition: CameraPosition(target: _ll(start), zoom: 14),
+      // The rider dragging or zooming the map stops following until they tap recenter.
+      onCameraMoveStarted: () {
+        if (!_cameraByUs && _following && widget.followDriver) setState(() => _following = false);
+      },
+      onCameraIdle: () => _cameraByUs = false,
       markers: markers,
       polylines: polylines,
       style: mapStyle,
@@ -273,7 +358,7 @@ class _RideMapState extends State<RideMap> with SingleTickerProviderStateMixin {
       padding: EdgeInsets.only(bottom: widget.bottomPadding, top: 80),
       onMapCreated: (c) {
         _controller = c;
-        _fit();
+        _following && widget.followDriver && widget.driver != null ? _follow(force: true) : _fit();
       },
     );
   }

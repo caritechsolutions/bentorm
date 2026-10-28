@@ -135,37 +135,69 @@ class MapIcons {
 
 /// Smooth movement for a marker: give it each new position as it arrives and read [at] every frame.
 /// Moves in a straight line over [over] (about the time between pings) and turns the shortest way.
+///
+/// Steady when parked: GPS wanders a few metres and its compass heading is noise when the car isn't moving, so
+/// small moves (under [minMoveM] while slower than [minSpeed]) are ignored and the car only turns once it has
+/// really moved — then it faces the way it travelled (the phone's heading is trusted only at speed).
+/// After a gap (the app was in the background, a lost connection) it jumps to the new position instead of
+/// sliding across the map.
 class GlidingPoint {
-  GlidingPoint({this.over = const Duration(seconds: 4)});
+  GlidingPoint({this.over = const Duration(seconds: 4), this.minMoveM = 8, this.minSpeed = 1.5, this.staleAfter = const Duration(seconds: 12)});
   final Duration over;
+  final double minMoveM;
+
+  /// m/s (~5 km/h)
+  final double minSpeed;
+  final Duration staleAfter;
 
   ({double lat, double lng})? _from;
   ({double lat, double lng})? _to;
   double _fromHeading = 0;
   double _toHeading = 0;
   DateTime _start = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _lastFix = DateTime.fromMillisecondsSinceEpoch(0);
 
   bool get hasPosition => _to != null;
 
-  /// A new reported position. A heading of null keeps the current one, or uses the direction of travel.
-  void moveTo(double lat, double lng, double? heading, {DateTime? now}) {
+  /// A new reported position, with the phone's [heading] (degrees) and [speed] (m/s) when known.
+  void moveTo(double lat, double lng, double? heading, {double? speed, DateTime? now}) {
     final t = now ?? DateTime.now();
     final cur = at(t);
-    if (cur == null) {
+    final last = _to;
+    final stale = t.difference(_lastFix) > staleAfter;
+    _lastFix = t;
+    if (cur == null || last == null || stale) {
+      // First fix, or the first after a gap: jump here. Keep the way it was facing unless the phone knows better at speed.
+      final atSpeed = heading != null && speed != null && speed >= minSpeed * 2;
       _from = (lat: lat, lng: lng);
       _to = _from;
-      _fromHeading = _toHeading = heading ?? 0;
+      _fromHeading = _toHeading = cur == null ? (heading ?? 0) : (atSpeed ? (heading ?? cur.heading) : cur.heading);
       _start = t;
       return;
     }
+    final moved = _metres(last.lat, last.lng, lat, lng);
+    final fast = speed != null && speed >= minSpeed;
+    if (moved < minMoveM && !fast) return; // parked or crawling: GPS noise, don't move or turn
     _from = (lat: cur.lat, lng: cur.lng);
     _fromHeading = cur.heading;
     _to = (lat: lat, lng: lng);
-    final moved = (lat - cur.lat).abs() + (lng - cur.lng).abs() > 0.00002;
-    _toHeading = heading ?? (moved ? _bearing(cur.lat, cur.lng, lat, lng) : cur.heading);
+    // Face the way it went; the phone's heading only when clearly driving (it's noise when slow).
+    _toHeading = heading != null && speed != null && speed >= minSpeed * 2
+        ? heading
+        : (moved >= minMoveM ? _bearing(last.lat, last.lng, lat, lng) : cur.heading);
     // A jump of more than ~2 km (first fix after a gap): don't glide across the map.
-    if ((lat - cur.lat).abs() + (lng - cur.lng).abs() > 0.02) _from = _to;
+    if (moved > 2000) {
+      _from = _to;
+      _fromHeading = _toHeading;
+    }
     _start = t;
+  }
+
+  static double _metres(double lat1, double lng1, double lat2, double lng2) {
+    const r = 6371000.0, rad = math.pi / 180;
+    final dLat = (lat2 - lat1) * rad, dLng = (lng2 - lng1) * rad;
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) + math.cos(lat1 * rad) * math.cos(lat2 * rad) * math.sin(dLng / 2) * math.sin(dLng / 2);
+    return 2 * r * math.asin(math.min(1, math.sqrt(a)));
   }
 
   /// Where the marker is now, or null before the first position.

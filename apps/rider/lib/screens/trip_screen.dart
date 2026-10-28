@@ -36,6 +36,9 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
   StreamSubscription<RealtimeEvent>? _live;
   RealtimeClient? _realtime;
   TripRoute? _route;
+
+  /// The rider folded the trip panel down to see more of the map.
+  bool _collapsed = false;
   String get _channel => 'private-trip.${_trip.id}';
 
   @override
@@ -54,7 +57,7 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
         if (e.name == 'driver.location' && e.channel == _channel) {
           final lat = (e.data['lat'] as num?)?.toDouble(), lng = (e.data['lng'] as num?)?.toDouble();
           if (lat != null && lng != null && mounted && _trip.hasDriver) {
-            setState(() => _driver = DriverPosition(lat, lng, (e.data['heading'] as num?)?.toDouble()));
+            setState(() => _driver = DriverPosition(lat, lng, (e.data['heading'] as num?)?.toDouble(), speed: (e.data['speed'] as num?)?.toDouble()));
           }
           return;
         }
@@ -195,11 +198,14 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
                 driver: driverPt,
                 driverHeading: t.hasDriver ? _driver?.heading : null,
                 driverVehicleType: t.vehicleType,
+                driverSpeed: t.hasDriver ? _driver?.speed : null,
+                followDriver: t.hasDriver && t.isActive,
+                followWith: _followTarget(t),
                 route: _routeLine(t, driverPt),
                 splitRouteAtDriver: t.status == 'in_progress',
                 pickupLabel: _pickupLabel(t),
                 dropoffLabel: _dropoffLabel(t),
-                bottomPadding: 320,
+                bottomPadding: _collapsed && t.isActive ? 110 : 320,
                 showMyLocation: t.isActive,
               ),
             ),
@@ -213,10 +219,23 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                   child: SafeArea(
                     top: false,
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: _panel(t)),
-                    ),
+                    child: !t.isActive
+                        ? SingleChildScrollView(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: _panel(t)),
+                          )
+                        : Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                            _handle(),
+                            if (_collapsed)
+                              _compact(t)
+                            else
+                              Flexible(
+                                child: SingleChildScrollView(
+                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: _panel(t)),
+                                ),
+                              ),
+                          ]),
                   ),
                 ),
               ),
@@ -225,6 +244,74 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+
+  /// Tap or drag the bar to fold the panel down (more map) or open it again.
+  Widget _handle() => GestureDetector(
+        key: const Key('panel-toggle'),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => setState(() => _collapsed = !_collapsed),
+        onVerticalDragEnd: (d) {
+          final v = d.primaryVelocity ?? 0;
+          if (v.abs() > 100) setState(() => _collapsed = v > 0);
+        },
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
+          child: Row(children: [
+            const Spacer(),
+            Container(width: 40, height: 5, decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(3))),
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Icon(_collapsed ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: Colors.black45,
+                    semanticLabel: _collapsed ? 'Show trip details' : 'Hide trip details'),
+              ),
+            ),
+          ]),
+        ),
+      );
+
+  /// The folded panel: who's coming and when, in one line.
+  Widget _compact(Trip t) {
+    final d = t.driver, v = t.vehicle, r = _route;
+    final when = switch (t.status) {
+      'arrived' => 'Your driver is here',
+      'accepted' when r != null && r.phase == 'to_pickup' => 'Arriving in ${_mins(r.durationS)}',
+      'accepted' => 'On the way to you',
+      'in_progress' => _dropoffLabel(t).replaceFirst('Drop-off · ', 'Arriving in ').replaceFirst('Drop-off', 'On the way'),
+      _ => t.statusTitle,
+    };
+    return InkWell(
+      key: const Key('trip-compact'),
+      onTap: () => setState(() => _collapsed = false),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+              Text(when, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+              if (d != null) Text([d.name, if (v != null) v.description].join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black54)),
+            ]),
+          ),
+          if (v != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(border: Border.all(color: Brand.charcoal, width: 1.5), borderRadius: BorderRadius.circular(6)),
+              child: Text(v.plate, style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+            ),
+        ]),
+      ),
+    );
+  }
+
+  /// What to keep in view with the driver: the pickup while they come to you, then the next stop or the drop-off.
+  LatLngPoint? _followTarget(Trip t) {
+    if (t.status == 'accepted' || t.status == 'arrived') return LatLngPoint(t.pickup.lat, t.pickup.lng);
+    if (t.status == 'in_progress') {
+      final next = t.remainingStops.isNotEmpty ? t.remainingStops.first.point : null;
+      return next ?? LatLngPoint(t.dropoff.lat, t.dropoff.lng);
+    }
+    return null;
   }
 
   /// The line on the map: the driver's way to you while they're coming, then the ride. Straight when no road route.

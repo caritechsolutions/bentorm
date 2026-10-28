@@ -362,12 +362,15 @@ class Trip {
 }
 
 class DriverPosition {
-  DriverPosition(this.lat, this.lng, this.heading);
+  DriverPosition(this.lat, this.lng, this.heading, {this.speed});
   final double lat;
   final double lng;
   final double? heading;
 
-  factory DriverPosition.fromJson(Map<String, dynamic> j) => DriverPosition(_d(j['lat']), _d(j['lng']), _dn(j['heading']));
+  /// m/s, from the driver's phone (null when unknown).
+  final double? speed;
+
+  factory DriverPosition.fromJson(Map<String, dynamic> j) => DriverPosition(_d(j['lat']), _d(j['lng']), _dn(j['heading']), speed: _dn(j['speed']));
 }
 
 /// The road line to draw: the driver's way to the pickup ("to_pickup") or the ride itself ("ride").

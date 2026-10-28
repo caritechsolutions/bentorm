@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -93,6 +94,32 @@ void main() {
     expect(g.at(t0.add(const Duration(seconds: 10)))!.heading, closeTo(90, 1));
   });
 
+  test('a parked car stays put and keeps facing the same way; it turns only once it really moves', () {
+    final g = GlidingPoint();
+    final t0 = DateTime(2026, 10, 28, 12);
+    g.moveTo(13.10, -59.60, 90, speed: 10, now: t0); // driving east
+    // Stopped: GPS wanders 3 m with a random compass heading at 0 m/s.
+    for (var i = 1; i <= 5; i++) {
+      g.moveTo(13.10 + 0.00002 * (i.isEven ? 1 : -1), -59.60, i * 70.0, speed: 0, now: t0.add(Duration(seconds: 4 * i)));
+      final p = g.at(t0.add(Duration(seconds: 4 * i + 2)))!;
+      expect(p.heading, closeTo(90, 0.001), reason: 'no spinning while parked');
+      expect(p.lat, 13.10, reason: 'no wandering while parked');
+    }
+    // Pulls away north: faces the way it actually went, not the noisy compass at low speed.
+    g.moveTo(13.1002, -59.60, 250, speed: 2, now: t0.add(const Duration(seconds: 24)));
+    expect(g.at(t0.add(const Duration(seconds: 30)))!.heading, closeTo(0, 1));
+  });
+
+  test('after a gap (app in the background) the car jumps to where it is instead of sliding across the map', () {
+    final g = GlidingPoint();
+    final t0 = DateTime(2026, 10, 28, 12);
+    g.moveTo(13.10, -59.60, null, now: t0);
+    g.moveTo(13.105, -59.60, null, now: t0.add(const Duration(seconds: 60)));
+    final p = g.at(t0.add(const Duration(seconds: 60)))!;
+    expect(p.lat, 13.105, reason: 'already there, no straight-line slide');
+    expect(g.moving(t0.add(const Duration(seconds: 60))), isFalse);
+  });
+
   testWidgets('map icons draw: cars by type and labelled pins', (tester) async {
     await tester.runAsync(() async {
       final std = await MapIcons.car('standard', 2);
@@ -127,6 +154,18 @@ void main() {
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
     await tester.pump();
     expect(server.calls('GET /trips/$id').length, before);
+
+    // The map follows the driver; the recenter button brings it back after the rider moves the map.
+    expect(find.byKey(const Key('recenter')), findsOneWidget);
+    // Fold the trip panel down to see the map, then open it again.
+    expect(find.byKey(const Key('driver-name')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('panel-toggle')));
+    await settle(tester);
+    expect(find.byKey(const Key('trip-compact')), findsOneWidget);
+    expect(find.byKey(const Key('driver-name')), findsNothing);
+    await tester.tap(find.byKey(const Key('trip-compact')));
+    await settle(tester);
+    expect(find.byKey(const Key('driver-name')), findsOneWidget);
 
     await unmount(tester);
     expect(live.socket.unsubscribed(), contains('private-trip.$id'));
