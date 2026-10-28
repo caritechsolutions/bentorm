@@ -90,8 +90,9 @@ class CarResource extends Resource
                     VehicleStatus::Pending => 'Being checked', default => Ui::label($state),
                 })->description(fn (Vehicle $r) => $r->status_note),
                 TextColumn::make('documents_count')->label('Documents')
-                    ->formatStateUsing(fn ($s, Vehicle $r) => ($i = app(ComplianceService::class)->vehicleIssues($r)) ? implode(' ', $i) : 'All approved')
-                    ->color(fn ($s, Vehicle $r) => app(ComplianceService::class)->vehicleIssues($r) ? 'danger' : 'success')->wrap(),
+                    ->formatStateUsing(fn ($s, Vehicle $r) => self::docSummary($r)[0])
+                    ->color(fn ($s, Vehicle $r) => self::docSummary($r)[1])
+                    ->tooltip(fn (Vehicle $r) => implode(' ', app(ComplianceService::class)->vehicleIssues($r)) ?: null),
                 TextColumn::make('id')->label('Driving now')->formatStateUsing(fn ($s, Vehicle $r) => $r->inUseBy()?->name ?? '—'),
             ])
             ->recordActions([
@@ -101,6 +102,19 @@ class CarResource extends Resource
                     ->modalDescription('The car is taken out of your fleet. Its trips stay on your statement.')
                     ->visible(fn (Vehicle $r) => ! $r->inUseBy()),
             ]);
+    }
+
+    /** "3 needed · 1 being checked" / "All approved", and its colour. @return array{0: string, 1: string} */
+    public static function docSummary(Vehicle $car): array
+    {
+        $rows = collect(app(ComplianceService::class)->checklist($car))->filter(fn ($r) => $r['type']->is_required);
+        $needed = $rows->filter(fn ($r) => in_array($r['state'], ['missing', 'rejected', 'expired'], true))->count();
+        $checking = $rows->where('state', 'pending')->count();
+        if (! $needed && ! $checking) {
+            return ['All approved', 'success'];
+        }
+
+        return [implode(' · ', array_filter([$needed ? "{$needed} needed" : null, $checking ? "{$checking} being checked" : null])), $needed ? 'danger' : 'warning'];
     }
 
     /** Editing an approved car sends it back for a check. */

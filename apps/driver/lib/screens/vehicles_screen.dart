@@ -143,6 +143,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
             if (!current)
               FilledButton(
                 key: Key('use-${v.plate}'),
+                style: FilledButton.styleFrom(minimumSize: const Size(150, 44)), // the theme's full-width buttons can't sit in a Row
                 onPressed: online || inUse || _busy != null ? null : () => _use(v),
                 child: _busy == v.id ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Drive this car'),
               ),
