@@ -45,7 +45,9 @@ jobs:
       - run: flutter pub get
       - name: Analyze shared core
         working-directory: apps/core
-        run: flutter pub get && flutter analyze --no-fatal-infos
+        run: |
+          set -o pipefail
+          flutter pub get && flutter analyze --no-fatal-infos 2>&1 | tee /tmp/analyze.txt
       - name: Analyze
         run: |
           set -o pipefail
