@@ -82,12 +82,12 @@ void main() {
     // Back home at the drop-off: the next pickup is where the rider is now, not this trip's pickup.
     phone.point = const LatLngPoint(13.0667, -59.5333);
     server.on('GET /places/reverse', {'place_id': 'there', 'name': 'Oistins Bay Gardens', 'address': 'Oistins, Christ Church, Barbados', 'lat': 13.0667, 'lng': -59.5333});
+    ScaffoldMessenger.of(tester.element(find.text('Done'))).hideCurrentSnackBar(); // the "thanks" note covers the button
+    await settle(tester);
     await tester.ensureVisible(find.text('Done'));
     await tester.pump();
     await tester.tap(find.text('Done'));
     await settle(tester);
-    // ignore: avoid_print
-    print('SCREEN: ${find.byType(Text).evaluate().map((e) => (e.widget as Text).data).whereType<String>().join(' | ')}');
     expect(find.text('Hi Rita, where to?'), findsOneWidget);
     expect(find.textContaining('Oistins Bay Gardens'), findsOneWidget, reason: 'pickup follows the rider');
     expect(find.textContaining('Bay Street'), findsNothing);
