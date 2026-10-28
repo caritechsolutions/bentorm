@@ -77,7 +77,11 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: _load,
-        child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 96), physics: const AlwaysScrollableScrollPhysics(), children: [
+        // A handful of cars: build them all (no lazy list), so every card is there to find.
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (_error != null) Text(_error!, style: const TextStyle(color: Brand.red)),
           if (cars == null && _error == null) const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator())),
           if (online)
@@ -87,7 +91,8 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
             ),
           if (cars != null && cars.isEmpty) const Text('No vehicles yet. Add your own car, or accept a fleet\'s invitation.'),
           for (final v in cars ?? const <Vehicle>[]) _card(v, online),
-        ]),
+          ]),
+        ),
       ),
     );
   }
@@ -133,21 +138,25 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
               padding: const EdgeInsets.only(top: 6),
               child: Text('In use by ${v.inUseBy}', key: Key('in-use-${v.plate}'), style: const TextStyle(fontWeight: FontWeight.w600, color: Brand.red)),
             ),
-          const SizedBox(height: 8),
-          Row(children: [
-            if (!v.isFleetCar) ...[
+          if (!v.isFleetCar)
+            Row(children: [
               TextButton(onPressed: () => _open(VehicleForm(vehicle: v, serviceAreaId: widget.serviceAreaId)), child: const Text('Edit')),
               TextButton(onPressed: () => _open(DocumentsScreen(vehicle: v)), child: const Text('Documents')),
-            ],
-            const Spacer(),
-            if (!current)
-              FilledButton(
-                key: Key('use-${v.plate}'),
-                style: FilledButton.styleFrom(minimumSize: const Size(150, 44)), // the theme's full-width buttons can't sit in a Row
-                onPressed: online || inUse || _busy != null ? null : () => _use(v),
-                child: _busy == v.id ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Drive this car'),
+            ]),
+          if (!current)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  key: Key('use-${v.plate}'),
+                  onPressed: online || inUse || _busy != null ? null : () => _use(v),
+                  child: _busy == v.id
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Drive this car'),
+                ),
               ),
-          ]),
+            ),
         ]),
       ),
     );
