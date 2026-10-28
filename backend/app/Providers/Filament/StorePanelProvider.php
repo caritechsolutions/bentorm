@@ -38,7 +38,7 @@ class StorePanelProvider extends PanelProvider
             ->registration(Register::class)
             ->passwordReset(ResetPassword::class)
             ->brandName('Ride Coop Stores')
-            ->favicon(asset('favicon.ico'))
+            ->favicon(fn (): string => asset('favicon.ico')) // at request time, so it's https behind NPM
             ->colors(['primary' => Color::Amber])
             ->defaultAvatarProvider(\App\Filament\Support\InitialsAvatarProvider::class)
             ->tenant(Store::class, slugAttribute: 'slug')

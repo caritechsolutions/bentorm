@@ -42,7 +42,7 @@ class FleetPanelProvider extends PanelProvider
             ->registration(Register::class)
             ->passwordReset(ResetPassword::class)
             ->brandName('Ride Coop Fleets')
-            ->favicon(asset('favicon.ico'))
+            ->favicon(fn (): string => asset('favicon.ico')) // at request time, so it's https behind NPM
             ->colors(['primary' => Color::Sky])
             ->defaultAvatarProvider(\App\Filament\Support\InitialsAvatarProvider::class)
             ->tenant(Fleet::class, slugAttribute: 'slug')

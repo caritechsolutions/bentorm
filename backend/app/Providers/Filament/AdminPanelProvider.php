@@ -30,7 +30,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login(Login::class)
             ->brandName('Ride Coop Admin')
-            ->favicon(asset('favicon.ico'))
+            ->favicon(fn (): string => asset('favicon.ico')) // at request time, so it's https behind NPM
             ->colors(['primary' => Color::Teal])
             ->defaultAvatarProvider(\App\Filament\Support\InitialsAvatarProvider::class)
             ->navigationGroups([
