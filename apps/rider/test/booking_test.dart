@@ -82,6 +82,8 @@ void main() {
     // Back home at the drop-off: the next pickup is where the rider is now, not this trip's pickup.
     phone.point = const LatLngPoint(13.0667, -59.5333);
     server.on('GET /places/reverse', {'place_id': 'there', 'name': 'Oistins Bay Gardens', 'address': 'Oistins, Christ Church, Barbados', 'lat': 13.0667, 'lng': -59.5333});
+    await tester.ensureVisible(find.text('Done'));
+    await tester.pump();
     await tester.tap(find.text('Done'));
     await settle(tester);
     expect(find.text('Hi Rita, where to?'), findsOneWidget);
