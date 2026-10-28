@@ -171,7 +171,7 @@ class GlidingPoint {
       final atSpeed = heading != null && speed != null && speed >= minSpeed * 2;
       _from = (lat: lat, lng: lng);
       _to = _from;
-      _fromHeading = _toHeading = cur == null ? (heading ?? 0) : (atSpeed ? (heading ?? cur.heading) : cur.heading);
+      _fromHeading = _toHeading = cur == null ? (heading ?? 0) : (atSpeed ? heading : cur.heading);
       _start = t;
       return;
     }
