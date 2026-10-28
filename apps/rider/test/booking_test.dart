@@ -1,7 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ridecoop_rider/api/models.dart' show LatLngPoint;
+import 'package:ridecoop_rider/state/location.dart';
+
 import 'support/fake_server.dart';
+
+/// The rider's phone, which moves between trips.
+class MovingLocation extends LocationService {
+  LatLngPoint point = const LatLngPoint(13.0969, -59.6145);
+  @override
+  Future<LatLngPoint?> current() async => point;
+}
 
 FakeServer signedInServer() => FakeServer()
   ..on('GET /me', fixture('me'))
@@ -30,7 +40,8 @@ void main() {
     var stage = 'active_requested';
     server.handle('GET /trips/$tripId', (_) => fixture(stage));
 
-    await pumpApp(tester, server);
+    final phone = MovingLocation();
+    await pumpApp(tester, server, location: phone);
     expect(find.text('Hi Rita, where to?'), findsOneWidget);
     expect(find.textContaining('Bay Street'), findsOneWidget, reason: 'pickup from reverse geocoding');
 
@@ -67,6 +78,15 @@ void main() {
     await tapKey(tester, 'submit-rating');
     expect(server.calls('POST /trips/$tripId/rate').single.body, contains('"score":5'));
     expect(find.text('Thanks for rating your driver!'), findsOneWidget);
+
+    // Back home at the drop-off: the next pickup is where the rider is now, not this trip's pickup.
+    phone.point = const LatLngPoint(13.0667, -59.5333);
+    server.on('GET /places/reverse', {'place_id': 'there', 'name': 'Oistins Bay Gardens', 'address': 'Oistins, Christ Church, Barbados', 'lat': 13.0667, 'lng': -59.5333});
+    await tester.tap(find.text('Done'));
+    await settle(tester);
+    expect(find.text('Hi Rita, where to?'), findsOneWidget);
+    expect(find.textContaining('Oistins Bay Gardens'), findsOneWidget, reason: 'pickup follows the rider');
+    expect(find.textContaining('Bay Street'), findsNothing);
     await unmount(tester);
   });
 

@@ -33,6 +33,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   LatLngPoint? _me;
   Place? _pickup;
+
+  /// The pickup is "where I am" (not a place the rider picked): it follows the rider when they come back.
+  bool _pickupIsHere = false;
   Place? _dropoff;
   final List<Place> _stops = [];
   static const maxStops = 2;
@@ -85,6 +88,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Back from the bank's card page: see whether it's paid.
     if (state == AppLifecycleState.resumed && _owed.isNotEmpty) _loadOwed();
+    // Back in the app before booking: if the pickup is "where I am", it moves with the rider.
+    if (state == AppLifecycleState.resumed && !_away && _pickupIsHere && _dropoff == null) _pickupHere();
   }
 
   Future<void> _loadOwed() async {
@@ -182,16 +187,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _loadPlaces();
     _loadCredit();
     _loadOwed();
+    await _pickupHere(onlyIfEmpty: true);
+  }
+
+  /// Use where the rider is now as the pickup (fresh GPS fix + address). With [onlyIfEmpty], keep one already set.
+  Future<void> _pickupHere({bool onlyIfEmpty = false}) async {
+    final scope = AppScope.of(context);
     final me = await scope.location.current();
     if (!mounted) return;
     final point = me ?? const LatLngPoint(AppConfig.defaultLat, AppConfig.defaultLng);
-    setState(() => _me = me);
-    if (_pickup == null) {
-      final here = await scope.api.reverse(point.lat, point.lng);
-      if (!mounted || _pickup != null) return;
-      setState(() => _pickup = here ?? Place(name: me != null ? 'Current location' : 'Bridgetown', lat: point.lat, lng: point.lng));
-      _loadCars();
-    }
+    setState(() => _me = me ?? _me);
+    if (onlyIfEmpty && _pickup != null) return;
+    final here = await scope.api.reverse(point.lat, point.lng);
+    if (!mounted || (onlyIfEmpty && _pickup != null)) return;
+    setState(() {
+      _pickup = here ?? Place(name: me != null ? 'Current location' : 'Bridgetown', lat: point.lat, lng: point.lng);
+      _pickupIsHere = true;
+    });
+    _loadCars();
   }
 
   Future<void> _loadCards() async {
@@ -263,7 +276,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
     ));
     if (place != null && mounted) {
-      setState(() => _pickup = place);
+      setState(() {
+        _pickup = place;
+        // Picking "Current location" keeps following the rider; any other place stays put.
+        _pickupIsHere = _me != null && (place.lat - _me!.lat).abs() < 0.0002 && (place.lng - _me!.lng).abs() < 0.0002;
+      });
       _quote();
     }
   }
@@ -362,7 +379,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _away = false;
     if (!mounted) return;
     _loadCars();
-    // Back from the trip: start fresh from where the rider is.
+    // Back from the trip: start fresh from where the rider is now (not the last trip's pickup).
+    _pickupHere();
     setState(() {
       _dropoff = null;
       _stops.clear();

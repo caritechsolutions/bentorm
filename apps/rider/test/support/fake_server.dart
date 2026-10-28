@@ -54,7 +54,8 @@ class Reply {
 /// Pumps the whole app. [signedIn] starts with a stored token.
 /// [config]: a captured GET /config (feature switches); without it every feature counts as on.
 /// [realtime]: a live-updates client (with a fake socket) the screens use.
-Future<({Session session, FakeServer server})> pumpApp(WidgetTester tester, FakeServer server, {bool signedIn = true, Map<String, dynamic>? config, RealtimeClient? realtime}) async {
+Future<({Session session, FakeServer server})> pumpApp(WidgetTester tester, FakeServer server,
+    {bool signedIn = true, Map<String, dynamic>? config, RealtimeClient? realtime, LocationService? location}) async {
   RideMap.enabled = false;
   tester.view.physicalSize = const Size(1080, 2400);
   tester.view.devicePixelRatio = 3;
@@ -62,7 +63,7 @@ Future<({Session session, FakeServer server})> pumpApp(WidgetTester tester, Fake
 
   final session = Session(RiderApi(ApiClient(client: server.client, baseUrl: 'https://api.test/api/v1')), MemoryTokenStore(signedIn ? 'tok' : null), role: 'rider');
   final live = config == null && realtime == null ? null : (LiveLink(session, config: RemoteConfig(config))..realtime = realtime);
-  await tester.pumpWidget(RideCoopApp(session: session, location: FixedLocationService(const LatLngPoint(13.0969, -59.6145)), live: live));
+  await tester.pumpWidget(RideCoopApp(session: session, location: location ?? FixedLocationService(const LatLngPoint(13.0969, -59.6145)), live: live));
   // Not awaited: the fake clock (pump) drives it, like the real app's first frames.
   unawaited(session.restore());
   await settle(tester);
