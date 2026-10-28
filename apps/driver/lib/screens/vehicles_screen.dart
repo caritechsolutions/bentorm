@@ -69,17 +69,11 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     final online = AppScope.of(context).engine.online;
     return Scaffold(
       appBar: AppBar(title: const Text('My vehicles')),
-      floatingActionButton: FloatingActionButton.extended(
-        key: const Key('add-vehicle'),
-        onPressed: () => _open(VehicleForm(serviceAreaId: widget.serviceAreaId)),
-        icon: const Icon(Icons.add),
-        label: const Text('Add my own car'),
-      ),
       body: RefreshIndicator(
         onRefresh: _load,
         // A handful of cars: build them all (no lazy list), so every card is there to find.
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+          padding: const EdgeInsets.all(16),
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (_error != null) Text(_error!, style: const TextStyle(color: Brand.red)),
@@ -91,6 +85,13 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
             ),
           if (cars != null && cars.isEmpty) const Text('No vehicles yet. Add your own car, or accept a fleet\'s invitation.'),
           for (final v in cars ?? const <Vehicle>[]) _card(v, online),
+            if (cars != null)
+              OutlinedButton.icon(
+                key: const Key('add-vehicle'),
+                onPressed: () => _open(VehicleForm(serviceAreaId: widget.serviceAreaId)),
+                icon: const Icon(Icons.add),
+                label: const Text('Add my own car'),
+              ),
           ]),
         ),
       ),
