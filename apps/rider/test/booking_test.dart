@@ -86,6 +86,8 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Done'));
     await settle(tester);
+    // ignore: avoid_print
+    print('SCREEN: ${find.byType(Text).evaluate().map((e) => (e.widget as Text).data).whereType<String>().join(' | ')}');
     expect(find.text('Hi Rita, where to?'), findsOneWidget);
     expect(find.textContaining('Oistins Bay Gardens'), findsOneWidget, reason: 'pickup follows the rider');
     expect(find.textContaining('Bay Street'), findsNothing);
