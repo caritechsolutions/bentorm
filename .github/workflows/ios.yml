@@ -1,0 +1,114 @@
+name: iOS apps
+
+# Builds the rider and driver apps for iPhone on a Mac runner.
+# - Always: a release build without signing, to prove both apps compile for iOS.
+# - With the App Store Connect secrets set (see docs/ios.md): signed builds uploaded to TestFlight, so they can be
+#   installed on any iPhone with the TestFlight app.
+on:
+  push:
+    branches: [main]
+    paths: ['apps/rider/**', 'apps/driver/**', 'apps/core/**', '.github/workflows/ios.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: 3.47.5
+  API_BASE: https://api.ridecoop.net/api/v1
+  GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+
+jobs:
+  build:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [rider, driver]
+    defaults:
+      run:
+        working-directory: apps/${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Maps key and bundle id
+        env:
+          BUNDLE_RIDER: ${{ vars.IOS_BUNDLE_ID_RIDER }}
+          BUNDLE_DRIVER: ${{ vars.IOS_BUNDLE_ID_DRIVER }}
+        run: |
+          for f in ios/Flutter/Release.xcconfig ios/Flutter/Debug.xcconfig; do echo "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY" >> "$f"; done
+          [ -n "$GOOGLE_MAPS_API_KEY" ] || echo "::warning::GOOGLE_MAPS_API_KEY secret not set - maps will be blank"
+          BID=$([ "${{ matrix.app }}" = rider ] && echo "$BUNDLE_RIDER" || echo "$BUNDLE_DRIVER")
+          [ -n "$BID" ] || BID=$(grep -m1 'PRODUCT_BUNDLE_IDENTIFIER = net.ridecoop' ios/Runner.xcodeproj/project.pbxproj | sed -E 's/.*= ([^;]+);/\1/')
+          echo "BUNDLE_ID=$BID" >> "$GITHUB_ENV"; echo "Bundle id: $BID"
+
+      # Push: GoogleService-Info.plist for this app from a secret (never committed). Without it, push is off.
+      - name: Firebase config
+        env:
+          PLIST_RIDER: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_RIDER }}
+          PLIST_DRIVER: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_DRIVER }}
+        run: |
+          P=$([ "${{ matrix.app }}" = rider ] && echo "$PLIST_RIDER" || echo "$PLIST_DRIVER")
+          if [ -z "$P" ]; then echo "::warning::No GoogleService-Info.plist secret for ${{ matrix.app }} - push off on iOS"; exit 0; fi
+          printf '%s' "$P" > ios/Runner/GoogleService-Info.plist
+          echo "FIREBASE_DEFINES=--dart-define=PUSH=true" >> "$GITHUB_ENV"
+
+      - name: Build (no signing) — proves it compiles for iPhone
+        run: |
+          set -o pipefail
+          flutter build ios --release --no-codesign --dart-define=API_BASE=$API_BASE $FIREBASE_DEFINES 2>&1 | tee /tmp/build.txt
+
+      - name: Signed build to TestFlight
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+          KEY_P8: ${{ secrets.APPSTORE_API_KEY_P8 }}
+        run: |
+          set -o pipefail
+          if [ -z "$TEAM_ID" ] || [ -z "$KEY_ID" ] || [ -z "$ISSUER_ID" ] || [ -z "$KEY_P8" ]; then
+            echo "::notice::App Store Connect secrets not set - skipping TestFlight (see docs/ios.md)"; exit 0
+          fi
+          P8="$RUNNER_TEMP/AuthKey_$KEY_ID.p8"; printf '%s' "$KEY_P8" > "$P8"
+          AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$P8" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID")
+          flutter build ios --release --config-only --build-number=${{ github.run_number }} --dart-define=API_BASE=$API_BASE $FIREBASE_DEFINES
+          xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release -sdk iphoneos \
+            -archivePath "$RUNNER_TEMP/Runner.xcarchive" archive \
+            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" "${AUTH[@]}" 2>&1 | tee -a /tmp/build.txt | grep -E "error|warning: .*sign|ARCHIVE" || true
+          test -d "$RUNNER_TEMP/Runner.xcarchive" || { echo "::error::Archive failed - see build log"; exit 1; }
+          cat > "$RUNNER_TEMP/export.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Runner.xcarchive" -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
+            -exportPath "$RUNNER_TEMP/export" "${AUTH[@]}" 2>&1 | tee -a /tmp/build.txt | tail -20
+          echo "::notice::Uploaded ${{ matrix.app }} build ${{ github.run_number }} ($BUNDLE_ID) to App Store Connect - it appears in TestFlight after Apple's processing (about 10-30 min)."
+
+      - name: Publish build log on failure
+        if: failure()
+        working-directory: .
+        run: |
+          mkdir -p /tmp/ci && tail -c 300000 /tmp/build.txt > /tmp/ci/build.txt 2>/dev/null || true
+          cd /tmp/ci && git init -q && git checkout -q -b ci-logs-ios-${{ matrix.app }}
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "${GITHUB_SHA}" > sha.txt && git add -A && git commit -qm "iOS log for ${GITHUB_SHA}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" ci-logs-ios-${{ matrix.app }}
