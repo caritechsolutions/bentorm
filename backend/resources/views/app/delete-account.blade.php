@@ -3,7 +3,7 @@
 @section('content')
   <h1>Delete your Ride Coop account</h1>
   <div class="card">
-    <p>You can delete your account in the Ride Coop or Ride Coop Driver app (Menu → Account → Delete account), or here.</p>
+    <p>You can delete your account in the Ride Coop or Ride Coop Driver app (Menu → Delete account), or here.</p>
     <p class="small muted"><b>What is removed:</b> your name, phone number, email, saved places, saved cards, and for drivers your documents and bank details. You are signed out on every phone.</p>
     <p class="small muted"><b>What is kept:</b> past trips and payments, without your details, because we must keep financial records and the other person's trip history. Messages to support stay with the ticket.</p>
     <p class="small muted">You can sign up again later with the same number; it will be a new account.</p>

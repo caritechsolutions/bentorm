@@ -7,7 +7,7 @@ These terms apply when you use the Ride Coop apps and website ("Ride Coop", "we"
 ## 1. Your account
 - You need a mobile number we can confirm with a code. Keep your phone and codes to yourself; you are responsible for what is done with your account.
 - You must be at least 18 to have an account.
-- You can delete your account at any time in the app (Menu → Account → Delete account) or at {{delete_url}}.
+- You can delete your account at any time in the app (Menu → Delete account) or at {{delete_url}}.
 
 ## 2. Rides and deliveries
 - Ride Coop connects riders and customers with independent drivers. The driver provides the ride or delivery.

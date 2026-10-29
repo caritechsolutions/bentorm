@@ -26,7 +26,7 @@ Ride Coop is operated by Caritech Solutions Inc., Barbados ("we"). This policy e
 - Account details are kept while you have an account. If you delete your account, your name, number, email, saved places, saved cards, and drivers' documents and bank details are removed. Trip and payment records are kept without your details for as long as tax and accounting law requires.
 
 ## Your choices and rights
-- You can see and change your details in the app, ask us for a copy of your data, ask us to correct it, or delete your account in the app (Menu → Account → Delete account) or at {{delete_url}}.
+- You can see and change your details in the app, ask us for a copy of your data, ask us to correct it, or delete your account in the app (Menu → Delete account) or at {{delete_url}}.
 
 ## Contact
 {{contact}}
