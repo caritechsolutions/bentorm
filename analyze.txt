@@ -1,0 +1,41 @@
+Analyzing rider...                                              
+
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:21:48 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:21:80 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:29:7 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:35:90 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:40:91 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:80:9 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:109:9 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:116:9 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:126:80 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:137:9 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:152:85 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:173:61 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:194:56 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:227:9 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:243:9 • use_null_aware_elements
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/api/rider_api.dart:267:9 • use_null_aware_elements
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/history_screen.dart:65:33 • unnecessary_underscores
+  error • Undefined name 'LegalLinks'. Try correcting the name to one that is defined, or defining the name • lib/screens/home_screen.dart:1060:16 • undefined_identifier
+  error • Undefined name 'AccountDeletion'. Try correcting the name to one that is defined, or defining the name • lib/screens/home_screen.dart:1061:13 • undefined_identifier
+   info • Statements in an if should be enclosed in a block. Try wrapping the statement in a block • lib/screens/shop/order_screen.dart:64:36 • curly_braces_in_flow_control_structures
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/shop/orders_screen.dart:64:35 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/shop/shop_widgets.dart:77:98 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/shop/shop_widgets.dart:77:102 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/shop/store_screen.dart:89:109 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/shop/store_screen.dart:89:113 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/shop/store_screen.dart:235:109 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/shop/store_screen.dart:235:113 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/upcoming_screen.dart:50:43 • unnecessary_underscores
+   info • 'getToken' is deprecated and shouldn't be used. Use register() and onRegistered instead. Try replacing the use of the deprecated member with the replacement • lib/state/push.dart:127:57 • deprecated_member_use
+   info • 'onTokenRefresh' is deprecated and shouldn't be used. Use onRegistered instead. Try replacing the use of the deprecated member with the replacement • lib/state/push.dart:130:65 • deprecated_member_use
+   info • 'deleteToken' is deprecated and shouldn't be used. Use unregister() and onUnregistered instead. Try replacing the use of the deprecated member with the replacement • lib/state/push.dart:163:60 • deprecated_member_use
+   info • 'zIndex' is deprecated and shouldn't be used. Use zIndexInt instead. On some platforms zIndex is truncated to an int, which can lead to incorrect/unstable ordering. Try replacing the use of the deprecated member with the replacement • lib/widgets/ride_map.dart:271:11 • deprecated_member_use
+   info • 'zIndex' is deprecated and shouldn't be used. Use zIndexInt instead. On some platforms zIndex is truncated to an int, which can lead to incorrect/unstable ordering. Try replacing the use of the deprecated member with the replacement • lib/widgets/ride_map.dart:279:11 • deprecated_member_use
+   info • 'zIndex' is deprecated and shouldn't be used. Use zIndexInt instead. On some platforms zIndex is truncated to an int, which can lead to incorrect/unstable ordering. Try replacing the use of the deprecated member with the replacement • lib/widgets/ride_map.dart:287:11 • deprecated_member_use
+   info • 'zIndex' is deprecated and shouldn't be used. Use zIndexInt instead. On some platforms zIndex is truncated to an int, which can lead to incorrect/unstable ordering. Try replacing the use of the deprecated member with the replacement • lib/widgets/ride_map.dart:296:11 • deprecated_member_use
+   info • 'zIndex' is deprecated and shouldn't be used. Use zIndexInt instead. On some platforms zIndex is truncated to an int, which can lead to incorrect/unstable ordering. Try replacing the use of the deprecated member with the replacement • lib/widgets/ride_map.dart:306:11 • deprecated_member_use
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • test/live_map_test.dart:21:48 • use_null_aware_elements
+
+37 issues found. (ran in 8.5s)
