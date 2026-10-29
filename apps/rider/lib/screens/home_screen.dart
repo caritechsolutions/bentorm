@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:ridecoop_core/ridecoop_core.dart' show AppPages;
+import 'package:ridecoop_core/ridecoop_core.dart' show AccountDeletion, AppPages, LegalLinks;
 
 import '../api/api_client.dart';
 import '../api/models.dart';
