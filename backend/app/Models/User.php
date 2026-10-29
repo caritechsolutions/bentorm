@@ -37,6 +37,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         return [
             'role' => UserRole::class,
             'is_active' => 'boolean',
+            'rider_rating_avg' => 'decimal:2',
             'phone_verified_at' => 'datetime',
             'last_seen_at' => 'datetime',
             'password' => 'hashed',

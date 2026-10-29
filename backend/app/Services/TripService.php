@@ -294,12 +294,15 @@ class TripService
         );
 
         $ratee = User::query()->find($rateeId);
-        if ($ratee?->isDriver() && $ratee->driverProfile) {
-            $agg = Rating::query()->where('ratee_id', $rateeId)->selectRaw('AVG(score) as avg, COUNT(*) as cnt')->first();
-            $ratee->driverProfile->forceFill([
-                'rating_avg' => round((float) $agg->avg, 2),
-                'rating_count' => (int) $agg->cnt,
-            ])->save();
+        // As a driver (ratings from riders) or as a rider (ratings from drivers): a person can be both.
+        $asDriver = $rateeId === $trip->driver_id;
+        $agg = Rating::query()->where('ratee_id', $rateeId)
+            ->whereHas('trip', fn ($q) => $q->where($asDriver ? 'driver_id' : 'rider_id', $rateeId))
+            ->selectRaw('AVG(score) as avg, COUNT(*) as cnt')->first();
+        if ($asDriver && $ratee?->driverProfile) {
+            $ratee->driverProfile->forceFill(['rating_avg' => round((float) $agg->avg, 2), 'rating_count' => (int) $agg->cnt])->save();
+        } elseif (! $asDriver && $ratee) {
+            $ratee->forceFill(['rider_rating_avg' => round((float) $agg->avg, 2), 'rider_rating_count' => (int) $agg->cnt])->save();
         }
 
         return $rating;
@@ -309,6 +312,8 @@ class TripService
 
     public function arrive(Trip $trip, User $driver): Trip
     {
+        $this->assertNearRider($trip, $driver, 'mark that you\'ve arrived');
+
         return $this->transition($trip, $driver, TripStatus::Arrived, ['arrived_at' => now()]);
     }
 
@@ -318,6 +323,7 @@ class TripService
         if ($trip->isDelivery()) {
             abort(409, 'The store confirms the hand-over in their portal — the job moves on by itself.');
         }
+        $this->assertNearRider($trip, $driver, 'start the ride');
 
         return $this->withPin($trip, $driver, $pin, TripStatus::InProgress, 'the rider', function (Trip $t) {
             $t->forceFill([
@@ -717,6 +723,37 @@ class TripService
     }
 
     // ---------------------------------------------------------------- internals
+
+    /**
+     * Rides: the driver must be near the rider — where the rider's phone is (they may have walked from the pin) or
+     * the pickup pin — before Arrived / Start (admin setting, 0 = off). Without a recent position for the driver
+     * there's nothing to measure, so it's allowed.
+     */
+    private function assertNearRider(Trip $trip, User $driver, string $action): void
+    {
+        $max = \App\Support\Features::number('pickup.max_distance_m');
+        if ($max <= 0 || $trip->isDelivery() || $trip->driver_id !== $driver->id) {
+            return;
+        }
+        $me = $this->locations->position($driver);
+        if (! $me || ($me['updated_at'] ?? 0) < now()->timestamp - RiderLocationService::FRESH_SECONDS) {
+            return;
+        }
+        $toPin = Geo::haversine($me['lat'], $me['lng'], (float) $trip->pickup_lat, (float) $trip->pickup_lng);
+        $rider = app(RiderLocationService::class)->get($trip);
+        $toRider = $rider ? Geo::haversine($me['lat'], $me['lng'], $rider['lat'], $rider['lng']) : null;
+        $nearest = $toRider === null ? $toPin : min($toPin, $toRider);
+        if ($nearest <= $max) {
+            return;
+        }
+        $name = $trip->rider?->firstName() ?? 'the rider';
+        $far = $nearest >= 1000 ? number_format($nearest / 1000, 1).' km' : ((int) round($nearest, -1)).' m';
+        abort(response()->json([
+            'message' => "You're {$far} from {$name}. Get within ".(int) $max.' m of '.($toRider !== null ? "{$name} or " : '')."the pickup to {$action}.",
+            'distance_m' => (int) round($nearest),
+            'max_distance_m' => (int) $max,
+        ], 409));
+    }
 
     private function transition(Trip $trip, User $driver, TripStatus $to, array $extra): Trip
     {

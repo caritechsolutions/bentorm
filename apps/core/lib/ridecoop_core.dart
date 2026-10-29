@@ -1,6 +1,7 @@
 /// Shared by the Ride Coop rider and driver apps.
 library;
 
+export 'src/account.dart';
 export 'src/api_client.dart';
 export 'src/app_pages.dart';
 export 'src/auth_api.dart';

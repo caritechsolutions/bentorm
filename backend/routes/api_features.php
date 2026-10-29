@@ -8,6 +8,17 @@ use Illuminate\Support\Facades\Route;
 // Web pages inside the apps: a one-time sign-in link.
 Route::post('app-links', [AppLinkController::class, 'store'])->middleware('throttle:30,1,post-app-links');
 
+// Delete my account (Account → Delete account in both apps)
+Route::get('me/deletion', fn (\Illuminate\Http\Request $request, \App\Services\AccountDeletionService $d) => [
+    'blockers' => $d->blockers($request->user()), 'web_url' => url('/account/delete'),
+]);
+Route::delete('me', function (\Illuminate\Http\Request $request, \App\Services\AccountDeletionService $d) {
+    $request->validate(['confirm' => ['accepted']]);
+    $d->delete($request->user(), 'app');
+
+    return ['ok' => true, 'message' => 'Your account has been deleted.'];
+})->middleware('throttle:5,1,delete-me');
+
 // Free cars around the rider before booking (rough positions, no driver details)
 Route::get('drivers/nearby', function (\Illuminate\Http\Request $request, \App\Services\DriverLocationService $locations) {
     $d = $request->validate(['lat' => ['required', 'numeric', 'between:-90,90'], 'lng' => ['required', 'numeric', 'between:-180,180'], 'vehicle_type' => ['nullable', 'string', 'max:40']]);
@@ -83,6 +94,18 @@ Route::post('promo-codes/check', function (\Illuminate\Http\Request $request, \A
     return ['code' => $p->code, 'summary' => $p->summary(), 'description' => $p->description,
         'discount' => isset($d['amount']) ? $p->discountOn((float) $d['amount']) : null];
 })->middleware('throttle:20,1,post-promo-codes-check');
+
+// The rider's phone position while the driver comes (the driver must get near the rider or the pickup to start)
+Route::post('trips/{trip}/rider-location', function (\Illuminate\Http\Request $request, \App\Models\Trip $trip, \App\Services\RiderLocationService $where) {
+    abort_unless($trip->rider_id === $request->user()->id, 404);
+    $d = $request->validate(['lat' => ['required', 'numeric', 'between:-90,90'], 'lng' => ['required', 'numeric', 'between:-180,180'], 'accuracy' => ['nullable', 'numeric', 'min:0']]);
+    if (! in_array($trip->status->value, ['accepted', 'arrived'], true)) {
+        return ['ok' => true, 'shared' => false]; // only while the driver is on the way
+    }
+    $where->put($trip, (float) $d['lat'], (float) $d['lng'], isset($d['accuracy']) ? (float) $d['accuracy'] : null);
+
+    return ['ok' => true, 'shared' => true];
+})->middleware('throttle:30,1,post-trips-rider-location');
 
 // Safety: share my trip, SOS
 Route::post('trips/{trip}/share', function (\Illuminate\Http\Request $request, \App\Models\Trip $trip, \App\Services\SafetyService $safety) {

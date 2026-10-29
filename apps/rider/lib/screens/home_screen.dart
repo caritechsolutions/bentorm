@@ -951,7 +951,8 @@ class _AccountDrawer extends StatelessWidget {
     final user = session.user;
     return Drawer(
       child: SafeArea(
-        child: Column(
+        child: SingleChildScrollView(
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
@@ -1055,8 +1056,11 @@ class _AccountDrawer extends StatelessWidget {
                   }
                 },
               ),
-            const Spacer(),
+            const Divider(),
+            ...LegalLinks.tiles(context, AppScope.of(context).api.client),
+            AccountDeletion.tile(context, session),
             ListTile(
+              key: const Key('sign-out'),
               leading: const Icon(Icons.logout),
               title: const Text('Sign out'),
               onTap: () async {
@@ -1067,6 +1071,7 @@ class _AccountDrawer extends StatelessWidget {
               },
             ),
           ],
+          ),
         ),
       ),
     );

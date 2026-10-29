@@ -352,7 +352,9 @@ class _OfferCardState extends State<OfferCard> {
         Text('You earn about ${money(o.estimatedEarnings, t.currency.isEmpty ? null : t.currency)}',
             key: const Key('offer-earnings'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E9E5A))),
       if (d == null)
-        Text('Fare ${money(t.estimatedFare, t.currency.isEmpty ? null : t.currency)} · ${t.isCash ? 'Cash' : 'Card'}', style: const TextStyle(color: Colors.black54))
+        Text('Fare ${money(t.estimatedFare, t.currency.isEmpty ? null : t.currency)} · ${t.isCash ? 'Cash' : 'Card'}'
+            '${t.riderRating != null ? ' · ${t.riderFirstName} ★ ${t.riderRating!.toStringAsFixed(1)}' : ''}',
+            key: const Key('offer-fare'), style: const TextStyle(color: Colors.black54))
       else
         Text('Order ${d.orderNumber} · ${d.itemCount} ${d.itemCount == 1 ? 'item' : 'items'} · paid by card', style: const TextStyle(color: Colors.black54)),
       const Divider(height: 20),
@@ -471,7 +473,8 @@ class _Menu extends StatelessWidget {
     final profile = scope.engine.status?.profile;
     return Drawer(
       child: SafeArea(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child: SingleChildScrollView(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Padding(
             padding: const EdgeInsets.all(20),
             child: Row(children: [
@@ -540,8 +543,11 @@ class _Menu extends StatelessWidget {
               title: const Text('Help'),
               onTap: () => _page(context, 'help'),
             ),
-          const Spacer(),
+          const Divider(),
+          ...LegalLinks.tiles(context, scope.api.client),
+          AccountDeletion.tile(context, scope.session),
           ListTile(
+            key: const Key('sign-out'),
             leading: const Icon(Icons.logout),
             title: const Text('Sign out'),
             onTap: () async {
@@ -551,7 +557,8 @@ class _Menu extends StatelessWidget {
               await scope.session.signOut();
             },
           ),
-        ]),
+          ]),
+        ),
       ),
     );
   }

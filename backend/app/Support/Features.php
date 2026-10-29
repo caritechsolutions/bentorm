@@ -31,6 +31,7 @@ final class Features
         'masked_calls' => true,               // needs Twilio voice (Settings → Gateways → SMS → Twilio)
         'support' => true,
         'auto_surge' => false,
+        'pickup.max_distance_m' => 150,       // driver must be this close to the rider or the pickup to arrive / start (0 = off)
     ];
 
     /** What the apps may see (no secrets; amounts are shown to customers anyway). */

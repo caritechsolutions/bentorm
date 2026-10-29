@@ -26,6 +26,7 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
   late Trip _trip = widget.initial;
   DriverPosition? _driver;
   Timer? _timer;
+  Timer? _shareTimer;
   bool _busy = false;
   bool _openedPayment = false;
   int _stars = 0;
@@ -47,6 +48,8 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _rated = widget.initial.rated;
     _timer = Timer.periodic(widget.pollEvery, (_) => _refresh());
+    // While the driver comes, tell them where this phone is (the rider may not be at the pin).
+    _shareTimer = Timer.periodic(const Duration(seconds: 10), (_) => _shareWhereIAm());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Live updates: the driver's position arrives on the trip's own channel every few seconds; trip changes and
       // messages on the rider's channel refresh at once. The poll stays at its normal pace as a safety net.
@@ -72,6 +75,7 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    _shareTimer?.cancel();
     _live?.cancel();
     _realtime?.leave(_channel);
     _comment.dispose();
@@ -81,6 +85,18 @@ class _TripScreenState extends State<TripScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  Future<void> _shareWhereIAm() async {
+    if (!mounted || (_trip.status != 'accepted' && _trip.status != 'arrived')) return;
+    final scope = AppScope.of(context);
+    final me = await scope.location.current();
+    if (me == null || !mounted) return;
+    try {
+      await scope.api.shareLocation(_trip.id, me.lat, me.lng);
+    } on ApiException {
+      // Not essential; the next tick tries again.
+    }
   }
 
   Future<void> _refresh() async {

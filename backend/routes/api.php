@@ -46,6 +46,8 @@ Route::prefix('v1')->group(function () {
         // Feature switches (Settings → App features): the apps hide what is off, no new build needed.
         'features' => \App\Support\Features::forApps(),
         'emergency_numbers' => \App\Services\SafetyService::emergencyNumbers(),
+        // Public pages the apps link to (sign-up, menu).
+        'links' => ['terms' => url('/terms'), 'privacy' => url('/privacy'), 'delete_account' => url('/account/delete')],
     ]);
     // Shop browsing is public (the app shows stores before sign-in).
     Route::get('shop/categories', [\App\Http\Controllers\Api\V1\Shop\ShopController::class, 'categories']);
@@ -166,6 +168,7 @@ Route::prefix('v1')->group(function () {
             Route::post('trips/{trip}/navigation', [DriverTripController::class, 'navigation']);
             Route::post('trips/{trip}/complete', [DriverTripController::class, 'complete']);
             Route::post('trips/{trip}/cancel', [DriverTripController::class, 'cancel']);
+            Route::post('trips/{trip}/rate', [DriverTripController::class, 'rate']);
         });
 
         // Admin

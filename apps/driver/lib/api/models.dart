@@ -362,7 +362,21 @@ class DriverTrip {
     this.canCall = false,
     this.unreadMessages = 0,
     this.earningsPaidTo,
+    this.riderPosition,
+    this.ratedByMe = false,
+    this.riderRating,
+    this.riderRatingCount = 0,
   });
+
+  /// You already rated this rider for this trip.
+  final bool ratedByMe;
+
+  /// The rider's average from drivers (null = no ratings yet).
+  final double? riderRating;
+  final int riderRatingCount;
+
+  /// Where the rider's phone is while you come to them (they may have walked from the pickup pin).
+  final LatLngPoint? riderPosition;
 
   /// Set when the trip was in a fleet's car: its earnings are paid to that fleet.
   final String? earningsPaidTo;
@@ -442,6 +456,12 @@ class DriverTrip {
       canCall: j['can_call'] == true,
       unreadMessages: _in(j['unread_messages']) ?? 0,
       earningsPaidTo: _s(j['earnings_paid_to']),
+      ratedByMe: j['rated_by_me'] == true,
+      riderRating: _dn(_m(j['rider_rating'])['avg']),
+      riderRatingCount: _in(_m(j['rider_rating'])['count']) ?? 0,
+      riderPosition: j['rider_position'] is Map && _m(j['rider_position'])['lat'] != null
+          ? LatLngPoint(_d(_m(j['rider_position'])['lat']), _d(_m(j['rider_position'])['lng']))
+          : null,
     );
   }
 
@@ -456,7 +476,7 @@ class DriverTrip {
   bool get hasPendingStopChange => stopChange?.pending ?? false;
 
   /// Changes when anything the trip screen shows changes (used to decide whether a poll result is new).
-  String get signature => [status, unreadMessages, canChat, canCall, tip, for (final s in stops) '${s.lat},${s.lng},${s.reached}', stopChange?.status, stopChange?.stops.length].join('|');
+  String get signature => [status, riderPosition?.lat, riderPosition?.lng, unreadMessages, canChat, canCall, tip, for (final s in stops) '${s.lat},${s.lng},${s.reached}', stopChange?.status, stopChange?.stops.length].join('|');
 
   bool get isActive => const ['accepted', 'arrived', 'in_progress'].contains(status);
   bool get canCancel => const ['accepted', 'arrived'].contains(status);

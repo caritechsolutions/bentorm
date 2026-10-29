@@ -40,6 +40,9 @@ void main() {
 
   test('trip steps, earnings and history parse', () {
     expect(DriverTrip.fromJson(fixture('trip_accepted')).status, 'accepted');
+    final withRider = DriverTrip.fromJson({...fixture('trip_accepted') as Map<String, dynamic>, 'rider_position': {'lat': 13.07, 'lng': -59.53, 'at': 1}});
+    expect([withRider.riderPosition?.lat, withRider.riderPosition?.lng], [13.07, -59.53]);
+    expect(DriverTrip.fromJson(fixture('trip_accepted')).riderPosition, isNull);
     expect(DriverTrip.fromJson(fixture('trip_arrived')).status, 'arrived');
     expect(DriverTrip.fromJson(fixture('trip_started')).status, 'in_progress');
     final done = DriverTrip.fromJson(fixture('trip_completed'));

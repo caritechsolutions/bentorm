@@ -12,6 +12,23 @@ Route::get('/', fn () => match (request()->getHost()) {
     default => response()->json(['service' => 'bentorm-api', 'health' => '/api/v1/health']),
 });
 
+// Terms and Privacy (public; edited in admin → Settings → Legal pages)
+foreach (App\Support\LegalPages::PAGES as $slug => $title) {
+    Route::get('/'.$slug, fn () => view('legal', ['title' => $title, 'html' => App\Support\LegalPages::html($slug)]));
+}
+
+// Delete my account (public page the app stores link to): a code to the phone, then confirm.
+Route::middleware('web')->group(function () {
+    Route::get('/account/delete', [App\Http\Controllers\AppPages\AccountDeletionController::class, 'show']);
+    Route::get('/account/delete/restart', function () {
+        session()->forget('delete.phone');
+
+        return redirect('/account/delete');
+    });
+    Route::post('/account/delete/code', [App\Http\Controllers\AppPages\AccountDeletionController::class, 'sendCode'])->middleware('throttle:5,10,post-account-delete-code');
+    Route::post('/account/delete', [App\Http\Controllers\AppPages\AccountDeletionController::class, 'destroy'])->middleware('throttle:10,10,post-account-delete');
+});
+
 // Share my trip: a public live page (no login) while the trip runs and an hour after.
 Route::get('/t/{token}', function (string $token, App\Services\SafetyService $safety) {
     $trip = $safety->sharedTrip($token);

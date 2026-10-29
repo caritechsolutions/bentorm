@@ -46,6 +46,28 @@ class ViewTrip extends ViewRecord
                     Notification::make()->title('Marked as paid in cash')->success()->send();
                     $this->refreshFormData([]);
                 }),
+            Action::make('adjustFare')->label('Adjust fare')->icon(Heroicon::OutlinedPencilSquare)->color('gray')
+                ->visible(fn (Trip $record) => $record->status->value === 'completed' && ! $record->isDelivery())
+                ->modalDescription(fn (Trip $record) => sprintf('Charged %s %.2f. The driver\'s share and the commission change in proportion; the difference shows on their statement.',
+                    $record->currency, (float) $record->final_fare))
+                ->fillForm(fn (Trip $record) => ['new_fare' => (float) $record->final_fare,
+                    'refund_as' => \App\Models\Payment::query()->where('trip_id', $record->id)->where('status', 'captured')->exists() ? 'card' : 'credit'])
+                ->schema(fn (Trip $record) => [
+                    \Filament\Forms\Components\TextInput::make('new_fare')->label('Correct fare')->numeric()->minValue(0)->required()->prefix($record->currency),
+                    \Filament\Forms\Components\Radio::make('refund_as')->label('If lower, give the rider the difference')->required()
+                        ->options(array_filter([
+                            'card' => \App\Models\Payment::query()->where('trip_id', $record->id)->where('status', 'captured')->exists() ? 'Back to their card' : null,
+                            'credit' => 'As ride credit',
+                            'cash' => 'In cash from the office',
+                        ]))
+                        ->helperText('If the fare goes up, the rider owes the difference and pays it in the app before their next ride.'),
+                    Textarea::make('reason')->label('Reason (shown to the rider)')->required()->maxLength(255),
+                ])
+                ->action(function (Trip $record, array $data): void {
+                    app(\App\Services\FareAdjustmentService::class)->adjust($record, (float) $data['new_fare'], $data['reason'], $data['refund_as'], auth()->user());
+                    Notification::make()->title('Fare corrected')->body('The rider has been told.')->success()->send();
+                    $this->refreshFormData(['final_fare', 'driver_earnings']);
+                }),
             Action::make('waive')->label('Waive amount owed')->icon(Heroicon::OutlinedGift)->color('warning')
                 ->visible(fn (Trip $record) => $record->amount_due > 0 && $record->payment_status->value === 'pending')
                 ->schema([Textarea::make('reason')->required()->maxLength(255)])

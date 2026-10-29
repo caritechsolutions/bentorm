@@ -284,4 +284,9 @@ class RiderApi extends AuthApi {
   /// Answer the store's "we're out of something" request. No cancels the order.
   Future<Order> answerOrderChange(String id, bool accept) async =>
       Order.fromJson(await client.post('/shop/orders/$id/change', {'accept': accept}) as Map<String, dynamic>);
+
+  /// While the driver comes: where this phone is, so they can find the rider (and may only start nearby).
+  Future<void> shareLocation(String tripId, double lat, double lng) async {
+    await client.post('/trips/$tripId/rider-location', {'lat': lat, 'lng': lng});
+  }
 }

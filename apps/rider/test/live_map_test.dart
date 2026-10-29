@@ -155,6 +155,12 @@ void main() {
     await tester.pump();
     expect(server.calls('GET /trips/$id').length, before);
 
+    // While the driver comes, the rider's phone shares where it is (they may not be at the pin).
+    server.on('POST /trips/$id/rider-location', {'ok': true, 'shared': true});
+    await tester.pump(const Duration(seconds: 11));
+    await settle(tester);
+    expect(server.calls('POST /trips/$id/rider-location'), isNotEmpty);
+
     // The map follows the driver; the recenter button brings it back after the rider moves the map.
     expect(find.byKey(const Key('recenter')), findsOneWidget);
     // Fold the trip panel down to see the map, then open it again.

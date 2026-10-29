@@ -50,6 +50,9 @@ class TripResource extends Resource
                 'tax' => $this->tax_amount,
             ],
             'driver_earnings' => $this->when($isDriverOrAdmin, $this->driver_earnings),
+            // Where the rider's phone is while the driver comes (they may have walked from the pin): driver only.
+            'rider_position' => $this->when($isDriverOrAdmin && in_array($this->status?->value, ['accepted', 'arrived'], true),
+                fn () => app(\App\Services\RiderLocationService::class)->get($this->resource)),
             // A trip in a fleet's car: its earnings are paid to the fleet.
             'earnings_paid_to' => $this->when($isDriverOrAdmin && $this->fleet_id, fn () => $this->fleet?->name),
             'tip' => (float) $this->tip_amount,
@@ -92,7 +95,13 @@ class TripResource extends Resource
                 'completed_at' => $this->completed_at?->toIso8601String(),
                 'cancelled_at' => $this->cancelled_at?->toIso8601String(),
             ],
-            'ratings' => RatingResource::collection($this->whenLoaded('ratings')),
+            // Only the viewer's own rating (riders don't see how their driver rated them; admins see both).
+            'ratings' => RatingResource::collection($this->whenLoaded('ratings', fn () => $request->user()?->isAdmin()
+                ? $this->ratings : $this->ratings->where('rater_id', $request->user()?->id)->values())),
+            'rated_by_me' => $request->user() ? $this->ratings()->where('rater_id', $request->user()->id)->exists() : false,
+            // The rider's average from drivers, for the driver (offer and trip).
+            'rider_rating' => $this->when($isDriverOrAdmin || ($request->user()?->isDriver() && $this->status?->value === 'requested'),
+                fn () => $this->rider ? ['avg' => $this->rider->rider_rating_avg !== null ? (float) $this->rider->rider_rating_avg : null, 'count' => (int) $this->rider->rider_rating_count] : null),
             // Shop deliveries: what to collect where, for whom. The customer's PIN is never sent to the driver.
             'kind' => $this->order_id ? 'delivery' : 'ride',
             'delivery' => $this->order_id ? $this->deliveryInfo() : null,

@@ -121,4 +121,15 @@ class TripController extends Controller
 
         return new TripResource($this->trips->cancel($trip, $request->user(), $data['reason'])->load(['rider', 'vehicle']));
     }
+
+    /** POST /driver/trips/{trip}/rate — the driver rates the rider after the ride. */
+    public function rate(Request $request, Trip $trip): JsonResponse
+    {
+        abort_unless($trip->driver_id === $request->user()->id, 403, 'This is not your trip.');
+        abort_if($trip->isDelivery(), 409, 'Deliveries are not rated by the driver.');
+        $data = $request->validate(['score' => ['required', 'integer', 'min:1', 'max:5'], 'comment' => ['nullable', 'string', 'max:500']]);
+        $rating = $this->trips->rate($trip, $request->user(), $data['score'], $data['comment'] ?? null);
+
+        return response()->json(['id' => $rating->id, 'score' => $rating->score], 201);
+    }
 }

@@ -216,6 +216,7 @@ class _TripScreenState extends State<TripScreen> {
                 dropoff: t.status == 'accepted' ? null : t.dropoff.point,
                 stops: t.status == 'accepted' ? const [] : [for (final s in t.stops) if (!s.reached) s.point],
                 me: engine.position,
+                rider: t.status == 'accepted' || t.status == 'arrived' ? t.riderPosition : null,
                 bottomPadding: 300,
               ),
             ),
@@ -377,6 +378,7 @@ class _TripScreenState extends State<TripScreen> {
               child: Text('+ ${money(t.tip, cur)} tip from ${t.riderFirstName}', key: const Key('tip-received'), style: const TextStyle(fontSize: 16, color: Color(0xFF1E9E5A))),
             ),
           const SizedBox(height: 16),
+          if (!t.isDelivery) _RateRider(trip: t),
           FilledButton(key: const Key('done'), onPressed: () => Navigator.of(context).pop(), child: const Text('Done')),
         ];
       default:
@@ -658,4 +660,68 @@ class _PinDialogState extends State<_PinDialog> {
           FilledButton(key: const Key('pin-submit'), onPressed: _busy ? null : _go, child: Text(widget.action)),
         ],
       );
+}
+
+/// After the ride: rate the rider (riders never see how a driver rated them; other drivers see the average).
+class _RateRider extends StatefulWidget {
+  const _RateRider({required this.trip});
+  final DriverTrip trip;
+
+  @override
+  State<_RateRider> createState() => _RateRiderState();
+}
+
+class _RateRiderState extends State<_RateRider> {
+  int _stars = 0;
+  bool _busy = false;
+  late bool _done = widget.trip.ratedByMe;
+  final _comment = TextEditingController();
+
+  @override
+  void dispose() {
+    _comment.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    setState(() => _busy = true);
+    try {
+      await AppScope.of(context).api.rateRider(widget.trip.id, _stars, comment: _comment.text);
+      if (mounted) setState(() => _done = true);
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_done) {
+      return const Padding(
+        padding: EdgeInsets.only(bottom: 12),
+        child: Text('Thanks — rider rated.', key: Key('rider-rated'), textAlign: TextAlign.center, style: TextStyle(color: Colors.black54)),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('How was ${widget.trip.riderFirstName}?', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w600)),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          for (var i = 1; i <= 5; i++)
+            IconButton(
+              key: Key('rider-star-$i'),
+              iconSize: 36,
+              onPressed: _busy ? null : () => setState(() => _stars = i),
+              icon: Icon(i <= _stars ? Icons.star : Icons.star_border, color: Brand.yellow),
+            ),
+        ]),
+        if (_stars > 0) ...[
+          if (_stars <= 3)
+            TextField(key: const Key('rider-comment'), controller: _comment, maxLength: 500, decoration: const InputDecoration(labelText: 'What went wrong? (optional)')),
+          OutlinedButton(key: const Key('rate-rider'), onPressed: _busy ? null : _send, child: const Text('Send rating')),
+        ],
+      ]),
+    );
+  }
 }

@@ -144,6 +144,11 @@ class DriverApi extends AuthApi {
   Future<DriverTrip> complete(String tripId, {double? lat, double? lng, String? pin}) async => DriverTrip.fromJson(_map(await client
       .post('/driver/trips/$tripId/complete', {if (lat != null) 'lat': lat, if (lng != null) 'lng': lng, if (pin != null) 'pin': pin})));
 
+  /// Rate the rider after the ride (1–5 stars, optional comment).
+  Future<void> rateRider(String tripId, int score, {String? comment}) async {
+    await client.post('/driver/trips/$tripId/rate', {'score': score, if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim()});
+  }
+
   Future<DriverTrip> cancel(String tripId, String reason) async =>
       DriverTrip.fromJson(_map(await client.post('/driver/trips/$tripId/cancel', {'reason': reason})));
 

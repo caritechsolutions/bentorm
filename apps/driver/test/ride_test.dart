@@ -64,6 +64,14 @@ void main() {
     expect(find.text('You earned BBD ${(done['driver_earnings'] as num).toStringAsFixed(2)}'), findsOneWidget);
     expect(jsonDecode(server.calls('POST /driver/trips/$tripId/complete').single.body), containsPair('lat', 13.0975));
 
+    // Rate the rider: a low score asks what went wrong.
+    server.on('POST /driver/trips/$tripId/rate', {'id': 1, 'score': 3}, status: 201);
+    await tapKey(tester, 'rider-star-3');
+    await tester.enterText(find.byKey(const Key('rider-comment')), 'Late to the pickup');
+    await tapKey(tester, 'rate-rider');
+    expect(jsonDecode(server.calls('POST /driver/trips/$tripId/rate').single.body), {'score': 3, 'comment': 'Late to the pickup'});
+    expect(find.byKey(const Key('rider-rated')), findsOneWidget);
+
     await tapKey(tester, 'done');
     expect(find.byKey(const Key('online-title')), findsOneWidget, reason: 'back online, ready for the next ride');
     expect(app.engine.activeTrip, isNull);

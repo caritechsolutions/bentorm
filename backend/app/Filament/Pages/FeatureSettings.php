@@ -81,6 +81,10 @@ class FeatureSettings extends Page
                 $on('chat', 'Rider ↔ driver chat'),
                 $on('masked_calls', 'Masked phone calls', 'Ride Coop rings the caller and connects them, so numbers stay private. Needs Twilio voice.'),
             ]),
+            Section::make('Pickup')->columns(2)->schema([
+                $num('pickup.max_distance_m', 'Driver must be within', 'm of the rider or the pickup',
+                    'Before they can tap Arrived or Start. Measured to where the rider\'s phone is (they may have walked from the pin), or to the pickup pin. 0 = no check.'),
+            ]),
             Section::make('Help & pricing')->columns(2)->schema([
                 $on('support', 'Help pages and support tickets in the apps'),
                 $on('auto_surge', 'Automatic surge', 'Per-area limits under Settings → Automatic surge.'),

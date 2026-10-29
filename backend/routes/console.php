@@ -8,6 +8,8 @@ Schedule::call(fn () => OtpCode::query()->where('expires_at', '<', now()->subDay
 Schedule::command('sanctum:prune-expired --hours=720')->daily();
 Schedule::command('trips:expire-stale')->everyMinute();
 Schedule::command('documents:expire')->hourly();
+// Document expiry reminders (30 and 7 days ahead, and when expired) — once a day, in the morning in Barbados.
+Schedule::call(fn () => app(App\Services\DocumentReminderService::class)->run())->timezone('America/Barbados')->dailyAt('09:00')->name('documents:remind')->withoutOverlapping();
 // Shop: orders a store never answered are released after OrderService::ACCEPT_MINUTES.
 Schedule::call(fn () => app(App\Services\OrderService::class)->expireUnanswered())->everyMinute()->name('orders:expire')->withoutOverlapping();
 // Shop deliveries: send drivers when orders are nearly ready, retry jobs nobody took, alert after a while.

@@ -21,6 +21,7 @@ class DriverMap extends StatefulWidget {
     this.dropoff,
     this.stops = const [],
     this.me,
+    this.rider,
     this.route,
     this.center,
     this.bottomPadding = 0,
@@ -34,6 +35,9 @@ class DriverMap extends StatefulWidget {
   final LatLngPoint? dropoff;
   final List<LatLngPoint> stops;
   final LatLngPoint? me;
+
+  /// The rider's phone while you come to them.
+  final LatLngPoint? rider;
   final List<LatLngPoint>? route;
   final LatLngPoint? center;
   final double bottomPadding;
@@ -53,10 +57,11 @@ class _DriverMapState extends State<DriverMap> {
         if (widget.dropoff != null) widget.dropoff!,
         ...widget.stops,
         if (widget.me != null) widget.me!,
+        if (widget.rider != null) widget.rider!,
       ];
 
   String _pins(DriverMap w) =>
-      [w.pickup, w.dropoff, ...w.stops, w.route?.length].map((p) => p is LatLngPoint ? '${p.lat},${p.lng}' : '$p').join('|');
+      [w.pickup, w.dropoff, ...w.stops, w.rider, w.route?.length].map((p) => p is LatLngPoint ? '${p.lat},${p.lng}' : '$p').join('|');
 
   String _camera(DriverMap w) => '${_pins(w)}|${w.me?.lat},${w.me?.lng}|${w.center?.lat},${w.center?.lng}';
 
@@ -96,6 +101,8 @@ class _DriverMapState extends State<DriverMap> {
           nav.MarkerOptions(position: _ll(widget.stops[i]), icon: icons.stop, anchor: const nav.MarkerAnchor(u: 0.5, v: 0.5), infoWindow: nav.InfoWindow(title: 'Stop ${i + 1}')),
         if (widget.dropoff != null)
           nav.MarkerOptions(position: _ll(widget.dropoff!), icon: icons.dropoff, anchor: nav.MarkerAnchor(u: 0.5, v: icons.dropoffAnchor), infoWindow: const nav.InfoWindow(title: 'Drop-off')),
+        if (widget.rider != null)
+          nav.MarkerOptions(position: _ll(widget.rider!), icon: icons.rider, anchor: nav.MarkerAnchor(u: 0.5, v: icons.riderAnchor), infoWindow: const nav.InfoWindow(title: 'Your rider is here')),
       ]);
       final route = widget.route;
       if (route != null && route.length >= 2) {
@@ -153,7 +160,9 @@ class _DriverMapState extends State<DriverMap> {
 /// Pickup / drop-off pins with a label and stop dots (shared drawing in ridecoop_core), registered with the
 /// Navigation SDK once per pixel ratio.
 class _PinIcons {
-  _PinIcons(this.pickup, this.stop, this.dropoff, this.pickupAnchor, this.dropoffAnchor);
+  _PinIcons(this.pickup, this.stop, this.dropoff, this.pickupAnchor, this.dropoffAnchor, this.rider, this.riderAnchor);
+  final nav.ImageDescriptor rider;
+  final double riderAnchor;
   final nav.ImageDescriptor pickup;
   final nav.ImageDescriptor stop;
   final nav.ImageDescriptor dropoff;
@@ -173,7 +182,8 @@ class _PinIcons {
     final p = await MapIcons.labelPin('Pickup', Brand.blue, ratio);
     final d = await MapIcons.labelPin('Drop-off', Brand.red, ratio);
     final s = await MapIcons.dot(Colors.orange, ratio, size: 22);
-    return _PinIcons(await _register(p, ratio), await _register(s, ratio), await _register(d, ratio), p.anchorY, d.anchorY);
+    final r = await MapIcons.labelPin('Rider', const Color(0xFF1E9E5A), ratio);
+    return _PinIcons(await _register(p, ratio), await _register(s, ratio), await _register(d, ratio), p.anchorY, d.anchorY, await _register(r, ratio), r.anchorY);
   }
 
   static Future<nav.ImageDescriptor> _register(MapIcon icon, double ratio) =>

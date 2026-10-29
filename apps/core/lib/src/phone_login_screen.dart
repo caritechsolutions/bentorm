@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'account.dart';
 import 'api_client.dart';
 import 'brand.dart';
 import 'session.dart';
@@ -300,6 +301,14 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
         _phoneField(onSubmitted: _continueCreate),
         const SizedBox(height: 8),
         const Text('We\'ll send a code to your phone and email to confirm them.', style: TextStyle(color: Colors.black54, fontSize: 13)),
+        const SizedBox(height: 6),
+        Wrap(key: const Key('signup-legal'), crossAxisAlignment: WrapCrossAlignment.center, children: [
+          const Text('By creating an account you agree to the ', style: TextStyle(color: Colors.black54, fontSize: 13)),
+          InkWell(onTap: () => LegalLinks.open(_session.api.client, 'terms'), child: const Text('Terms of Use', style: TextStyle(color: Brand.blue, fontSize: 13))),
+          const Text(' and ', style: TextStyle(color: Colors.black54, fontSize: 13)),
+          InkWell(onTap: () => LegalLinks.open(_session.api.client, 'privacy'), child: const Text('Privacy Policy', style: TextStyle(color: Brand.blue, fontSize: 13))),
+          const Text('.', style: TextStyle(color: Colors.black54, fontSize: 13)),
+        ]),
       ];
 
   List<Widget> _codeStep() => [
